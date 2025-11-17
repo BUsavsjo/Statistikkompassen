@@ -131,6 +131,7 @@
     <select id="kpiSelect" onchange="bytKPI(this.value)">
       <option value="N15508">N15508 - Elever i åk 9 uppnått betygskriterierna i alla ämnen</option>
       <option value="N15543">N15543 - Elever i åk 6 uppnått betygskriterierna i alla ämnen</option>
+      <option value="N15814">N15814 - Andel lärare med lärarlegitimation och behörighet (åk 1–9)</option>
     </select>
   </div>
   
@@ -162,7 +163,8 @@
     // Tillgängliga KPI:er - lätt att utöka med nya
     const KPI_LIST = [
       { id: 'N15508', namn: 'Elever i åk 9 uppnått betygskriterierna i alla ämnen' },
-      { id: 'N15543', namn: 'Elever i åk 6 uppnått betygskriterierna i alla ämnen' }
+      { id: 'N15543', namn: 'Elever i åk 6 uppnått betygskriterierna i alla ämnen' },
+      { id: 'N15814', namn: 'Andel lärare med lärarlegitimation och behörighet i grundskolan åk 1–9, kommunala skolor' }
     ];
     
     const CONFIG = {
@@ -257,10 +259,14 @@
 
       const skillnad = nuvarandeVarde - forrigaVarde;
       const trend = beraknaTrend(skillnad);
+      
+      // Hämta valt KPI-namn från listan för att visa en generell beskrivning
+      const kpiInfo = KPI_LIST.find(k => k.id === aktivKPI) || { namn: aktivKPI };
+      const kpiNamn = kpiInfo.namn;
 
       return `
         <p class="analysis-text">
-          Andelen elever i ${namn} som uppnått betygskriterierna ${trend} från föregående år.
+          Valt mätvärde (<strong>${kpiNamn}</strong>) i ${namn} ${trend} från föregående år.
         </p>
         <p class="analysis-text">
           <strong>${nuvarandeAr}:</strong> ${nuvarandeVarde.toFixed(1)}% | 
