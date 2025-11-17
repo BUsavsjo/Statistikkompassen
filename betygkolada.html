@@ -60,6 +60,19 @@
       cursor: pointer;
       background: white;
     }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 1rem;
+      padding: 0.5rem 0.75rem;
+      background: white;
+      color: #1e40af;
+      border: 2px solid #2563eb;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .back-link:hover { background: #f0f9ff; }
     
     .analysis-container {
       display: grid;
@@ -121,6 +134,8 @@
     </select>
   </div>
   
+  <a href="index.html" class="back-link">← Till startsidan</a>
+
   <div class="filter-container">
     <button class="filter-btn active" onclick="visaDataset('alla')">Visa alla</button>
     <button class="filter-btn" onclick="visaDataset('kvinnor')">👩 Kvinnor</button>
