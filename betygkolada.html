@@ -369,7 +369,7 @@
      * Skapar Chart.js konfiguration
      * @returns {Object} Chart-konfiguration
      */
-    function skapaChartConfig(labels, datasets) {
+    function skapaChartConfig(labels, datasets, titleText = 'Andel behöriga') {
       return {
         type: 'line',
         data: { labels, datasets },
@@ -378,7 +378,7 @@
           plugins: {
             title: {
               display: true,
-              text: 'Andel behöriga till gymnasiet i åk 9 (Sävsjö kommun)'
+              text: titleText
             }
           },
           scales: {
@@ -429,7 +429,9 @@
         };
 
         // Skapa och rendera chart
-        const config = skapaChartConfig(allData.labels, allData.datasets);
+        const kpiInfo = KPI_LIST.find(k => k.id === aktivKPI) || { namn: aktivKPI };
+        const chartTitle = `${kpiInfo.namn} (Sävsjö kommun)`;
+        const config = skapaChartConfig(allData.labels, allData.datasets, chartTitle);
         if (chart) {
           chart.destroy();
         }
