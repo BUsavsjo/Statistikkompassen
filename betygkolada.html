@@ -110,30 +110,82 @@
   </div>
 
   <script>
+    // ========== KONSTANTER ==========
+    const CONFIG = {
+      API_BASE: 'https://api.kolada.se/v3/data/municipality',
+      KPI: 'N15508',
+      KOMMUN_ID: '1485',
+      RIKE_ID: '0000'
+    };
+
+    const FILTER_DATASETS = {
+      alla: [0, 1, 2, 3],
+      kvinnor: [0],
+      man: [1],
+      totalt: [2, 3]
+    };
+
+    const DATASET_CONFIG = [
+      { label: 'Kvinnor', color: 'rgb(255, 99, 132)' },
+      { label: 'Män', color: 'rgb(54, 162, 235)' },
+      { label: 'Totalt', color: 'rgb(255, 205, 86)' },
+      { label: 'Riket (Totalt)', color: 'rgb(107, 114, 128)', dashed: true }
+    ];
+
+    // ========== GLOBALA VARIABLER ==========
     let chart = null;
     let allData = null;
 
+    // ========== UTILITY FUNKTIONER ==========
+    
+    /**
+     * Hämtar senaste två värden från en array
+     * @param {Array} data - Array med värden
+     * @returns {Object} { nuvarande, forriga }
+     */
+    function hantaSenastaTvaVarden(data) {
+      const validVarden = data.filter(v => v !== null);
+      return {
+        nuvarande: validVarden[validVarden.length - 1],
+        forriga: validVarden[validVarden.length - 2]
+      };
+    }
+
+    /**
+     * Beräknar trend och returnerar formaterad sträng
+     * @param {number} skillnad - Skillnaden mellan två värden
+     * @returns {string} HTML-formaterad trend-sträng
+     */
+    function beraknaTrend(skillnad) {
+      const andel = skillnad.toFixed(2);
+      
+      if (skillnad > 0) {
+        return `går <span class="trend-up">upp med ${andel} procentenheter ⬆️</span>`;
+      } else if (skillnad < 0) {
+        return `går <span class="trend-down">ner med ${Math.abs(andel)} procentenheter ⬇️</span>`;
+      } else {
+        return `förblir <span class="trend-neutral">oförändrad ➡️</span>`;
+      }
+    }
+
+    // ========== ANALYS FUNKTIONER ==========
+    
+    /**
+     * Genererar analys-text för en region
+     * @param {string} namn - Namn på regionen
+     * @param {number} nuvarandeVarde - Nuvarande värde
+     * @param {number} forrigaVarde - Föregående värde
+     * @param {string} nuvarandeAr - Nuvarande år
+     * @param {string} forrigaAr - Föregående år
+     * @returns {string} HTML-formaterad analys-text
+     */
     function genereraAnalysText(namn, nuvarandeVarde, forrigaVarde, nuvarandeAr, forrigaAr) {
       if (nuvarandeVarde === null || forrigaVarde === null) {
         return `<p class="analysis-text">Data ej tillgänglig för jämförelse.</p>`;
       }
 
       const skillnad = nuvarandeVarde - forrigaVarde;
-      const andel = skillnad.toFixed(2);
-      
-      let trend = '';
-      let trendClass = '';
-      
-      if (skillnad > 0) {
-        trend = `går <span class="trend-up">upp med ${andel} procentenheter ⬆️</span>`;
-        trendClass = 'trend-up';
-      } else if (skillnad < 0) {
-        trend = `går <span class="trend-down">ner med ${Math.abs(andel)} procentenheter ⬇️</span>`;
-        trendClass = 'trend-down';
-      } else {
-        trend = `förblir <span class="trend-neutral">oförändrad ➡️</span>`;
-        trendClass = 'trend-neutral';
-      }
+      const trend = beraknaTrend(skillnad);
 
       return `
         <p class="analysis-text">
@@ -146,51 +198,41 @@
       `;
     }
 
+    /**
+     * Uppdaterar analys-boxar med aktuell data
+     * @param {Array} totalt - Total data för kommun
+     * @param {Array} riketTotalt - Total data för riket
+     * @param {Array} ar - Array med årtalen
+     */
     function uppdateraAnalysis(totalt, riketTotalt, ar) {
-      // Hitta de två senaste värdena
-      const validaTotaltVarden = totalt.filter(v => v !== null);
-      const validaRiketVarden = riketTotalt.filter(v => v !== null);
-      
-      // Hitta motsvarande år
-      const validaTotalAr = ar.filter((_, i) => totalt[i] !== null);
-      const validaRiketAr = ar.filter((_, i) => riketTotalt[i] !== null);
+      const uppdateraBox = (data, arArray, elementId, namn) => {
+        const senaste = hantaSenastaTvaVarden(data);
+        if (senaste.nuvarande !== undefined && senaste.forriga !== undefined) {
+          const validAr = arArray.filter((_, i) => data[i] !== null);
+          const nuAr = validAr[validAr.length - 1];
+          const forAr = validAr[validAr.length - 2];
+          document.getElementById(elementId).innerHTML = genereraAnalysText(
+            namn, senaste.nuvarande, senaste.forriga, nuAr, forAr
+          );
+        }
+      };
 
-      if (validaTotaltVarden.length >= 2) {
-        const nuvarandeKommun = validaTotaltVarden[validaTotaltVarden.length - 1];
-        const forrigaKommun = validaTotaltVarden[validaTotaltVarden.length - 2];
-        const nuvarandeAr = validaTotalAr[validaTotalAr.length - 1];
-        const forrigaAr = validaTotalAr[validaTotalAr.length - 2];
-        document.getElementById('kommunAnalysis').innerHTML = genereraAnalysText('Sävsjö kommun', nuvarandeKommun, forrigaKommun, nuvarandeAr, forrigaAr);
-      }
-
-      if (validaRiketVarden.length >= 2) {
-        const nuvarandeRiket = validaRiketVarden[validaRiketVarden.length - 1];
-        const forrigaRiket = validaRiketVarden[validaRiketVarden.length - 2];
-        const nuvarandeAr = validaRiketAr[validaRiketAr.length - 1];
-        const forrigaAr = validaRiketAr[validaRiketAr.length - 2];
-        document.getElementById('riketAnalysis').innerHTML = genereraAnalysText('riket', nuvarandeRiket, forrigaRiket, nuvarandeAr, forrigaAr);
-      }
+      uppdateraBox(totalt, ar, 'kommunAnalysis', 'Sävsjö kommun');
+      uppdateraBox(riketTotalt, ar, 'riketAnalysis', 'riket');
     }
 
+    // ========== FILTER FUNKTIONER ==========
+    
+    /**
+     * Visar/döljer datasets baserat på filter-typ
+     * @param {string} typ - Filter-typ ('alla', 'kvinnor', 'man', 'totalt')
+     */
     function visaDataset(typ) {
-      // Uppdatera aktiv knapp
       document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
       event.target.classList.add('active');
 
-      // Filtrera datasets baserat på valet
-      let visibleDatasets = [];
+      const visibleDatasets = FILTER_DATASETS[typ] || FILTER_DATASETS.alla;
       
-      if (typ === 'alla') {
-        visibleDatasets = [0, 1, 2, 3]; // Alla fyra (inkl. riket)
-      } else if (typ === 'kvinnor') {
-        visibleDatasets = [0]; // Endast kvinnor
-      } else if (typ === 'man') {
-        visibleDatasets = [1]; // Endast män
-      } else if (typ === 'totalt') {
-        visibleDatasets = [2, 3]; // Totalt + Riket
-      }
-
-      // Uppdatera visibility för varje dataset
       allData.datasets.forEach((dataset, index) => {
         chart.getDatasetMeta(index).hidden = !visibleDatasets.includes(index);
       });
@@ -198,8 +240,16 @@
       chart.update();
     }
 
-    async function hamtaData() {
-      const response = await fetch("https://api.kolada.se/v3/data/municipality/1485/kpi/N15508");
+    // ========== DATA-HÄMTNING ==========
+    
+    /**
+     * Hämtar och strukturerar data från API
+     * @param {string} kommunKod - Kommun-id
+     * @returns {Promise<Object>} Strukturerad data
+     */
+    async function hamtaKommunData(kommunKod) {
+      const url = `${CONFIG.API_BASE}/${kommunKod}/kpi/${CONFIG.KPI}`;
+      const response = await fetch(url);
       const json = await response.json();
 
       const ar = [];
@@ -209,65 +259,42 @@
 
       json.values.forEach(entry => {
         ar.push(entry.period);
-        const v = { K: null, M: null, T: null };
+        const varden = { K: null, M: null, T: null };
         entry.values.forEach(varde => {
-          v[varde.gender] = varde.value;
+          varden[varde.gender] = varde.value;
         });
-        kvinnor.push(v.K);
-        man.push(v.M);
-        totalt.push(v.T);
+        kvinnor.push(varden.K);
+        man.push(varden.M);
+        totalt.push(varden.T);
       });
 
-      // Hämta data för riket
-      const responseRike = await fetch("https://api.kolada.se/v3/data/municipality/0000/kpi/N15508");
-      const jsonRike = await responseRike.json();
+      return { ar, kvinnor, man, totalt };
+    }
 
-      const riketTotalt = [];
-      jsonRike.values.forEach(entry => {
-        const v = { T: null };
-        entry.values.forEach(varde => {
-          v[varde.gender] = varde.value;
-        });
-        riketTotalt.push(v.T);
-      });
+    /**
+     * Skapar Chart.js dataset-objekt
+     * @returns {Array} Array med dataset-konfigurationer
+     */
+    function skapaDatasets(kvinnor, man, totalt, riketTotalt) {
+      const data = [kvinnor, man, totalt, riketTotalt];
+      
+      return DATASET_CONFIG.map((config, index) => ({
+        label: config.label,
+        data: data[index],
+        borderColor: config.color,
+        borderDash: config.dashed ? [5, 5] : [],
+        fill: false
+      }));
+    }
 
-      // Uppdatera analysboxar
-      uppdateraAnalysis(totalt, riketTotalt, ar);
-
-      allData = {
-        labels: ar,
-        datasets: [
-          {
-            label: 'Kvinnor',
-            data: kvinnor,
-            borderColor: 'rgb(255, 99, 132)',
-            fill: false
-          },
-          {
-            label: 'Män',
-            data: man,
-            borderColor: 'rgb(54, 162, 235)',
-            fill: false
-          },
-          {
-            label: 'Totalt',
-            data: totalt,
-            borderColor: 'rgb(255, 205, 86)',
-            fill: false
-          },
-          {
-            label: 'Riket (Totalt)',
-            data: riketTotalt,
-            borderColor: 'rgb(107, 114, 128)',
-            borderDash: [5, 5],
-            fill: false
-          }
-        ]
-      };
-
-      const config = {
+    /**
+     * Skapar Chart.js konfiguration
+     * @returns {Object} Chart-konfiguration
+     */
+    function skapaChartConfig(labels, datasets) {
+      return {
         type: 'line',
-        data: allData,
+        data: { labels, datasets },
         options: {
           responsive: true,
           plugins: {
@@ -280,25 +307,57 @@
             y: {
               beginAtZero: false,
               max: 100,
-              title: {
-                display: true,
-                text: 'Procent (%)'
-              }
+              title: { display: true, text: 'Procent (%)' }
             },
             x: {
-              title: {
-                display: true,
-                text: 'År'
-              }
+              title: { display: true, text: 'År' }
             }
           }
         }
       };
-
-      chart = new Chart(document.getElementById('koladaChart'), config);
     }
 
-    hamtaData();
+    // ========== INITIALISERING ==========
+    
+    /**
+     * Huvudfunktion - Hämtar all data och renderar sidan
+     */
+    async function hamtaData() {
+      try {
+        // Hämta data för kommun och riket
+        const kommunData = await hamtaKommunData(CONFIG.KOMMUN_ID);
+        const rikeData = await hamtaKommunData(CONFIG.RIKE_ID);
+
+        // Uppdatera analys-boxar
+        uppdateraAnalysis(kommunData.totalt, rikeData.totalt, kommunData.ar);
+
+        // Skapa datasets
+        const datasets = skapaDatasets(
+          kommunData.kvinnor,
+          kommunData.man,
+          kommunData.totalt,
+          rikeData.totalt
+        );
+
+        // Skapa chart-data
+        allData = {
+          labels: kommunData.ar,
+          datasets
+        };
+
+        // Skapa och rendera chart
+        const config = skapaChartConfig(allData.labels, allData.datasets);
+        chart = new Chart(document.getElementById('koladaChart'), config);
+
+      } catch (error) {
+        console.error('Fel vid hämtning av data:', error);
+        document.getElementById('kommunAnalysis').innerHTML = 
+          '<p class="analysis-text">Fel vid hämtning av data. Försök igen senare.</p>';
+      }
+    }
+
+    // Initiera sidan när den är laddad
+    document.addEventListener('DOMContentLoaded', hamtaData);
   </script>
 </body>
 </html>
