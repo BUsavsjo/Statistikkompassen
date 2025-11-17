@@ -132,6 +132,7 @@
       <option value="N15508">N15508 - Elever i åk 9 uppnått betygskriterierna i alla ämnen</option>
       <option value="N15543">N15543 - Elever i åk 6 uppnått betygskriterierna i alla ämnen</option>
       <option value="N15814">N15814 - Andel lärare med lärarlegitimation och behörighet (åk 1–9)</option>
+      <option value="N11032">N11032 - Kostnad per inskrivet barn kommunal förskola</option>
     </select>
   </div>
   
@@ -164,7 +165,8 @@
     const KPI_LIST = [
       { id: 'N15508', namn: 'Elever i åk 9 uppnått betygskriterierna i alla ämnen' },
       { id: 'N15543', namn: 'Elever i åk 6 uppnått betygskriterierna i alla ämnen' },
-      { id: 'N15814', namn: 'Andel lärare med lärarlegitimation och behörighet i grundskolan åk 1–9, kommunala skolor' }
+      { id: 'N15814', namn: 'Andel lärare med lärarlegitimation och behörighet i grundskolan åk 1–9, kommunala skolor' },
+      { id: 'N11032', namn: 'Kostnad per inskrivet barn kommunal förskola' }
     ];
     
     const CONFIG = {
@@ -231,11 +233,14 @@
      */
     function beraknaTrend(skillnad) {
       const andel = skillnad.toFixed(2);
-      
+      let enhet = '%';
+      if (aktivKPI === 'N11032') {
+        enhet = 'kr';
+      }
       if (skillnad > 0) {
-        return `går <span class="trend-up">upp med ${andel} procentenheter ⬆️</span>`;
+        return `går <span class="trend-up">upp med ${Math.abs(andel)} ${enhet} ⬆️</span>`;
       } else if (skillnad < 0) {
-        return `går <span class="trend-down">ner med ${Math.abs(andel)} procentenheter ⬇️</span>`;
+        return `går <span class="trend-down">ner med ${Math.abs(andel)} ${enhet} ⬇️</span>`;
       } else {
         return `förblir <span class="trend-neutral">oförändrad ➡️</span>`;
       }
@@ -264,13 +269,17 @@
       const kpiInfo = KPI_LIST.find(k => k.id === aktivKPI) || { namn: aktivKPI };
       const kpiNamn = kpiInfo.namn;
 
+      let valueUnit = '%';
+      if (aktivKPI === 'N11032') {
+        valueUnit = 'kr';
+      }
       return `
         <p class="analysis-text">
           Valt mätvärde (<strong>${kpiNamn}</strong>) i ${namn} ${trend} från föregående år.
         </p>
         <p class="analysis-text">
-          <strong>${nuvarandeAr}:</strong> ${nuvarandeVarde.toFixed(1)}% | 
-          <strong>${forrigaAr}:</strong> ${forrigaVarde.toFixed(1)}%
+          <strong>${nuvarandeAr}:</strong> ${nuvarandeVarde.toLocaleString()} ${valueUnit} | 
+          <strong>${forrigaAr}:</strong> ${forrigaVarde.toLocaleString()} ${valueUnit}
         </p>
       `;
     }
@@ -376,6 +385,15 @@
      * @returns {Object} Chart-konfiguration
      */
     function skapaChartConfig(labels, datasets, titleText = 'Andel behöriga') {
+      // Dynamisk y-axel beroende på KPI
+      let yLabel = 'Procent (%)';
+      let yTicksCallback = undefined;
+      let yMax = 100;
+      if (aktivKPI === 'N11032') {
+        yLabel = 'Kostnad (kr)';
+        yTicksCallback = function(value) { return value.toLocaleString() + ' kr'; };
+        yMax = undefined;
+      }
       return {
         type: 'line',
         data: { labels, datasets },
@@ -390,8 +408,9 @@
           scales: {
             y: {
               beginAtZero: false,
-              max: 100,
-              title: { display: true, text: 'Procent (%)' }
+              max: yMax,
+              title: { display: true, text: yLabel },
+              ticks: yTicksCallback ? { callback: yTicksCallback } : {}
             },
             x: {
               title: { display: true, text: 'År' }
