@@ -37,6 +37,30 @@
     
     h1 { color: #1e40af; margin-bottom: 1rem; }
     
+    .kpi-selector {
+      margin-bottom: 1.5rem;
+      padding: 1rem;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 0 10px #ccc;
+    }
+    
+    .kpi-selector label {
+      font-weight: bold;
+      color: #1e40af;
+      margin-right: 1rem;
+      display: inline-block;
+    }
+    
+    .kpi-selector select {
+      padding: 0.5rem 1rem;
+      border: 2px solid #2563eb;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      background: white;
+    }
+    
     .analysis-container {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -87,7 +111,15 @@
   </style>
 </head>
 <body>
-  <h1>Statistikkompassen: Elever i åk 9 som uppnått betygskriterierna i alla ämnen, hemkommun, andel (%)</h1>
+  <h1 id="pageTitle">Statistikkompassen: Elever i åk 9 som uppnått betygskriterierna i alla ämnen, hemkommun, andel (%)</h1>
+  
+  <div class="kpi-selector">
+    <label for="kpiSelect">Välj nyckeltal:</label>
+    <select id="kpiSelect" onchange="bytKPI(this.value)">
+      <option value="N15508">N15508 - Elever i åk 9 uppnått betygskriterierna i alla ämnen</option>
+      <option value="N15543">N15543 - Elever i åk 6 uppnått betygskriterierna i alla ämnen</option>
+    </select>
+  </div>
   
   <div class="filter-container">
     <button class="filter-btn active" onclick="visaDataset('alla')">Visa alla</button>
@@ -111,6 +143,13 @@
 
   <script>
     // ========== KONSTANTER ==========
+    
+    // Tillgängliga KPI:er - lätt att utöka med nya
+    const KPI_LIST = [
+      { id: 'N15508', namn: 'Elever i åk 9 uppnått betygskriterierna i alla ämnen' },
+      { id: 'N15543', namn: 'Elever i åk 6 uppnått betygskriterierna i alla ämnen' }
+    ];
+    
     const CONFIG = {
       API_BASE: 'https://api.kolada.se/v3/data/municipality',
       KPI: 'N15508',
@@ -135,6 +174,23 @@
     // ========== GLOBALA VARIABLER ==========
     let chart = null;
     let allData = null;
+    let aktivKPI = 'N15508';
+
+    // ========== KPI HANTERING ==========
+    
+    /**
+     * Byter KPI och uppdaterar grafen
+     * @param {string} kpiKod - KPI-kod (ex: 'N15508')
+     */
+    function bytKPI(kpiKod) {
+      aktivKPI = kpiKod;
+      // Uppdatera titel
+      const kpiInfo = KPI_LIST.find(k => k.id === kpiKod);
+      if (kpiInfo) {
+        document.getElementById('pageTitle').textContent = `Statistikkompassen: ${kpiInfo.namn}`;
+      }
+      hamtaData();
+    }
 
     // ========== UTILITY FUNKTIONER ==========
     
@@ -207,13 +263,19 @@
     function uppdateraAnalysis(totalt, riketTotalt, ar) {
       const uppdateraBox = (data, arArray, elementId, namn) => {
         const senaste = hantaSenastaTvaVarden(data);
-        if (senaste.nuvarande !== undefined && senaste.forriga !== undefined) {
+        if (senaste.nuvarande !== undefined && senaste.nuvarande !== null && 
+            senaste.forriga !== undefined && senaste.forriga !== null) {
           const validAr = arArray.filter((_, i) => data[i] !== null);
-          const nuAr = validAr[validAr.length - 1];
-          const forAr = validAr[validAr.length - 2];
-          document.getElementById(elementId).innerHTML = genereraAnalysText(
-            namn, senaste.nuvarande, senaste.forriga, nuAr, forAr
-          );
+          if (validAr.length >= 2) {
+            const nuAr = validAr[validAr.length - 1];
+            const forAr = validAr[validAr.length - 2];
+            document.getElementById(elementId).innerHTML = genereraAnalysText(
+              namn, senaste.nuvarande, senaste.forriga, nuAr, forAr
+            );
+          }
+        } else {
+          document.getElementById(elementId).innerHTML = 
+            `<p class="analysis-text">Data ej tillgänglig för jämförelse (N15543 kanske saknar data för denna kommun).</p>`;
         }
       };
 
@@ -245,10 +307,11 @@
     /**
      * Hämtar och strukturerar data från API
      * @param {string} kommunKod - Kommun-id
+     * @param {string} kpiKod - KPI-kod (optional, använder aktivKPI om ej angiven)
      * @returns {Promise<Object>} Strukturerad data
      */
-    async function hamtaKommunData(kommunKod) {
-      const url = `${CONFIG.API_BASE}/${kommunKod}/kpi/${CONFIG.KPI}`;
+    async function hamtaKommunData(kommunKod, kpiKod = aktivKPI) {
+      const url = `${CONFIG.API_BASE}/${kommunKod}/kpi/${kpiKod}`;
       const response = await fetch(url);
       const json = await response.json();
 
@@ -324,9 +387,14 @@
      */
     async function hamtaData() {
       try {
-        // Hämta data för kommun och riket
-        const kommunData = await hamtaKommunData(CONFIG.KOMMUN_ID);
-        const rikeData = await hamtaKommunData(CONFIG.RIKE_ID);
+        console.log('Hämtar data för KPI:', aktivKPI);
+        
+        // Hämta data för kommun och riket med explicit KPI
+        const kommunData = await hamtaKommunData(CONFIG.KOMMUN_ID, aktivKPI);
+        const rikeData = await hamtaKommunData(CONFIG.RIKE_ID, aktivKPI);
+
+        console.log('Kommun data:', kommunData);
+        console.log('Rike data:', rikeData);
 
         // Uppdatera analys-boxar
         uppdateraAnalysis(kommunData.totalt, rikeData.totalt, kommunData.ar);
@@ -347,6 +415,9 @@
 
         // Skapa och rendera chart
         const config = skapaChartConfig(allData.labels, allData.datasets);
+        if (chart) {
+          chart.destroy();
+        }
         chart = new Chart(document.getElementById('koladaChart'), config);
 
       } catch (error) {
