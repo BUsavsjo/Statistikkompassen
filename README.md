@@ -71,7 +71,7 @@ Plattformen är helt responsiv och fungerar perfekt på:
 - 📱 Tablet
 - 📲 Smartphone
 
-## 🔗 Datasöll
+## 🔗 Datasöl
 
 **Kolada API**: `https://api.kolada.se/`
 
@@ -84,7 +84,7 @@ Jämförelsekommuner är valda baserat på geografisk närhet och storlek:
 - **Värnamo kommun**
 - **Växjö kommun**
 - **Alvesta kommun**
-
+y
 ## 🎯 Mål
 
 Statistikkompassen syftar till att:
