@@ -116,6 +116,24 @@
       font-weight: bold;
     }
     
+    .copy-chart-btn {
+      display: block;
+      margin: 0.5rem auto 2rem auto;
+      padding: 0.4rem 1.2rem;
+      font-size: 0.95rem;
+      background: #f8fafc;
+      color: #2563eb;
+      border: 1px solid #2563eb;
+      border-radius: 6px;
+      cursor: pointer;
+      opacity: 0.7;
+      transition: opacity 0.2s, background 0.2s;
+    }
+    .copy-chart-btn:hover {
+      background: #e0e7ff;
+      opacity: 1;
+    }
+    
     @media (max-width: 768px) {
       .analysis-container {
         grid-template-columns: 1fr;
@@ -146,6 +164,7 @@
   </div>
   
   <canvas id="koladaChart" width="800" height="400"></canvas>
+  <button id="copyChartBtn" class="copy-chart-btn" title="Kopiera diagrammet till urklipp">📋 Kopiera bild</button>
 
   <div class="analysis-container">
     <div class="analysis-box">
@@ -471,6 +490,27 @@
 
     // Initiera sidan när den är laddad
     document.addEventListener('DOMContentLoaded', hamtaData);
+
+    // Kopiera Chart.js-diagrammet till urklipp
+    document.getElementById('copyChartBtn').addEventListener('click', async function() {
+      const canvas = document.getElementById('koladaChart');
+      if (canvas) {
+        canvas.toBlob(async function(blob) {
+          try {
+            await navigator.clipboard.write([
+              new window.ClipboardItem({ 'image/png': blob })
+            ]);
+            // Visa tillfällig bekräftelse
+            const btn = document.getElementById('copyChartBtn');
+            const oldText = btn.textContent;
+            btn.textContent = '✅ Kopierad!';
+            setTimeout(() => { btn.textContent = oldText; }, 1500);
+          } catch (err) {
+            alert('Kunde inte kopiera bilden. Prova en modern webbläsare.');
+          }
+        }, 'image/png');
+      }
+    });
   </script>
 </body>
 </html>
