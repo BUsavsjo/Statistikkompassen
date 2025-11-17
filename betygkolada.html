@@ -36,6 +36,54 @@
     }
     
     h1 { color: #1e40af; margin-bottom: 1rem; }
+    
+    .analysis-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-top: 2rem;
+    }
+    
+    .analysis-box {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 8px;
+      box-shadow: 0 0 10px #ccc;
+      border-left: 4px solid #2563eb;
+    }
+    
+    .analysis-box h3 {
+      color: #1e40af;
+      margin-bottom: 1rem;
+      font-size: 1.1rem;
+    }
+    
+    .analysis-text {
+      color: #333;
+      line-height: 1.6;
+      font-size: 0.95rem;
+    }
+    
+    .trend-up {
+      color: #dc2626;
+      font-weight: bold;
+    }
+    
+    .trend-down {
+      color: #16a34a;
+      font-weight: bold;
+    }
+    
+    .trend-neutral {
+      color: #666;
+      font-weight: bold;
+    }
+    
+    @media (max-width: 768px) {
+      .analysis-container {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 <body>
@@ -50,9 +98,79 @@
   
   <canvas id="koladaChart" width="800" height="400"></canvas>
 
+  <div class="analysis-container">
+    <div class="analysis-box">
+      <h3>📊 Sävsjö kommun</h3>
+      <div class="analysis-text" id="kommunAnalysis">Hämtar data...</div>
+    </div>
+    <div class="analysis-box">
+      <h3>🇸🇪 Riket</h3>
+      <div class="analysis-text" id="riketAnalysis">Hämtar data...</div>
+    </div>
+  </div>
+
   <script>
     let chart = null;
     let allData = null;
+
+    function genereraAnalysText(namn, nuvarandeVarde, forrigaVarde, nuvarandeAr, forrigaAr) {
+      if (nuvarandeVarde === null || forrigaVarde === null) {
+        return `<p class="analysis-text">Data ej tillgänglig för jämförelse.</p>`;
+      }
+
+      const skillnad = nuvarandeVarde - forrigaVarde;
+      const andel = skillnad.toFixed(2);
+      
+      let trend = '';
+      let trendClass = '';
+      
+      if (skillnad > 0) {
+        trend = `går <span class="trend-up">upp med ${andel} procentenheter ⬆️</span>`;
+        trendClass = 'trend-up';
+      } else if (skillnad < 0) {
+        trend = `går <span class="trend-down">ner med ${Math.abs(andel)} procentenheter ⬇️</span>`;
+        trendClass = 'trend-down';
+      } else {
+        trend = `förblir <span class="trend-neutral">oförändrad ➡️</span>`;
+        trendClass = 'trend-neutral';
+      }
+
+      return `
+        <p class="analysis-text">
+          Andelen elever i ${namn} som uppnått betygskriterierna ${trend} från föregående år.
+        </p>
+        <p class="analysis-text">
+          <strong>${nuvarandeAr}:</strong> ${nuvarandeVarde.toFixed(1)}% | 
+          <strong>${forrigaAr}:</strong> ${forrigaVarde.toFixed(1)}%
+        </p>
+      `;
+    }
+
+    function uppdateraAnalysis(totalt, riketTotalt, ar) {
+      // Hitta de två senaste värdena
+      const validaTotaltVarden = totalt.filter(v => v !== null);
+      const validaRiketVarden = riketTotalt.filter(v => v !== null);
+      
+      // Hitta motsvarande år
+      const validaTotalAr = ar.filter((_, i) => totalt[i] !== null);
+      const validaRiketAr = ar.filter((_, i) => riketTotalt[i] !== null);
+
+      if (validaTotaltVarden.length >= 2) {
+        const nuvarandeKommun = validaTotaltVarden[validaTotaltVarden.length - 1];
+        const forrigaKommun = validaTotaltVarden[validaTotaltVarden.length - 2];
+        const nuvarandeAr = validaTotalAr[validaTotalAr.length - 1];
+        const forrigaAr = validaTotalAr[validaTotalAr.length - 2];
+        document.getElementById('kommunAnalysis').innerHTML = genereraAnalysText('Sävsjö kommun', nuvarandeKommun, forrigaKommun, nuvarandeAr, forrigaAr);
+      }
+
+      if (validaRiketVarden.length >= 2) {
+        const nuvarandeRiket = validaRiketVarden[validaRiketVarden.length - 1];
+        const forrigaRiket = validaRiketVarden[validaRiketVarden.length - 2];
+        const nuvarandeAr = validaRiketAr[validaRiketAr.length - 1];
+        const forrigaAr = validaRiketAr[validaRiketAr.length - 2];
+        document.getElementById('riketAnalysis').innerHTML = genereraAnalysText('riket', nuvarandeRiket, forrigaRiket, nuvarandeAr, forrigaAr);
+      }
+    }
 
     function visaDataset(typ) {
       // Uppdatera aktiv knapp
@@ -112,6 +230,9 @@
         });
         riketTotalt.push(v.T);
       });
+
+      // Uppdatera analysboxar
+      uppdateraAnalysis(totalt, riketTotalt, ar);
 
       allData = {
         labels: ar,
