@@ -63,13 +63,13 @@
       let visibleDatasets = [];
       
       if (typ === 'alla') {
-        visibleDatasets = [0, 1, 2]; // Alla tre
+        visibleDatasets = [0, 1, 2, 3]; // Alla fyra (inkl. riket)
       } else if (typ === 'kvinnor') {
         visibleDatasets = [0]; // Endast kvinnor
       } else if (typ === 'man') {
         visibleDatasets = [1]; // Endast män
       } else if (typ === 'totalt') {
-        visibleDatasets = [2]; // Endast totalt
+        visibleDatasets = [2, 3]; // Totalt + Riket
       }
 
       // Uppdatera visibility för varje dataset
@@ -100,6 +100,19 @@
         totalt.push(v.T);
       });
 
+      // Hämta data för riket
+      const responseRike = await fetch("https://api.kolada.se/v3/data/municipality/0000/kpi/N15508");
+      const jsonRike = await responseRike.json();
+
+      const riketTotalt = [];
+      jsonRike.values.forEach(entry => {
+        const v = { T: null };
+        entry.values.forEach(varde => {
+          v[varde.gender] = varde.value;
+        });
+        riketTotalt.push(v.T);
+      });
+
       allData = {
         labels: ar,
         datasets: [
@@ -119,6 +132,13 @@
             label: 'Totalt',
             data: totalt,
             borderColor: 'rgb(255, 205, 86)',
+            fill: false
+          },
+          {
+            label: 'Riket (Totalt)',
+            data: riketTotalt,
+            borderColor: 'rgb(107, 114, 128)',
+            borderDash: [5, 5],
             fill: false
           }
         ]
