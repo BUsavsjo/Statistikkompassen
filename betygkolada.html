@@ -45,11 +45,23 @@
       box-shadow: 0 0 10px #ccc;
     }
     
+    .selector-row {
+      display: flex;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+    
+    .selector-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
     .kpi-selector label {
       font-weight: bold;
       color: #1e40af;
-      margin-right: 1rem;
-      display: inline-block;
+      display: block;
+      font-size: 0.95rem;
     }
     
     .kpi-selector select {
@@ -59,6 +71,7 @@
       font-weight: bold;
       cursor: pointer;
       background: white;
+      min-width: 300px;
     }
 
     .back-link {
@@ -145,13 +158,29 @@
   <h1 id="pageTitle">Statistikkompassen: Elever i åk 9 som uppnått betygskriterierna i alla ämnen, hemkommun, andel (%)</h1>
   
   <div class="kpi-selector">
-    <label for="kpiSelect">Välj nyckeltal:</label>
-    <select id="kpiSelect" onchange="bytKPI(this.value)">
-      <option value="N15508">N15508 - Elever i åk 9 uppnått betygskriterierna i alla ämnen</option>
-      <option value="N15543">N15543 - Elever i åk 6 uppnått betygskriterierna i alla ämnen</option>
-      <option value="N15814">N15814 - Andel lärare med lärarlegitimation och behörighet (åk 1–9)</option>
-      <option value="N11032">N11032 - Kostnad per inskrivet barn kommunal förskola</option>
-    </select>
+    <div class="selector-row">
+      <div class="selector-group">
+        <label for="kommunSelect">Välj kommun:</label>
+        <select id="kommunSelect" onchange="bytKommun(this.value)">
+          <option value="0684" selected>Sävsjö</option>
+        </select>
+      </div>
+      <div class="selector-group">
+        <label for="skolTypSelect">Välj skoltyp:</label>
+        <select id="skolTypSelect" onchange="bytSkoltyp(this.value)">
+          <option value="grundskola" selected>Grundskola</option>
+          <option value="forskola">Förskola</option>
+        </select>
+      </div>
+      <div class="selector-group">
+        <label for="kpiSelect">Välj nyckeltal:</label>
+        <select id="kpiSelect" onchange="bytKPI(this.value)">
+          <option value="N15508">N15508 - Elever i åk 9 uppnått betygskriterierna i alla ämnen</option>
+          <option value="N15543">N15543 - Elever i åk 6 uppnått betygskriterierna i alla ämnen</option>
+          <option value="N15814">N15814 - Andel lärare med lärarlegitimation och behörighet (åk 1–9)</option>
+        </select>
+      </div>
+    </div>
   </div>
   
   <a href="index.html" class="back-link">← Till startsidan</a>
@@ -180,20 +209,29 @@
   <script>
     // ========== KONSTANTER ==========
     
-    // Tillgängliga KPI:er - lätt att utöka med nya
-    const KPI_LIST = [
+    // Tillgängliga KPI:er - uppdelade per skoltyp
+    const KPI_GRUNDSKOLA = [
       { id: 'N15508', namn: 'Elever i åk 9 uppnått betygskriterierna i alla ämnen' },
       { id: 'N15543', namn: 'Elever i åk 6 uppnått betygskriterierna i alla ämnen' },
-      { id: 'N15814', namn: 'Andel lärare med lärarlegitimation och behörighet i grundskolan åk 1–9, kommunala skolor' },
+      { id: 'N15814', namn: 'Andel lärare med lärarlegitimation och behörighet i grundskolan åk 1–9, kommunala skolor' }
+    ];
+    
+    const KPI_FORSKOLA = [
       { id: 'N11032', namn: 'Kostnad per inskrivet barn kommunal förskola' }
     ];
+    
+    let KPI_LIST = KPI_GRUNDSKOLA; // Default till grundskola
+    let aktivSkoltyp = 'grundskola';
     
     const CONFIG = {
       API_BASE: 'https://api.kolada.se/v3/data/municipality',
       KPI: 'N15508',
-      KOMMUN_ID: '1485',
+      KOMMUN_ID: '0684',
       RIKE_ID: '0000'
     };
+    
+    // Alla Sveriges kommuner från Kolada API
+    const ALLA_KOMMUNER = [{"id":"0684","title":"Sävsjö"},{"id":"0114","title":"Upplands Väsby"},{"id":"0115","title":"Vallentuna"},{"id":"0117","title":"Österåker"},{"id":"0120","title":"Värmdö"},{"id":"0123","title":"Järfälla"},{"id":"0125","title":"Ekerö"},{"id":"0126","title":"Huddinge"},{"id":"0127","title":"Botkyrka"},{"id":"0128","title":"Salem"},{"id":"0136","title":"Haninge"},{"id":"0138","title":"Tyresö"},{"id":"0139","title":"Upplands-Bro"},{"id":"0140","title":"Nykvarn"},{"id":"0160","title":"Täby"},{"id":"0162","title":"Danderyd"},{"id":"0163","title":"Sollentuna"},{"id":"0180","title":"Stockholm"},{"id":"0181","title":"Södertälje"},{"id":"0182","title":"Nacka"},{"id":"0183","title":"Sundbyberg"},{"id":"0184","title":"Solna"},{"id":"0186","title":"Lidingö"},{"id":"0187","title":"Vaxholm"},{"id":"0188","title":"Norrtälje"},{"id":"0191","title":"Sigtuna"},{"id":"0192","title":"Nynäshamn"},{"id":"0305","title":"Håbo"},{"id":"0319","title":"Älvkarleby"},{"id":"0330","title":"Knivsta"},{"id":"0331","title":"Heby"},{"id":"0360","title":"Tierp"},{"id":"0380","title":"Uppsala"},{"id":"0381","title":"Enköping"},{"id":"0382","title":"Östhammar"},{"id":"0428","title":"Vingåker"},{"id":"0461","title":"Gnesta"},{"id":"0480","title":"Nyköping"},{"id":"0481","title":"Oxelösund"},{"id":"0482","title":"Flen"},{"id":"0483","title":"Katrineholm"},{"id":"0484","title":"Eskilstuna"},{"id":"0486","title":"Strängnäs"},{"id":"0488","title":"Trosa"},{"id":"0509","title":"Ödeshög"},{"id":"0512","title":"Ydre"},{"id":"0513","title":"Kinda"},{"id":"0560","title":"Boxholm"},{"id":"0561","title":"Åtvidaberg"},{"id":"0562","title":"Finspång"},{"id":"0563","title":"Valdemarsvik"},{"id":"0580","title":"Linköping"},{"id":"0581","title":"Norrköping"},{"id":"0582","title":"Söderköping"},{"id":"0583","title":"Motala"},{"id":"0584","title":"Vadstena"},{"id":"0586","title":"Mjölby"},{"id":"0604","title":"Aneby"},{"id":"0617","title":"Gnosjö"},{"id":"0642","title":"Mullsjö"},{"id":"0643","title":"Gåbo"},{"id":"0662","title":"Gislaved"},{"id":"0665","title":"Vaggeryd"},{"id":"0680","title":"Jönköping"},{"id":"0682","title":"Nässjö"},{"id":"0683","title":"Värnamo"},{"id":"0685","title":"Vetlanda"},{"id":"0686","title":"Eksjö"},{"id":"0687","title":"Tranås"},{"id":"0760","title":"Uppvidinge"},{"id":"0761","title":"Lessebo"},{"id":"0763","title":"Tingsryd"},{"id":"0764","title":"Alvesta"},{"id":"0765","title":"Älmhult"},{"id":"0767","title":"Markaryd"},{"id":"0780","title":"Växjö"},{"id":"0781","title":"Ljungby"},{"id":"0821","title":"Högsby"},{"id":"0834","title":"Torsås"},{"id":"0840","title":"Mörbylånga"},{"id":"0860","title":"Hultsfred"},{"id":"0861","title":"Mönsterås"},{"id":"0862","title":"Emmaboda"},{"id":"0880","title":"Kalmar"},{"id":"0881","title":"Nybro"},{"id":"0882","title":"Oskarshamn"},{"id":"0883","title":"Västervik"},{"id":"0884","title":"Vimmerby"},{"id":"0885","title":"Borgholm"},{"id":"0980","title":"Gotland"},{"id":"1060","title":"Olofström"},{"id":"1080","title":"Karlskrona"},{"id":"1081","title":"Ronneby"},{"id":"1082","title":"Karlshamn"},{"id":"1083","title":"Sölvesborg"},{"id":"1214","title":"Svalöv"},{"id":"1230","title":"Staffanstorp"},{"id":"1231","title":"Burlöv"},{"id":"1233","title":"Vellinge"},{"id":"1256","title":"Östra Göinge"},{"id":"1257","title":"Örkelljunga"},{"id":"1260","title":"Bjuv"},{"id":"1261","title":"Kävlinge"},{"id":"1262","title":"Lomma"},{"id":"1263","title":"Svedala"},{"id":"1264","title":"Skurup"},{"id":"1265","title":"Sjöbo"},{"id":"1266","title":"Hörby"},{"id":"1267","title":"Höör"},{"id":"1270","title":"Tomelilla"},{"id":"1272","title":"Bromölla"},{"id":"1273","title":"Osby"},{"id":"1275","title":"Perstorp"},{"id":"1276","title":"Klippan"},{"id":"1277","title":"Åstorp"},{"id":"1278","title":"Båstad"},{"id":"1280","title":"Malmö"},{"id":"1281","title":"Lund"},{"id":"1282","title":"Landskrona"},{"id":"1283","title":"Helsingborg"},{"id":"1284","title":"Höganäs"},{"id":"1285","title":"Eslöv"},{"id":"1286","title":"Ystad"},{"id":"1287","title":"Trelleborg"},{"id":"1290","title":"Kristianstad"},{"id":"1291","title":"Simrishamn"},{"id":"1292","title":"Ängelholm"},{"id":"1293","title":"Hässleholm"},{"id":"1315","title":"Hylte"},{"id":"1380","title":"Halmstad"},{"id":"1381","title":"Laholm"},{"id":"1382","title":"Falkenberg"},{"id":"1383","title":"Varberg"},{"id":"1384","title":"Kungsbacka"},{"id":"1401","title":"Härryda"},{"id":"1402","title":"Partille"},{"id":"1407","title":"Öckerö"},{"id":"1415","title":"Stenungsund"},{"id":"1419","title":"Tönsberg"},{"id":"1421","title":"Orust"},{"id":"1427","title":"Sotenäs"},{"id":"1430","title":"Munkedal"},{"id":"1435","title":"Tanum"},{"id":"1438","title":"Dals-Ed"},{"id":"1439","title":"Färgelanda"},{"id":"1440","title":"Ale"},{"id":"1441","title":"Lerum"},{"id":"1442","title":"Vårgårda"},{"id":"1443","title":"Bollebygd"},{"id":"1444","title":"Grästorp"},{"id":"1445","title":"Essunga"},{"id":"1446","title":"Karlsborg"},{"id":"1447","title":"Gullspång"},{"id":"1452","title":"Tranemo"},{"id":"1460","title":"Bengtsfors"},{"id":"1461","title":"Mellerud"},{"id":"1462","title":"Lilla Edet"},{"id":"1463","title":"Mark"},{"id":"1465","title":"Svenljunga"},{"id":"1466","title":"Herrljunga"},{"id":"1470","title":"Vara"},{"id":"1471","title":"Götene"},{"id":"1472","title":"Tibro"},{"id":"1473","title":"Töreboda"},{"id":"1480","title":"Göteborg"},{"id":"1481","title":"Mölndal"},{"id":"1482","title":"Kungälv"},{"id":"1484","title":"Lysekil"},{"id":"1485","title":"Uddevalla"},{"id":"1486","title":"Strömstad"},{"id":"1487","title":"Vänersborg"},{"id":"1488","title":"Trollhättan"},{"id":"1489","title":"Alingsås"},{"id":"1490","title":"Borås"},{"id":"1491","title":"Ulricehamn"},{"id":"1492","title":"Åmål"},{"id":"1493","title":"Mariestad"},{"id":"1494","title":"Lidköping"},{"id":"1495","title":"Skara"},{"id":"1496","title":"Skövde"},{"id":"1497","title":"Hjo"},{"id":"1498","title":"Tidaholm"},{"id":"1499","title":"Falköping"},{"id":"1715","title":"Kil"},{"id":"1730","title":"Eda"},{"id":"1737","title":"Torsby"},{"id":"1760","title":"Storfors"},{"id":"1761","title":"Hammarö"},{"id":"1762","title":"Munfors"},{"id":"1763","title":"Forshaga"},{"id":"1764","title":"Grums"},{"id":"1765","title":"Årjäng"},{"id":"1766","title":"Sunne"},{"id":"1780","title":"Karlstad"},{"id":"1781","title":"Kristinehamn"},{"id":"1782","title":"Filipstad"},{"id":"1783","title":"Hagfors"},{"id":"1784","title":"Arvika"},{"id":"1785","title":"Säffle"},{"id":"1814","title":"Lekeberg"},{"id":"1860","title":"Laxå"},{"id":"1861","title":"Hallsberg"},{"id":"1862","title":"Degerfors"},{"id":"1863","title":"Hällefors"},{"id":"1864","title":"Ljusnarsberg"},{"id":"1880","title":"Örebro"},{"id":"1881","title":"Kumla"},{"id":"1882","title":"Askersund"},{"id":"1883","title":"Karlskoga"},{"id":"1884","title":"Nora"},{"id":"1885","title":"Lindesberg"},{"id":"1904","title":"Skinnskatteberg"},{"id":"1907","title":"Surahammar"},{"id":"1960","title":"Kungsör"},{"id":"1961","title":"Hallstahammar"},{"id":"1962","title":"Norberg"},{"id":"1980","title":"Västerås"},{"id":"1981","title":"Sala"},{"id":"1982","title":"Fagersta"},{"id":"1983","title":"Köping"},{"id":"1984","title":"Arboga"},{"id":"2021","title":"Vansbro"},{"id":"2023","title":"Malung-Sälen"},{"id":"2026","title":"Gagnef"},{"id":"2029","title":"Leksand"},{"id":"2031","title":"Rättvik"},{"id":"2034","title":"Orsa"},{"id":"2039","title":"Älvdalen"},{"id":"2061","title":"Smedjebacken"},{"id":"2062","title":"Mora"},{"id":"2080","title":"Falun"},{"id":"2081","title":"Borlänge"},{"id":"2082","title":"Säter"},{"id":"2083","title":"Hedemora"},{"id":"2084","title":"Avesta"},{"id":"2085","title":"Ludvika"},{"id":"2101","title":"Ockelbo"},{"id":"2104","title":"Hofors"},{"id":"2121","title":"Ovanåker"},{"id":"2132","title":"Nordanstig"},{"id":"2161","title":"Ljusdal"},{"id":"2180","title":"Gävle"},{"id":"2181","title":"Sandviken"},{"id":"2182","title":"Söderhamn"},{"id":"2183","title":"Bollnäs"},{"id":"2184","title":"Hudiksvall"},{"id":"2260","title":"Ånge"},{"id":"2262","title":"Timrå"},{"id":"2280","title":"Härnösand"},{"id":"2281","title":"Sundsvall"},{"id":"2282","title":"Kramfors"},{"id":"2283","title":"Sollefteå"},{"id":"2284","title":"Örnsköldsvik"},{"id":"2303","title":"Ragunda"},{"id":"2305","title":"Bräcke"},{"id":"2309","title":"Krokom"},{"id":"2313","title":"Strömsund"},{"id":"2321","title":"Åre"},{"id":"2326","title":"Berg"},{"id":"2361","title":"Härjedalen"},{"id":"2380","title":"Östersund"},{"id":"2401","title":"Nordmaling"},{"id":"2403","title":"Bjurholm"},{"id":"2404","title":"Vindeln"},{"id":"2409","title":"Robertsfors"},{"id":"2417","title":"Norsjö"},{"id":"2418","title":"Malå"},{"id":"2421","title":"Storuman"},{"id":"2422","title":"Sorsele"},{"id":"2425","title":"Dorotea"},{"id":"2460","title":"Vännäs"},{"id":"2462","title":"Vilhelmina"},{"id":"2463","title":"Åsele"},{"id":"2480","title":"Umeå"},{"id":"2481","title":"Lycksele"},{"id":"2482","title":"Skellefteå"},{"id":"2505","title":"Arvidsjaur"},{"id":"2506","title":"Arjeplog"},{"id":"2510","title":"Jokkmokk"},{"id":"2513","title":"Överkalix"},{"id":"2514","title":"Kalix"},{"id":"2518","title":"Övertorneå"},{"id":"2521","title":"Pajala"},{"id":"2523","title":"Gällivare"},{"id":"2560","title":"Älvsbyn"},{"id":"2580","title":"Luleå"},{"id":"2581","title":"Piteå"},{"id":"2582","title":"Boden"},{"id":"2583","title":"Haparanda"},{"id":"2584","title":"Kiruna"}];
 
     const FILTER_DATASETS = {
       alla: [0, 1, 2, 3],
@@ -215,6 +253,43 @@
     let aktivKPI = 'N15508';
 
     // ========== KPI HANTERING ==========
+    
+    /**
+     * Byter skoltyp och uppdaterar KPI-listan
+     * @param {string} skoltyp - Skoltyp ('grundskola' eller 'forskola')
+     */
+    function bytSkoltyp(skoltyp) {
+      aktivSkoltyp = skoltyp;
+      if (skoltyp === 'grundskola') {
+        KPI_LIST = KPI_GRUNDSKOLA;
+      } else if (skoltyp === 'forskola') {
+        KPI_LIST = KPI_FORSKOLA;
+      }
+      
+      // Uppdatera KPI-dropdown
+      const kpiSelect = document.getElementById('kpiSelect');
+      kpiSelect.innerHTML = '';
+      KPI_LIST.forEach(kpi => {
+        const option = document.createElement('option');
+        option.value = kpi.id;
+        option.textContent = kpi.id + ' - ' + kpi.namn;
+        kpiSelect.appendChild(option);
+      });
+      
+      // Byt till första KPI i den nya listan
+      if (KPI_LIST.length > 0) {
+        bytKPI(KPI_LIST[0].id);
+      }
+    }
+
+    /**
+     * Byter kommun och uppdaterar grafen
+     * @param {string} kommunId - Kommun-id
+     */
+    function bytKommun(kommunId) {
+      CONFIG.KOMMUN_ID = kommunId;
+      hamtaData();
+    }
     
     /**
      * Byter KPI och uppdaterar grafen
@@ -324,11 +399,12 @@
           }
         } else {
           document.getElementById(elementId).innerHTML = 
-            `<p class="analysis-text">Data ej tillgänglig för jämförelse (N15543 kanske saknar data för denna kommun).</p>`;
+            `<p class="analysis-text">Data ej tillgänglig för jämförelse.</p>`;
         }
       };
 
-      uppdateraBox(totalt, ar, 'kommunAnalysis', 'Sävsjö kommun');
+      const kommunNamn = ALLA_KOMMUNER.find(k => k.id === CONFIG.KOMMUN_ID)?.title || 'Okänd kommun';
+      uppdateraBox(totalt, ar, 'kommunAnalysis', kommunNamn);
       uppdateraBox(riketTotalt, ar, 'riketAnalysis', 'riket');
     }
 
@@ -489,7 +565,25 @@
     }
 
     // Initiera sidan när den är laddad
-    document.addEventListener('DOMContentLoaded', hamtaData);
+    document.addEventListener('DOMContentLoaded', function() {
+      // Fyll kommun-dropdown
+      const kommunSelect = document.getElementById('kommunSelect');
+      if (kommunSelect) {
+        console.log('Fyller kommun-dropdown med ' + ALLA_KOMMUNER.length + ' kommuner');
+        ALLA_KOMMUNER.forEach(kommun => {
+          if (kommun.id !== '0684') { // Hoppa över Sävsjö som redan är default
+            const option = document.createElement('option');
+            option.value = kommun.id;
+            option.textContent = kommun.title;
+            kommunSelect.appendChild(option);
+          }
+        });
+        console.log('Kommun-dropdown fylld. Totalt: ' + kommunSelect.options.length + ' alternativ');
+      } else {
+        console.error('Kunde inte hitta element med id "kommunSelect"');
+      }
+      hamtaData();
+    });
 
     // Kopiera Chart.js-diagrammet till urklipp
     document.getElementById('copyChartBtn').addEventListener('click', async function() {
