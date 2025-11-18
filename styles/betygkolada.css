@@ -1,0 +1,164 @@
+body {
+  font-family: Arial, sans-serif;
+  padding: 2rem;
+  background: #e3f2fd;
+}
+
+canvas {
+  background: white;
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 0 10px #ccc;
+}
+
+.filter-container {
+  margin-bottom: 2rem;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.filter-btn {
+  padding: 0.75rem 1.5rem;
+  border: 2px solid #2563eb;
+  background: white;
+  color: #2563eb;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.filter-btn:hover {
+  background: #f0f9ff;
+}
+
+.filter-btn.active {
+  background: #2563eb;
+  color: white;
+}
+
+h1 {
+  color: #1e40af;
+  margin-bottom: 1rem;
+}
+
+.kpi-selector {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 0 10px #ccc;
+}
+
+.selector-row {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.selector-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.kpi-selector label {
+  font-weight: bold;
+  color: #1e40af;
+  display: block;
+  font-size: 0.95rem;
+}
+
+.kpi-selector select {
+  padding: 0.5rem 1rem;
+  border: 2px solid #2563eb;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  background: white;
+  min-width: 300px;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 1rem;
+  padding: 0.5rem 0.75rem;
+  background: white;
+  color: #1e40af;
+  border: 2px solid #2563eb;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.back-link:hover {
+  background: #f0f9ff;
+}
+
+.analysis-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+.analysis-box {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 0 10px #ccc;
+  border-left: 4px solid #2563eb;
+}
+
+.analysis-box h3 {
+  color: #1e40af;
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+}
+
+.analysis-text {
+  color: #333;
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+
+.trend-up {
+  color: #dc2626;
+  font-weight: bold;
+}
+
+.trend-down {
+  color: #16a34a;
+  font-weight: bold;
+}
+
+.trend-neutral {
+  color: #666;
+  font-weight: bold;
+}
+
+.copy-chart-btn {
+  display: block;
+  margin: 0.5rem auto 2rem auto;
+  padding: 0.4rem 1.2rem;
+  font-size: 0.95rem;
+  background: #f8fafc;
+  color: #2563eb;
+  border: 1px solid #2563eb;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s, background 0.2s;
+}
+
+.copy-chart-btn:hover {
+  background: #e0e7ff;
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .analysis-container {
+    grid-template-columns: 1fr;
+  }
+}
