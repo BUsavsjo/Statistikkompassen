@@ -183,6 +183,7 @@ async function hamtaSkolenheterForKommun(kommunId) {
     const data = await response.json();
     const resultat = data.results || data.values || [];
     resultat.forEach(enhet => {
+    (data.results || []).forEach(enhet => {
       enheter.push({
         id: enhet.id,
         title: enhet.title,
@@ -190,6 +191,7 @@ async function hamtaSkolenheterForKommun(kommunId) {
       });
     });
     url = data.next_page || data.next || null;
+    url = data.next_page;
   }
   enheter.sort((a, b) => a.title.localeCompare(b.title, 'sv'));
   skolenhetCache.set(kommunId, enheter);
