@@ -16,6 +16,12 @@
         <select id="kommunSelect"></select>
       </div>
       <div class="selector-group">
+        <label for="skolenhetSelect">Välj skolenhet:</label>
+        <select id="skolenhetSelect" disabled>
+          <option value="">Hämtar skolenheter...</option>
+        </select>
+      </div>
+      <div class="selector-group">
         <label for="skolTypSelect">Välj skoltyp:</label>
         <select id="skolTypSelect">
           <option value="grundskola" selected>Grundskola</option>
@@ -40,10 +46,11 @@
 
   <canvas id="koladaChart" width="800" height="400"></canvas>
   <button id="copyChartBtn" class="copy-chart-btn" title="Kopiera diagrammet till urklipp">📋 Kopiera bild</button>
+  <div id="datasetNotice" class="dataset-notice" aria-live="polite"></div>
 
   <div class="analysis-container">
     <div class="analysis-box">
-      <h3>📊 Sävsjö kommun</h3>
+      <h3 id="lokalAnalysisTitle">📊 Sävsjö kommun</h3>
       <div class="analysis-text" id="kommunAnalysis">Hämtar data...</div>
     </div>
     <div class="analysis-box">
