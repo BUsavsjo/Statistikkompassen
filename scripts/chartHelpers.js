@@ -1,8 +1,11 @@
-import { API_BASE, DATASET_CONFIG } from './constants.js';
+import { API_BASE, DATASET_CONFIG, getKpiMetadata } from './constants.js';
 
-export async function hamtaKommunData(kommunKod, kpiKod, apiBase = API_BASE) {
+export async function hamtaKoladaData(kommunKod, kpiKod, apiBase = API_BASE) {
   const url = `${apiBase}/${kommunKod}/kpi/${kpiKod}`;
   const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Kunde inte hämta data (${response.status})`);
+  }
   const json = await response.json();
 
   const ar = [];
@@ -10,10 +13,10 @@ export async function hamtaKommunData(kommunKod, kpiKod, apiBase = API_BASE) {
   const man = [];
   const totalt = [];
 
-  json.values.forEach(entry => {
+  (json.values || []).forEach(entry => {
     ar.push(entry.period);
     const varden = { K: null, M: null, T: null };
-    entry.values.forEach(varde => {
+    (entry.values || []).forEach(varde => {
       varden[varde.gender] = varde.value;
     });
     kvinnor.push(varden.K);
@@ -37,15 +40,13 @@ export function skapaDatasets(kvinnor, man, totalt, riketTotalt) {
 }
 
 export function skapaChartConfig(aktivKPI, labels, datasets, titleText = 'Andel behöriga') {
-  let yLabel = 'Procent (%)';
-  let yTicksCallback;
-  let yMax = 100;
-
-  if (aktivKPI === 'N11032') {
-    yLabel = 'Kostnad (kr)';
-    yTicksCallback = function(value) { return value.toLocaleString() + ' kr'; };
-    yMax = undefined;
-  }
+  const metadata = getKpiMetadata(aktivKPI);
+  const unit = metadata?.unit === 'currency' ? 'currency' : 'percent';
+  let yLabel = unit === 'currency' ? 'Kostnad (kr)' : 'Procent (%)';
+  let yTicksCallback = unit === 'currency'
+    ? function(value) { return value.toLocaleString() + ' kr'; }
+    : undefined;
+  let yMax = unit === 'percent' ? 100 : undefined;
 
   return {
     type: 'line',
@@ -83,10 +84,8 @@ export function hantaSenastaTvaVarden(data) {
 
 export function beraknaTrend(aktivKPI, skillnad) {
   const andel = skillnad.toFixed(2);
-  let enhet = '%';
-  if (aktivKPI === 'N11032') {
-    enhet = 'kr';
-  }
+  const metadata = getKpiMetadata(aktivKPI);
+  const enhet = metadata?.unit === 'currency' ? 'kr' : '%';
   if (skillnad > 0) {
     return `går <span class="trend-up">upp med ${Math.abs(andel)} ${enhet} ⬆️</span>`;
   } else if (skillnad < 0) {
@@ -102,7 +101,8 @@ export function genereraAnalysText(aktivKPI, kpiNamn, namn, nuvarandeVarde, forr
 
   const skillnad = nuvarandeVarde - forrigaVarde;
   const trend = beraknaTrend(aktivKPI, skillnad);
-  let valueUnit = aktivKPI === 'N11032' ? 'kr' : '%';
+  const metadata = getKpiMetadata(aktivKPI);
+  const valueUnit = metadata?.unit === 'currency' ? 'kr' : '%';
 
   return `
         <p class="analysis-text">
