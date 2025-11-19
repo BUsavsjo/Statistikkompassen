@@ -3,12 +3,14 @@ import {
   DEFAULT_KPI,
   FILTER_DATASETS,
   RIKET_ID,
+  SKOLENHET_DATA_BASE,
+  SKOLENHET_SEARCH_API,
   getKpiList
 } from './constants.js';
 import { ALLA_KOMMUNER } from './kommuner.js';
 import {
   genereraAnalysText,
-  hamtaKommunData,
+  hamtaKoladaData,
   hantaSenastaTvaVarden,
   skapaChartConfig,
   skapaDatasets
@@ -17,8 +19,11 @@ import {
 let aktivKPI = DEFAULT_KPI;
 let aktivSkoltyp = 'grundskola';
 let aktivKommun = DEFAULT_KOMMUN_ID;
+let aktivSkolenhet = '';
+let aktivSkolenhetNamn = '';
 let chart;
 let allData;
+const skolenhetCache = new Map();
 
 function uppdateraKpiDropdown() {
   const kpiSelect = document.getElementById('kpiSelect');
@@ -38,35 +43,83 @@ function uppdateraKpiDropdown() {
   }
 }
 
-function uppdateraAnalysis(totalt, riketTotalt, ar) {
-  const uppdateraBox = (data, arArray, elementId, namn) => {
-    const senaste = hantaSenastaTvaVarden(data);
-    if (senaste.nuvarande !== undefined && senaste.nuvarande !== null &&
-        senaste.forriga !== undefined && senaste.forriga !== null) {
-      const validAr = arArray.filter((_, i) => data[i] !== null);
-      if (validAr.length >= 2) {
-        const nuAr = validAr[validAr.length - 1];
-        const forAr = validAr[validAr.length - 2];
-        const kpiInfo = getKpiList(aktivSkoltyp).find(k => k.id === aktivKPI) || { namn: aktivKPI };
-        document.getElementById(elementId).innerHTML = genereraAnalysText(
-          aktivKPI,
-          kpiInfo.namn,
-          namn,
-          senaste.nuvarande,
-          senaste.forriga,
-          nuAr,
-          forAr
-        );
-      }
-    } else {
-      document.getElementById(elementId).innerHTML =
-        '<p class="analysis-text">Data ej tillgänglig för jämförelse.</p>';
+function skapaAnalysInnehall(data = [], arArray = [], namn) {
+  const senaste = hantaSenastaTvaVarden(data);
+  if (senaste.nuvarande !== undefined && senaste.nuvarande !== null &&
+      senaste.forriga !== undefined && senaste.forriga !== null) {
+    const validAr = arArray.filter((_, i) => data[i] !== null);
+    if (validAr.length >= 2) {
+      const nuAr = validAr[validAr.length - 1];
+      const forAr = validAr[validAr.length - 2];
+      const kpiInfo = getKpiList(aktivSkoltyp).find(k => k.id === aktivKPI) || { namn: aktivKPI };
+      return genereraAnalysText(
+        aktivKPI,
+        kpiInfo.namn,
+        namn,
+        senaste.nuvarande,
+        senaste.forriga,
+        nuAr,
+        forAr
+      );
     }
-  };
+  }
+  return '<p class="analysis-text">Data ej tillgänglig för jämförelse.</p>';
+}
 
-  const kommunNamn = ALLA_KOMMUNER.find(k => k.id === aktivKommun)?.title || 'Okänd kommun';
-  uppdateraBox(totalt, ar, 'kommunAnalysis', kommunNamn);
-  uppdateraBox(riketTotalt, ar, 'riketAnalysis', 'riket');
+function uppdateraKommunAnalysis(data, ar, namn) {
+  const titelElement = document.getElementById('lokalAnalysisTitle');
+  if (titelElement) {
+    titelElement.textContent = `📊 ${namn}`;
+  }
+  document.getElementById('kommunAnalysis').innerHTML = skapaAnalysInnehall(data, ar, namn);
+}
+
+function uppdateraRiketAnalysis(data, ar) {
+  document.getElementById('riketAnalysis').innerHTML = skapaAnalysInnehall(data, ar, 'riket');
+}
+
+function uppdateraAnalysis(lokalData, lokalAr, riketData, riketAr, lokalNamn) {
+  uppdateraKommunAnalysis(lokalData, lokalAr, lokalNamn);
+  uppdateraRiketAnalysis(riketData, riketAr);
+}
+
+function visaIngenDataAnalys(lokalNamn) {
+  const titelElement = document.getElementById('lokalAnalysisTitle');
+  if (titelElement) {
+    titelElement.textContent = `📊 ${lokalNamn}`;
+  }
+  document.getElementById('kommunAnalysis').innerHTML =
+    '<p class="analysis-text">Data ej tillgängligt på detta dataset.</p>';
+}
+
+function datasetHarVarden(dataArray = []) {
+  return dataArray.some(v => v !== null && v !== undefined);
+}
+
+function uppdateraDatasetNotice(hasData) {
+  const notice = document.getElementById('datasetNotice');
+  if (!notice) {
+    return;
+  }
+  if (!hasData) {
+    notice.textContent = 'Data ej tillgängligt på detta dataset.';
+    notice.classList.add('visible');
+  } else {
+    notice.textContent = '';
+    notice.classList.remove('visible');
+  }
+}
+
+function hamtaKommunNamn(id) {
+  return ALLA_KOMMUNER.find(k => k.id === id)?.title || 'Okänd kommun';
+}
+
+function getAktivLokalNamn() {
+  if (aktivSkolenhet) {
+    return aktivSkolenhetNamn || 'Vald skolenhet';
+  }
+  const kommunNamn = hamtaKommunNamn(aktivKommun);
+  return kommunNamn.toLowerCase().includes('kommun') ? kommunNamn : `${kommunNamn} kommun`;
 }
 
 function visaDataset(event) {
@@ -89,6 +142,7 @@ function visaDataset(event) {
 function bytSkoltyp(skoltyp) {
   aktivSkoltyp = skoltyp;
   uppdateraKpiDropdown();
+  uppdateraSkolenhetDropdown();
   hamtaData();
 }
 
@@ -103,30 +157,130 @@ function bytKPI(kpiKod) {
 
 function bytKommun(kommunId) {
   aktivKommun = kommunId;
+  aktivSkolenhet = '';
+  aktivSkolenhetNamn = '';
+  uppdateraSkolenhetDropdown();
   hamtaData();
+}
+
+function bytSkolenhet(skolenhetId, skolenhetNamn) {
+  aktivSkolenhet = skolenhetId;
+  aktivSkolenhetNamn = skolenhetId ? skolenhetNamn : '';
+  hamtaData();
+}
+
+async function hamtaSkolenheterForKommun(kommunId) {
+  if (skolenhetCache.has(kommunId)) {
+    return skolenhetCache.get(kommunId);
+  }
+  let url = `${SKOLENHET_SEARCH_API}?municipality=${kommunId}&per_page=500`;
+  const enheter = [];
+  while (url) {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error('Kunde inte hämta skolenheter');
+    }
+    const data = await response.json();
+    (data.results || []).forEach(enhet => {
+      enheter.push({
+        id: enhet.id,
+        title: enhet.title,
+        type: (enhet.type || enhet.type_name || '').toLowerCase()
+      });
+    });
+    url = data.next_page;
+  }
+  enheter.sort((a, b) => a.title.localeCompare(b.title, 'sv'));
+  skolenhetCache.set(kommunId, enheter);
+  return enheter;
+}
+
+function filtreraSkolenheter(enheter) {
+  if (!enheter.length) {
+    return enheter;
+  }
+  const sokterm = aktivSkoltyp === 'forskola' ? 'förskola' : 'grundskola';
+  const filtrerade = enheter.filter(enhet =>
+    enhet.type.includes(sokterm) ||
+    (enhet.title && enhet.title.toLowerCase().includes(sokterm))
+  );
+  return filtrerade.length ? filtrerade : enheter;
+}
+
+async function uppdateraSkolenhetDropdown() {
+  const select = document.getElementById('skolenhetSelect');
+  if (!select) {
+    return;
+  }
+  const defaultOption = document.createElement('option');
+  defaultOption.value = '';
+  defaultOption.textContent = 'Hela kommunen (samlad nivå)';
+  select.innerHTML = '';
+  select.appendChild(defaultOption);
+  select.disabled = true;
+
+  try {
+    const allaEnheter = await hamtaSkolenheterForKommun(aktivKommun);
+    const filtrerade = filtreraSkolenheter(allaEnheter);
+    if (!filtrerade.length) {
+      const infoOption = document.createElement('option');
+      infoOption.value = '';
+      infoOption.textContent = 'Inga skolenheter hittades';
+      select.appendChild(infoOption);
+    } else {
+      filtrerade.forEach(enhet => {
+        const option = document.createElement('option');
+        option.value = enhet.id;
+        option.textContent = enhet.title;
+        option.selected = enhet.id === aktivSkolenhet;
+        select.appendChild(option);
+      });
+    }
+  } catch (error) {
+    console.error('Kunde inte hämta skolenheter', error);
+    const errorOption = document.createElement('option');
+    errorOption.value = '';
+    errorOption.textContent = 'Kunde inte hämta skolenheter';
+    select.appendChild(errorOption);
+  } finally {
+    select.disabled = false;
+    select.value = aktivSkolenhet;
+  }
 }
 
 async function hamtaData() {
   try {
-    const kommunData = await hamtaKommunData(aktivKommun, aktivKPI);
-    const rikeData = await hamtaKommunData(RIKET_ID, aktivKPI);
+    const lokalId = aktivSkolenhet || aktivKommun;
+    const lokalApi = aktivSkolenhet ? SKOLENHET_DATA_BASE : undefined;
+    const lokalData = await hamtaKoladaData(lokalId, aktivKPI, lokalApi);
+    const rikeData = await hamtaKoladaData(RIKET_ID, aktivKPI);
 
-    uppdateraAnalysis(kommunData.totalt, rikeData.totalt, kommunData.ar);
+    const lokalNamn = getAktivLokalNamn();
+    const harLokalData = datasetHarVarden(lokalData.totalt);
+    uppdateraDatasetNotice(harLokalData);
+
+    if (harLokalData) {
+      uppdateraAnalysis(lokalData.totalt, lokalData.ar, rikeData.totalt, rikeData.ar, lokalNamn);
+    } else {
+      visaIngenDataAnalys(lokalNamn);
+      uppdateraRiketAnalysis(rikeData.totalt, rikeData.ar);
+    }
 
     const datasets = skapaDatasets(
-      kommunData.kvinnor,
-      kommunData.man,
-      kommunData.totalt,
+      lokalData.kvinnor,
+      lokalData.man,
+      lokalData.totalt,
       rikeData.totalt
     );
 
+    const labels = lokalData.ar.length ? lokalData.ar : rikeData.ar;
     allData = {
-      labels: kommunData.ar,
+      labels,
       datasets
     };
 
     const kpiInfo = getKpiList(aktivSkoltyp).find(k => k.id === aktivKPI) || { namn: aktivKPI };
-    const chartTitle = `${kpiInfo.namn} (Sävsjö kommun)`;
+    const chartTitle = `${kpiInfo.namn} (${lokalNamn})`;
     const config = skapaChartConfig(aktivKPI, allData.labels, allData.datasets, chartTitle);
     if (chart) {
       chart.destroy();
@@ -136,6 +290,7 @@ async function hamtaData() {
     console.error('Fel vid hämtning av data:', error);
     document.getElementById('kommunAnalysis').innerHTML =
       '<p class="analysis-text">Fel vid hämtning av data. Försök igen senare.</p>';
+    uppdateraDatasetNotice(true);
   }
 }
 
@@ -168,6 +323,11 @@ function initSelectors() {
   document.getElementById('kommunSelect')?.addEventListener('change', event => {
     bytKommun(event.target.value);
   });
+
+  document.getElementById('skolenhetSelect')?.addEventListener('change', event => {
+    const option = event.target.selectedOptions[0];
+    bytSkolenhet(event.target.value, option ? option.textContent : '');
+  });
 }
 
 function initCopyButton() {
@@ -197,6 +357,7 @@ function init() {
   initSelectors();
   initCopyButton();
   uppdateraKpiDropdown();
+  uppdateraSkolenhetDropdown();
   hamtaData();
 }
 
