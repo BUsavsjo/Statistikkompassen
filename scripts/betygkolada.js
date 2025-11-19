@@ -181,6 +181,8 @@ async function hamtaSkolenheterForKommun(kommunId) {
       throw new Error('Kunde inte hämta skolenheter');
     }
     const data = await response.json();
+    const resultat = data.results || data.values || [];
+    resultat.forEach(enhet => {
     (data.results || []).forEach(enhet => {
       enheter.push({
         id: enhet.id,
@@ -188,6 +190,7 @@ async function hamtaSkolenheterForKommun(kommunId) {
         type: (enhet.type || enhet.type_name || '').toLowerCase()
       });
     });
+    url = data.next_page || data.next || null;
     url = data.next_page;
   }
   enheter.sort((a, b) => a.title.localeCompare(b.title, 'sv'));
