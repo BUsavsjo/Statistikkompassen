@@ -25,9 +25,21 @@ let chart;
 let allData;
 const skolenhetCache = new Map();
 
+function uppdateraSidtitel() {
+  const kpiInfo = getKpiList(aktivSkoltyp).find(k => k.id === aktivKPI);
+  if (kpiInfo) {
+    document.getElementById('pageTitle').textContent = `Statistikkompassen: ${kpiInfo.namn}`;
+  }
+}
+
 function uppdateraKpiDropdown() {
   const kpiSelect = document.getElementById('kpiSelect');
   const lista = getKpiList(aktivSkoltyp);
+
+  if (!lista.some(kpi => kpi.id === aktivKPI) && lista.length > 0) {
+    aktivKPI = lista[0].id;
+  }
+
   kpiSelect.innerHTML = '';
 
   lista.forEach(kpi => {
@@ -38,9 +50,8 @@ function uppdateraKpiDropdown() {
     kpiSelect.appendChild(option);
   });
 
-  if (!lista.some(kpi => kpi.id === aktivKPI) && lista.length > 0) {
-    aktivKPI = lista[0].id;
-  }
+  kpiSelect.value = aktivKPI;
+  uppdateraSidtitel();
 }
 
 function skapaAnalysInnehall(data = [], arArray = [], namn) {
@@ -148,10 +159,7 @@ function bytSkoltyp(skoltyp) {
 
 function bytKPI(kpiKod) {
   aktivKPI = kpiKod;
-  const kpiInfo = getKpiList(aktivSkoltyp).find(k => k.id === kpiKod);
-  if (kpiInfo) {
-    document.getElementById('pageTitle').textContent = `Statistikkompassen: ${kpiInfo.namn}`;
-  }
+  uppdateraSidtitel();
   hamtaData();
 }
 
@@ -163,18 +171,32 @@ function bytKommun(kommunId) {
   hamtaData();
 }
 
-function bytSkolenhet(skolenhetId, skolenhetNamn) {
+function bytSkolenhet(skolenhetId, skolenhetNamn, skolenhetTyp = '') {
   aktivSkolenhet = skolenhetId;
   aktivSkolenhetNamn = skolenhetId ? skolenhetNamn : '';
 
-  // Debug: log when a school unit is changed
-  console.log('bytSkolenhet called:', { aktivSkolenhet, aktivSkolenhetNamn });
+  const normalize = value =>
+    (value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '');
 
-  const lista = getKpiList(aktivSkoltyp);
-  if (!lista.some(k => k.id === aktivKPI) && lista.length > 0) {
-    aktivKPI = lista[0].id;
-    document.getElementById('kpiSelect').value = aktivKPI;
-    document.getElementById('pageTitle').textContent = `Statistikkompassen: ${lista[0].namn}`;
+  const normalizedTyp = normalize(skolenhetTyp);
+  const normalizedNamn = normalize(skolenhetNamn);
+  const matcharForskola = normalizedTyp.includes('forskola') || normalizedNamn.includes('forskola');
+  const matcharGrund = normalizedTyp.includes('grundskola') || normalizedNamn.includes('grundskola');
+  const typ = matcharForskola ? 'forskola' : matcharGrund ? 'grundskola' : '';
+
+  if (typ && typ !== aktivSkoltyp) {
+    aktivSkoltyp = typ;
+    document.getElementById('skolTypSelect').value = typ;
+    uppdateraKpiDropdown();
+  } else {
+    const lista = getKpiList(aktivSkoltyp);
+    if (!lista.some(k => k.id === aktivKPI) && lista.length > 0) {
+      aktivKPI = lista[0].id;
+      uppdateraKpiDropdown();
+    }
   }
 
   hamtaData();
@@ -189,7 +211,12 @@ async function hamtaSkolenheterForKommun(kommunId) {
   const enheter = [];
 
   while (url) {
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      mode: 'cors',
+      headers: {
+        Accept: 'application/json'
+      }
+    });
     if (!response.ok) throw new Error('Kunde inte hämta skolenheter');
     const data = await response.json();
     const resultat = data.results || data.values || [];
@@ -213,12 +240,18 @@ async function hamtaSkolenheterForKommun(kommunId) {
 function filtreraSkolenheter(enheter) {
   if (!enheter.length) return enheter;
 
+  const normalize = value =>
+    (value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '');
+
   const nyckelordLista = aktivSkoltyp === 'forskola'
-    ? ['förskola', 'fsk']
-    : ['grundskola', 'gr', 'skola', 'grskola', 'gr skola', 'kommunal grundskola'];
+    ? ['forskol', 'forskola', 'forskoleklass']
+    : ['grundskola', 'grund', 'skola', 'grskola', 'gr skola', 'kommunal grundskola'];
 
   const filtrerade = enheter.filter(enhet => {
-    const s = (enhet.type + ' ' + enhet.title).toLowerCase();
+    const s = normalize(enhet.type + ' ' + enhet.title);
     return nyckelordLista.some(nyckel => s.includes(nyckel));
   });
 
@@ -231,6 +264,8 @@ async function uppdateraSkolenhetDropdown() {
 
   select.innerHTML = '';
   select.disabled = true;
+
+  let valdSkolenhetFinns = false;
 
   const defaultOption = document.createElement('option');
   defaultOption.value = '';
@@ -251,17 +286,28 @@ async function uppdateraSkolenhetDropdown() {
         const option = document.createElement('option');
         option.value = enhet.id;
         option.textContent = enhet.title;
+        option.dataset.type = enhet.type;
         option.selected = enhet.id === aktivSkolenhet;
+        if (option.selected) {
+          valdSkolenhetFinns = true;
+        }
         select.appendChild(option);
       });
     }
   } catch (error) {
+    const isCors = error instanceof TypeError && /fetch/i.test(error.message);
     console.error('Kunde inte hämta skolenheter', error);
     const errorOption = document.createElement('option');
     errorOption.value = '';
-    errorOption.textContent = 'Kunde inte hämta skolenheter';
+    errorOption.textContent = isCors
+      ? 'Kunde inte hämta skolenheter (CORS eller nätverksfel)'
+      : 'Kunde inte hämta skolenheter';
     select.appendChild(errorOption);
   } finally {
+    if (!valdSkolenhetFinns) {
+      aktivSkolenhet = '';
+      aktivSkolenhetNamn = '';
+    }
     select.disabled = false;
     select.value = aktivSkolenhet;
   }
@@ -303,9 +349,12 @@ async function hamtaData() {
     if (chart) chart.destroy();
     chart = new Chart(document.getElementById('koladaChart'), config);
   } catch (error) {
+    const isCors = error instanceof TypeError && /fetch/i.test(error.message);
     console.error('Fel vid hämtning av data:', error);
     document.getElementById('kommunAnalysis').innerHTML =
-      '<p class="analysis-text">Fel vid hämtning av data. Försök igen senare.</p>';
+      isCors
+        ? '<p class="analysis-text">Kunde inte hämta data på grund av nätverks- eller CORS-fel. Kontrollera att API:et är tillgängligt.</p>'
+        : '<p class="analysis-text">Fel vid hämtning av data. Försök igen senare.</p>';
     uppdateraDatasetNotice(true);
   }
 }
@@ -329,6 +378,8 @@ function initFilters() {
 
 function initSelectors() {
   document.getElementById('skolTypSelect')?.addEventListener('change', event => {
+    aktivSkolenhet = '';
+    aktivSkolenhetNamn = '';
     bytSkoltyp(event.target.value);
   });
 
@@ -342,7 +393,8 @@ function initSelectors() {
 
   document.getElementById('skolenhetSelect')?.addEventListener('change', event => {
     const option = event.target.selectedOptions[0];
-    bytSkolenhet(event.target.value, option ? option.textContent : '');
+    const skolenhetTyp = option?.dataset?.type || '';
+    bytSkolenhet(event.target.value, option ? option.textContent : '', skolenhetTyp);
   });
 }
 
