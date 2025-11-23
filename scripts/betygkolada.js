@@ -232,12 +232,18 @@ async function hamtaSkolenheterForKommun(kommunId) {
 function filtreraSkolenheter(enheter) {
   if (!enheter.length) return enheter;
 
+  const normalize = value =>
+    (value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '');
+
   const nyckelordLista = aktivSkoltyp === 'forskola'
-    ? ['förskola', 'fsk']
-    : ['grundskola', 'gr', 'skola', 'grskola', 'gr skola', 'kommunal grundskola'];
+    ? ['forskol', 'forskola', 'forskoleklass']
+    : ['grundskola', 'grund', 'skola', 'grskola', 'gr skola', 'kommunal grundskola'];
 
   const filtrerade = enheter.filter(enhet => {
-    const s = (enhet.type + ' ' + enhet.title).toLowerCase();
+    const s = normalize(enhet.type + ' ' + enhet.title);
     return nyckelordLista.some(nyckel => s.includes(nyckel));
   });
 
@@ -250,6 +256,8 @@ async function uppdateraSkolenhetDropdown() {
 
   select.innerHTML = '';
   select.disabled = true;
+
+  let valdSkolenhetFinns = false;
 
   const defaultOption = document.createElement('option');
   defaultOption.value = '';
@@ -272,6 +280,9 @@ async function uppdateraSkolenhetDropdown() {
         option.textContent = enhet.title;
         option.dataset.type = enhet.type;
         option.selected = enhet.id === aktivSkolenhet;
+        if (option.selected) {
+          valdSkolenhetFinns = true;
+        }
         select.appendChild(option);
       });
     }
@@ -285,6 +296,10 @@ async function uppdateraSkolenhetDropdown() {
       : 'Kunde inte hämta skolenheter';
     select.appendChild(errorOption);
   } finally {
+    if (!valdSkolenhetFinns) {
+      aktivSkolenhet = '';
+      aktivSkolenhetNamn = '';
+    }
     select.disabled = false;
     select.value = aktivSkolenhet;
   }
@@ -355,6 +370,8 @@ function initFilters() {
 
 function initSelectors() {
   document.getElementById('skolTypSelect')?.addEventListener('change', event => {
+    aktivSkolenhet = '';
+    aktivSkolenhetNamn = '';
     bytSkoltyp(event.target.value);
   });
 
