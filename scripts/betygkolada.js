@@ -244,6 +244,16 @@ function filtreraSkolenheter(enheter) {
 
   const filtrerade = enheter.filter(enhet => {
     const s = normalize(enhet.type + ' ' + enhet.title);
+    const id = (enhet.id || '').toUpperCase();
+
+    if (aktivSkoltyp === 'forskola') {
+      return nyckelordLista.some(nyckel => s.includes(nyckel)) || id.startsWith('V11E');
+    }
+
+    if (aktivSkoltyp === 'grundskola') {
+      return id.startsWith('V15E');
+    }
+
     return nyckelordLista.some(nyckel => s.includes(nyckel));
   });
 
