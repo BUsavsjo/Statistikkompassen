@@ -16,8 +16,9 @@ import {
   skapaDatasets
 } from './chartHelpers.js';
 
+const documentSkoltyp = (document.body?.dataset?.skoltyp || '').toLowerCase();
+let aktivSkoltyp = documentSkoltyp === 'forskola' ? 'forskola' : 'grundskola';
 let aktivKPI = DEFAULT_KPI;
-let aktivSkoltyp = 'grundskola';
 let aktivKommun = DEFAULT_KOMMUN_ID;
 let aktivSkolenhet = '';
 let aktivSkolenhetNamn = '';
@@ -52,6 +53,13 @@ function uppdateraKpiDropdown() {
 
   kpiSelect.value = aktivKPI;
   uppdateraSidtitel();
+}
+
+function uppdateraSkoltypSelect() {
+  const select = document.getElementById('skolTypSelect');
+  if (select) {
+    select.value = aktivSkoltyp;
+  }
 }
 
 function skapaAnalysInnehall(data = [], arArray = [], namn) {
@@ -297,7 +305,7 @@ async function uppdateraSkolenhetDropdown() {
       });
     }
   } catch (error) {
-    const isCors = error instanceof TypeError && /fetch/i.test(error.message);
+    const isCors = error instanceof TypeError;
     console.error('Kunde inte hämta skolenheter', error);
     const errorOption = document.createElement('option');
     errorOption.value = '';
@@ -351,13 +359,13 @@ async function hamtaData() {
     if (chart) chart.destroy();
     chart = new Chart(document.getElementById('koladaChart'), config);
   } catch (error) {
-    const isCors = error instanceof TypeError && /fetch/i.test(error.message);
+    const isCors = error instanceof TypeError;
     console.error('Fel vid hämtning av data:', error);
     document.getElementById('kommunAnalysis').innerHTML =
       isCors
         ? '<p class="analysis-text">Kunde inte hämta data på grund av nätverks- eller CORS-fel. Kontrollera att API:et är tillgängligt.</p>'
         : '<p class="analysis-text">Fel vid hämtning av data. Försök igen senare.</p>';
-    uppdateraDatasetNotice(true);
+    uppdateraDatasetNotice(false);
   }
 }
 
@@ -379,6 +387,7 @@ function initFilters() {
 }
 
 function initSelectors() {
+  uppdateraSkoltypSelect();
   document.getElementById('skolTypSelect')?.addEventListener('change', event => {
     aktivSkolenhet = '';
     aktivSkolenhetNamn = '';
@@ -422,6 +431,11 @@ function initCopyButton() {
 }
 
 function init() {
+  const initialKpiList = getKpiList(aktivSkoltyp);
+  if (!initialKpiList.some(kpi => kpi.id === aktivKPI) && initialKpiList.length > 0) {
+    aktivKPI = initialKpiList[0].id;
+  }
+
   initKommunDropdown();
   initFilters();
   initSelectors();
