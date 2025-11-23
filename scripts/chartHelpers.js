@@ -2,10 +2,17 @@ import { API_BASE, DATASET_CONFIG, getKpiMetadata } from './constants.js';
 
 export async function hamtaKoladaData(kommunKod, kpiKod, apiBase = API_BASE) {
   const url = `${apiBase}/${kommunKod}/kpi/${kpiKod}`;
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    mode: 'cors',
+    headers: {
+      Accept: 'application/json'
+    }
+  });
+
   if (!response.ok) {
     throw new Error(`Kunde inte hämta data (${response.status})`);
   }
+
   const json = await response.json();
 
   const ar = [];

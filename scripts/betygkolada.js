@@ -203,7 +203,12 @@ async function hamtaSkolenheterForKommun(kommunId) {
   const enheter = [];
 
   while (url) {
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      mode: 'cors',
+      headers: {
+        Accept: 'application/json'
+      }
+    });
     if (!response.ok) throw new Error('Kunde inte hämta skolenheter');
     const data = await response.json();
     const resultat = data.results || data.values || [];
@@ -271,10 +276,13 @@ async function uppdateraSkolenhetDropdown() {
       });
     }
   } catch (error) {
+    const isCors = error instanceof TypeError && /fetch/i.test(error.message);
     console.error('Kunde inte hämta skolenheter', error);
     const errorOption = document.createElement('option');
     errorOption.value = '';
-    errorOption.textContent = 'Kunde inte hämta skolenheter';
+    errorOption.textContent = isCors
+      ? 'Kunde inte hämta skolenheter (CORS eller nätverksfel)'
+      : 'Kunde inte hämta skolenheter';
     select.appendChild(errorOption);
   } finally {
     select.disabled = false;
@@ -318,9 +326,12 @@ async function hamtaData() {
     if (chart) chart.destroy();
     chart = new Chart(document.getElementById('koladaChart'), config);
   } catch (error) {
+    const isCors = error instanceof TypeError && /fetch/i.test(error.message);
     console.error('Fel vid hämtning av data:', error);
     document.getElementById('kommunAnalysis').innerHTML =
-      '<p class="analysis-text">Fel vid hämtning av data. Försök igen senare.</p>';
+      isCors
+        ? '<p class="analysis-text">Kunde inte hämta data på grund av nätverks- eller CORS-fel. Kontrollera att API:et är tillgängligt.</p>'
+        : '<p class="analysis-text">Fel vid hämtning av data. Försök igen senare.</p>';
     uppdateraDatasetNotice(true);
   }
 }
