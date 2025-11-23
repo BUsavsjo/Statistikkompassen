@@ -175,18 +175,10 @@ function bytSkolenhet(skolenhetId, skolenhetNamn, skolenhetTyp = '') {
   aktivSkolenhet = skolenhetId;
   aktivSkolenhetNamn = skolenhetId ? skolenhetNamn : '';
 
-  const normalize = value =>
-    (value || '')
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/\p{Diacritic}/gu, '');
+  // Debug: log when a school unit is changed
+  console.log('bytSkolenhet called:', { aktivSkolenhet, aktivSkolenhetNamn });
 
-  const normalizedTyp = normalize(skolenhetTyp);
-  const normalizedNamn = normalize(skolenhetNamn);
-  const matcharForskola = normalizedTyp.includes('forskola') || normalizedNamn.includes('forskola');
-  const matcharGrund = normalizedTyp.includes('grundskola') || normalizedNamn.includes('grundskola');
-  const typ = matcharForskola ? 'forskola' : matcharGrund ? 'grundskola' : '';
-
+  const typ = skolenhetTyp.includes('forskola') ? 'forskola' : skolenhetTyp.includes('grund') ? 'grundskola' : '';
   if (typ && typ !== aktivSkoltyp) {
     aktivSkoltyp = typ;
     document.getElementById('skolTypSelect').value = typ;
