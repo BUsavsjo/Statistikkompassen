@@ -282,37 +282,6 @@ async function hamtaSkolenheterForKommun(kommunId) {
   return enheter;
 }
 
-function filtreraSkolenheter(enheter) {
-  if (!enheter.length) return enheter;
-
-  const normalize = value =>
-    (value || '')
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/\p{Diacritic}/gu, '');
-
-  const nyckelordLista = aktivSkoltyp === 'forskola'
-    ? ['forskol', 'forskola', 'forskoleklass']
-    : ['grundskola', 'grund', 'skola', 'grskola', 'gr skola', 'kommunal grundskola'];
-
-  const filtrerade = enheter.filter(enhet => {
-    const s = normalize(enhet.type + ' ' + enhet.title);
-    const id = (enhet.id || '').toUpperCase();
-
-    if (aktivSkoltyp === 'forskola') {
-      return nyckelordLista.some(nyckel => s.includes(nyckel)) || id.startsWith('V11E');
-    }
-
-    if (aktivSkoltyp === 'grundskola') {
-      return id.startsWith('V15E');
-    }
-
-    return nyckelordLista.some(nyckel => s.includes(nyckel));
-  });
-
-  return filtrerade.length ? filtrerade : enheter;
-}
-
 async function uppdateraSkolenhetDropdown() {
   const select = document.getElementById('skolenhetSelect');
   if (!select) return;
@@ -329,15 +298,14 @@ async function uppdateraSkolenhetDropdown() {
 
   try {
     const allaEnheter = await hamtaSkolenheterForKommun(aktivKommun);
-    const filtrerade = filtreraSkolenheter(allaEnheter);
 
-    if (!filtrerade.length) {
+    if (!allaEnheter.length) {
       const infoOption = document.createElement('option');
       infoOption.value = '';
       infoOption.textContent = 'Inga skolenheter hittades';
       select.appendChild(infoOption);
     } else {
-      filtrerade.forEach(enhet => {
+      allaEnheter.forEach(enhet => {
         const option = document.createElement('option');
         option.value = enhet.id;
         option.textContent = enhet.title;
