@@ -167,7 +167,13 @@ function bytSkoltyp(skoltyp) {
 
 function bytKPI(kpiKod) {
   aktivKPI = kpiKod;
+  console.log('bytKPI called, ny KPI:', kpiKod);
+  // Uppdatera dropdown‑listan ifall KPI‑listan beror på skoltyp (t.ex. vid byte av enhet)
+  uppdateraKpiDropdown();
   uppdateraSidtitel();
+  // Visa laddningsmeddelande i analysrutorna så att användaren ser att data uppdateras
+  document.getElementById('kommunAnalysis').innerHTML = '<p class="analysis-text">Hämtar data...</p>';
+  document.getElementById('riketAnalysis').innerHTML = '<p class="analysis-text">Hämtar data...</p>';
   hamtaData();
 }
 
@@ -180,13 +186,32 @@ function bytKommun(kommunId) {
 }
 
 function bytSkolenhet(skolenhetId, skolenhetNamn, skolenhetTyp = '') {
+  // Om användaren väljer "Hela kommunen" (tomt ID), återställ till kommunnivå
+  if (!skolenhetId) {
+    aktivSkolenhet = '';
+    aktivSkolenhetNamn = '';
+    console.log('Återställer till kommunnivå');
+    hamtaData();
+    return;
+  }
+
   aktivSkolenhet = skolenhetId;
-  aktivSkolenhetNamn = skolenhetId ? skolenhetNamn : '';
+  aktivSkolenhetNamn = skolenhetNamn || '';
 
   // Debug: log when a school unit is changed
   console.log('bytSkolenhet called:', { aktivSkolenhet, aktivSkolenhetNamn });
 
-  const typ = skolenhetTyp.includes('forskola') ? 'forskola' : skolenhetTyp.includes('grund') ? 'grundskola' : '';
+  // Försök bestämma skoltyp utifrån enhetens ID‑prefix (V11E = förskola, V15E = grundskola)
+  let typ = '';
+  if (skolenhetId) {
+    if (skolenhetId.startsWith('V11E')) typ = 'forskola';
+    else if (skolenhetId.startsWith('V15E')) typ = 'grundskola';
+  }
+  // Fallback: använd eventuell typ‑information från data‑attributet (om den finns)
+  if (!typ && skolenhetTyp) {
+    typ = skolenhetTyp.includes('forskola') ? 'forskola' : skolenhetTyp.includes('grund') ? 'grundskola' : '';
+  }
+
   if (typ && typ !== aktivSkoltyp) {
     aktivSkoltyp = typ;
     document.getElementById('skolTypSelect').value = typ;
@@ -198,7 +223,7 @@ function bytSkolenhet(skolenhetId, skolenhetNamn, skolenhetTyp = '') {
       uppdateraKpiDropdown();
     }
   }
-
+  // Efter att enheten har valts (och eventuella KPI‑ändringar har hanterats) hämta ny data och uppdatera diagrammet
   hamtaData();
 }
 
@@ -358,6 +383,8 @@ async function hamtaData() {
 
     if (chart) chart.destroy();
     chart = new Chart(document.getElementById('koladaChart'), config);
+    // Uppdatera sidrubriken så den alltid visar det valda KPI‑namnet (kan ha ändrats vid enhetsval)
+    uppdateraSidtitel();
   } catch (error) {
     const isCors = error instanceof TypeError;
     console.error('Fel vid hämtning av data:', error);
@@ -430,6 +457,13 @@ function initCopyButton() {
   });
 }
 
+function initUpdateButton() {
+  document.getElementById('updateChartBtn')?.addEventListener('click', () => {
+    console.log('Manuell uppdatering av diagrammet initierad');
+    hamtaData();
+  });
+}
+
 function init() {
   const initialKpiList = getKpiList(aktivSkoltyp);
   if (!initialKpiList.some(kpi => kpi.id === aktivKPI) && initialKpiList.length > 0) {
@@ -440,6 +474,7 @@ function init() {
   initFilters();
   initSelectors();
   initCopyButton();
+  initUpdateButton(); // Ny knapp för manuell uppdatering
   uppdateraKpiDropdown();
   uppdateraSkolenhetDropdown();
   hamtaData();

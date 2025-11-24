@@ -35,8 +35,8 @@ export const DATASET_CONFIG = [
 ];
 
 export const API_BASE = 'https://api.kolada.se/v3/data/municipality';
-export const SKOLENHET_DATA_BASE = 'https://api.kolada.se/v3/data/ou';
-export const SKOLENHET_SEARCH_API = 'https://api.kolada.se/v2/ou';
+export const SKOLENHET_DATA_BASE = 'https://api.kolada.se/v2/data/ou';
+export const SKOLENHET_SEARCH_API = 'https://api.kolada.se/v3/ou';
 export const DEFAULT_KOMMUN_ID = '0684';
 export const RIKET_ID = '0000';
 export const DEFAULT_KPI = 'N15508';
