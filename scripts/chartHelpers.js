@@ -1,13 +1,13 @@
-import { API_BASE, DATASET_CONFIG, getKpiMetadata } from './constants.js';
+import { API_BASE, DATASET_CONFIG, SKOLENHET_DATA_BASE, getKpiMetadata } from './constants.js';
 
 /**
  * Hämtar Kolada‑data för kommun eller skolenhet.
- * - Kommunnivå: använder path‑formatet (som tidigare).
- * - Skolenhetsnivå (OU): använder querystring‑formatet som Kolada v2 kräver.
+ * - Kommunnivå: använder V3‑endpointen för kommuner.
+ * - Skolenhetsnivå (OU): använder V3‑endpointen för organisation units.
  *
  * apiBase:
- *  - API_BASE (kommun) t.ex. https://api.kolada.se/v2/municipality
- *  - SKOLENHET_DATA_BASE (enhet) t.ex. https://api.kolada.se/v2/data
+ *  - API_BASE (kommun) t.ex. https://api.kolada.se/v3/data/kpi
+ *  - SKOLENHET_DATA_BASE (enhet) t.ex. https://api.kolada.se/v3/oudata/kpi
  */
 export async function hamtaKoladaData(kommunKod, kpiKod, apiBase = API_BASE) {
   const ar = [];
@@ -19,11 +19,11 @@ export async function hamtaKoladaData(kommunKod, kpiKod, apiBase = API_BASE) {
   const arOuId = typeof kommunKod === 'string' && /^V(11|15|17)E/i.test(kommunKod);
 
   // Bygg URL beroende på nivå
-  // Kommun:  /<kommun>/kpi/<kpi>
-  // OU:      /data?kpi=<kpi>&ou=<ou>
-  const url = arOuId
-    ? `${apiBase}?kpi=${encodeURIComponent(kpiKod)}&ou=${encodeURIComponent(kommunKod)}`
-    : `${apiBase}/${encodeURIComponent(kommunKod)}/kpi/${encodeURIComponent(kpiKod)}`;
+  // Kommun:  /<kpi>/municipality/<kommun>
+  // OU:      /<kpi>/ou/<ou>
+  const base = arOuId ? SKOLENHET_DATA_BASE : apiBase;
+  const suffix = arOuId ? `ou/${encodeURIComponent(kommunKod)}` : `municipality/${encodeURIComponent(kommunKod)}`;
+  const url = `${base}/${encodeURIComponent(kpiKod)}/${suffix}`;
 
   const response = await fetch(url, {
     mode: 'cors',
