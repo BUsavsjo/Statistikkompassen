@@ -14,6 +14,25 @@ export const KPI_GRUNDSKOLA = [
     namn: 'Andel lärare med lärarlegitimation och behörighet i grundskolan åk 1–9, kommunala skolor',
     unit: 'percent'
   }
+  ,
+  // Åk 6 - andel med minst E (per skolenhet, bra tidiga signaler)
+  { id: 'N15481', namn: 'Åk 6: lägst betyg E i engelska, fristående grundskola, andel (%)', unit: 'percent' },
+  { id: 'N15482', namn: 'Åk 6: lägst betyg E i engelska, kommunala skolor, andel (%)', unit: 'percent' },
+  { id: 'N15483', namn: 'Åk 6: lägst betyg E i matematik, lägeskommun, andel (%)', unit: 'percent' },
+  { id: 'N15484', namn: 'Åk 6: lägst betyg E i matematik, fristående skolor, andel (%)', unit: 'percent' },
+  { id: 'N15485', namn: 'Åk 6: lägst betyg E i matematik, kommunala skolor, andel (%)', unit: 'percent' },
+
+  // Åk 9 - betygspoäng / meritvärde (genomsnitt per skola)
+  { id: 'N15503', namn: 'Åk 9: betygspoäng i matematik, genomsnitt', unit: 'number' },
+  { id: 'N15504', namn: 'Åk 9: meritvärde lägeskommun, genomsnitt (17 ämnen)', unit: 'number' },
+  { id: 'N15505', namn: 'Åk 9: meritvärde kommunala skolor, genomsnitt (17 ämnen)', unit: 'number' },
+  { id: 'N15506', namn: 'Åk 9: meritvärde fristående skolor i kommunen, genomsnitt (17 ämnen)', unit: 'number' },
+  { id: 'N15502', namn: 'Åk 9: lägst betyg E i svenska, kommunala skolor, andel (%)', unit: 'percent' },
+
+  // SALSA-relaterade KPI:er (avvikelse / modellberäknade värden på enhetsnivå)
+  { id: 'U15414', namn: 'Åk 9: uppnått betygskriterierna, avvikelse från SALSA (procentenheter)', unit: 'percent' },
+  { id: 'U15415', namn: 'Åk 9: meritvärde, modellberäknat genomsnitt (SALSA)', unit: 'number' },
+  { id: 'U15416', namn: 'Åk 9: meritvärde, avvikelse från SALSA på enhetsnivå (poäng)', unit: 'number' }
 ];
 
 export const KPI_FORSKOLA = [
