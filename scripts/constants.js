@@ -34,10 +34,12 @@ export const DATASET_CONFIG = [
   { label: 'Riket', color: '#10b981', dashed: true }
 ];
 
-export const API_BASE = 'https://api.kolada.se/v3/data/municipality';
-// Skolenhetsnivån (OU) kräver v2‑endpointen med query‑parametrar, utan /ou‑suffix
-// Exempel: https://api.kolada.se/v2/data?kpi=N15508&ou=V15E123456
-export const SKOLENHET_DATA_BASE = 'https://api.kolada.se/v2/data';
+// V3‑endpoints fungerar för både kommun‑ och skolenhetsnivå (OU) och ger enhetlig
+// datastruktur över alla KPI:er.
+// Kommun:   https://api.kolada.se/v3/data/kpi/<kpi>/municipality/<id>
+// Skolenhet https://api.kolada.se/v3/oudata/kpi/<kpi>/ou/<id>
+export const API_BASE = 'https://api.kolada.se/v3/data/kpi';
+export const SKOLENHET_DATA_BASE = 'https://api.kolada.se/v3/oudata/kpi';
 export const SKOLENHET_SEARCH_API = 'https://api.kolada.se/v3/ou';
 export const DEFAULT_KOMMUN_ID = '0684';
 export const RIKET_ID = '0000';
