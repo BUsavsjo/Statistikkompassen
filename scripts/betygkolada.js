@@ -8,6 +8,7 @@ import {
   getKpiList
 } from './constants.js';
 import { ALLA_KOMMUNER } from './kommuner.js';
+import { getPredefinedSkolenheter } from './skolenheter.js';
 import {
   genereraAnalysText,
   hamtaKoladaData,
@@ -232,29 +233,48 @@ async function hamtaSkolenheterForKommun(kommunId) {
     return skolenhetCache.get(kommunId);
   }
 
+  const forinlagda = getPredefinedSkolenheter(kommunId).map(enhet => ({
+    id: enhet.id,
+    title: enhet.title,
+    type: (enhet.type || '').toLowerCase()
+  }));
+
   let url = `${SKOLENHET_SEARCH_API}?municipality=${kommunId}&per_page=500`;
-  const enheter = [];
+  const enheter = [...forinlagda];
 
-  while (url) {
-    const response = await fetch(url, {
-      mode: 'cors',
-      headers: {
-        Accept: 'application/json'
-      }
-    });
-    if (!response.ok) throw new Error('Kunde inte hämta skolenheter');
-    const data = await response.json();
-    const resultat = data.results || data.values || [];
-
-    resultat.forEach(enhet => {
-      enheter.push({
-        id: enhet.id,
-        title: enhet.title,
-        type: (enhet.type || enhet.type_name || '').toLowerCase()
+  try {
+    while (url) {
+      const response = await fetch(url, {
+        mode: 'cors',
+        headers: {
+          Accept: 'application/json'
+        }
       });
-    });
+      if (!response.ok) throw new Error('Kunde inte hämta skolenheter');
+      const data = await response.json();
+      const resultat = data.results || data.values || [];
 
-    url = data.next_page || data.next || null;
+      resultat.forEach(enhet => {
+        // Undvik dubbletter om samma enhet redan finns förladdad
+        if (!enheter.some(e => e.id === enhet.id)) {
+          enheter.push({
+            id: enhet.id,
+            title: enhet.title,
+            type: (enhet.type || enhet.type_name || '').toLowerCase()
+          });
+        }
+      });
+
+      url = data.next_page || data.next || null;
+    }
+  } catch (error) {
+    // Om förladdade enheter finns, returnera dem även om API‑anropet misslyckas
+    if (enheter.length) {
+      enheter.sort((a, b) => a.title.localeCompare(b.title, 'sv'));
+      skolenhetCache.set(kommunId, enheter);
+      return enheter;
+    }
+    throw error;
   }
 
   enheter.sort((a, b) => a.title.localeCompare(b.title, 'sv'));
