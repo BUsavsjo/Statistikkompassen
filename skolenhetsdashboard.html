@@ -172,6 +172,7 @@
     <!-- SALSA Section -->
     <div class="dashboard-section">
       <h2>SALSA/Resultat givet förutsättningar</h2>
+      <p class="panel-description">SALSA visar skolans resultat i relation till elevförutsättningar – en positiv avvikelse betyder att skolan presterar över förväntan, en negativ att resultaten ligger under förväntan.</p>
       <div class="kpi-grid" id="salsaKPIs"></div>
     </div>
 
@@ -249,10 +250,16 @@
       { id: 'N15505', label: 'Åk 9: Meritvärde (17 ämnen)', unit: 'poäng' },
       { id: 'N15503', label: 'Åk 9: Betygspoäng matematik', unit: 'poäng' },
       { id: 'U15429', label: 'Åk 9: Högre slutbetyg än NP i matematik', unit: '%' },
-      { id: 'U15430', label: 'Åk 9: Lägre slutbetyg än NP i matematik', unit: '%' }
+      { id: 'U15430', label: 'Åk 9: Lägre slutbetyg än NP i matematik', unit: '%' },
+      { id: 'U15431', label: 'Åk 9: Högre slutbetyg än NP i engelska', unit: '%' },
+      { id: 'U15432', label: 'Åk 9: Lägre slutbetyg än NP i engelska', unit: '%' },
+      { id: 'U15433', label: 'Åk 9: Högre slutbetyg än NP i svenska', unit: '%' },
+      { id: 'U15434', label: 'Åk 9: Lägre slutbetyg än NP i svenska', unit: '%' }
     ]);
     const kpiDefsSalsa = () => ([
+      { id: 'U15413', label: 'Åk 9: SALSA modellberäknad andel alla ämnen', unit: '%' },
       { id: 'U15414', label: 'Åk 9: Avvikelse SALSA (%)', unit: 'p.p.' },
+      { id: 'U15415', label: 'Åk 9: SALSA modellberäknat meritvärde', unit: 'poäng' },
       { id: 'U15416', label: 'Åk 9: Meritvärde avvikelse (SALSA)', unit: 'poäng' }
     ]);
     const kpiDefsTrygghet = () => ([
@@ -360,6 +367,70 @@
       }
       if (vuxnaAgerande?.dir === 'declining') {
         insights.push('⚠️ <strong>Förtroendet för vuxnas agerande sjunker.</strong> Behöver tydligare rutiner och synligt ledarskap.');
+      }
+      
+      // R7: SALSA-förväntning vs faktiskt
+      const salsaForvantat = kpiData['U15413'];
+      const faktisktAllaAmnen = kpiData['N15419'];
+      const salsaAvvikelse = kpiData['U15414'];
+      const salsaMeritForvantat = kpiData['U15415'];
+      const faktisktMerit = kpiData['N15505'];
+      const salsaMeritAvvikelse = kpiData['U15416'];
+      
+      // Andel alla ämnen godkända
+      if (salsaForvantat?.latest && faktisktAllaAmnen?.latest && salsaAvvikelse?.latest) {
+        if (salsaAvvikelse.latest > 5) {
+          insights.push(`📈 <strong>Presterar tydligt över SALSA-modellen.</strong> Faktiskt ${faktisktAllaAmnen.latest.toFixed(1)}% jämfört med förväntat ${salsaForvantat.latest.toFixed(1)}% (+${salsaAvvikelse.latest.toFixed(1)} p.p.). Skolan skapar mervärde givet elevernas förutsättningar.`);
+        } else if (salsaAvvikelse.latest > 2) {
+          insights.push(`📈 <strong>Presterar över SALSA-modellen.</strong> Faktiskt ${faktisktAllaAmnen.latest.toFixed(1)}% jämfört med förväntat ${salsaForvantat.latest.toFixed(1)}% (+${salsaAvvikelse.latest.toFixed(1)} p.p.).`);
+        } else if (salsaAvvikelse.latest < -5) {
+          insights.push(`📉 <strong>Presterar tydligt under SALSA-modellen.</strong> Faktiskt ${faktisktAllaAmnen.latest.toFixed(1)}% jämfört med förväntat ${salsaForvantat.latest.toFixed(1)}% (${salsaAvvikelse.latest.toFixed(1)} p.p.). Behöver prioritera kvalitetsutveckling.`);
+        } else if (salsaAvvikelse.latest < -2) {
+          insights.push(`📉 <strong>Presterar under SALSA-modellen.</strong> Faktiskt ${faktisktAllaAmnen.latest.toFixed(1)}% jämfört med förväntat ${salsaForvantat.latest.toFixed(1)}% (${salsaAvvikelse.latest.toFixed(1)} p.p.).`);
+        }
+      }
+      
+      // Meritvärde
+      if (salsaMeritForvantat?.latest && faktisktMerit?.latest && salsaMeritAvvikelse?.latest) {
+        if (salsaMeritAvvikelse.latest > 10) {
+          insights.push(`📈 <strong>Meritvärde över förväntat.</strong> Faktiskt ${faktisktMerit.latest.toFixed(1)} poäng jämfört med förväntat ${salsaMeritForvantat.latest.toFixed(1)} poäng (+${salsaMeritAvvikelse.latest.toFixed(1)} poäng).`);
+        } else if (salsaMeritAvvikelse.latest < -10) {
+          insights.push(`📉 <strong>Meritvärde under förväntat.</strong> Faktiskt ${faktisktMerit.latest.toFixed(1)} poäng jämfört med förväntat ${salsaMeritForvantat.latest.toFixed(1)} poäng (${salsaMeritAvvikelse.latest.toFixed(1)} poäng).`);
+        }
+      }
+      
+      // SALSA-trend
+      if (salsaAvvikelse?.dir === 'declining' && salsaAvvikelse.diff3 && salsaAvvikelse.diff3 < -3) {
+        insights.push('⚠️ <strong>SALSA-avvikelsen försämras över tid.</strong> Skolan tappar i förhållande till förutsättningarna.');
+      } else if (salsaAvvikelse?.dir === 'improving' && salsaAvvikelse.diff3 && salsaAvvikelse.diff3 > 3) {
+        insights.push('✅ <strong>SALSA-avvikelsen förbättras över tid.</strong> Skolan ökar sitt mervärde.');
+      }
+      
+      // R8: NP-gap bedömning
+      const matteHogreNP = kpiData['U15429'];
+      const matteLagreNP = kpiData['U15430'];
+      const engHogreNP = kpiData['U15431'];
+      const engLagreNP = kpiData['U15432'];
+      const sveHogreNP = kpiData['U15433'];
+      const sveLagreNP = kpiData['U15434'];
+      
+      if (matteHogreNP?.latest && matteHogreNP.latest > 15 && matteF6?.dir === 'declining') {
+        insights.push('⚖️ <strong>Matematik:</strong> Hög andel högre slutbetyg än NP + fallande resultat → risk för glapp i bedömning/NP-matchning.');
+      }
+      if (matteLagreNP?.latest && matteLagreNP.latest > 15) {
+        insights.push('⚖️ <strong>Matematik:</strong> Hög andel lägre slutbetyg än NP → elever presterar på prov men tappar över tid.');
+      }
+      if (engHogreNP?.latest && engHogreNP.latest > 15 && engelska?.dir === 'declining') {
+        insights.push('⚖️ <strong>Engelska:</strong> Hög andel högre slutbetyg än NP + fallande resultat → risk för glapp i bedömning/NP-matchning.');
+      }
+      if (engLagreNP?.latest && engLagreNP.latest > 15) {
+        insights.push('⚖️ <strong>Engelska:</strong> Hög andel lägre slutbetyg än NP → elever presterar på prov men tappar över tid.');
+      }
+      if (sveHogreNP?.latest && sveHogreNP.latest > 15 && svenska?.dir === 'declining') {
+        insights.push('⚖️ <strong>Svenska:</strong> Hög andel högre slutbetyg än NP + fallande resultat → risk för glapp i bedömning/NP-matchning.');
+      }
+      if (sveLagreNP?.latest && sveLagreNP.latest > 15) {
+        insights.push('⚖️ <strong>Svenska:</strong> Hög andel lägre slutbetyg än NP → elever presterar på prov men tappar över tid.');
       }
       
       // Data-saknas fallback
