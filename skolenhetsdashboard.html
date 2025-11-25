@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <title>Skolenhetsdashboard för rektorer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="styles/betygkolada.css">
+  <style>
+    .dashboard-panels {
+      display: grid;
+      gap: 1.5rem;
+      margin-top: 2rem;
+    }
+    .panel {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 8px;
+      box-shadow: 0 0 10px #ccc;
+      border-left: 4px solid #2563eb;
+    }
+    .panel h2 {
+      color: #1e40af;
+      margin-bottom: 1rem;
+      font-size: 1.3rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .panel-description {
+      color: #666;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+      font-style: italic;
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .kpi-item {
+      background: #f8fafc;
+      padding: 1rem;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+    }
+    .kpi-label {
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-bottom: 0.5rem;
+    }
+    .kpi-value {
+      font-size: 1.8rem;
+      font-weight: bold;
+      color: #1e40af;
+      margin-bottom: 0.5rem;
+    }
+    .kpi-trend {
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .trend-improving {
+      color: #16a34a;
+      font-weight: 600;
+    }
+    .trend-declining {
+      color: #dc2626;
+      font-weight: 600;
+    }
+    .trend-stable {
+      color: #64748b;
+      font-weight: 600;
+    }
+    .panel-interpretation {
+      background: #eff6ff;
+      padding: 1rem;
+      border-radius: 6px;
+      border-left: 3px solid #3b82f6;
+      margin-top: 1rem;
+    }
+    .panel-interpretation h4 {
+      color: #1e40af;
+      margin-bottom: 0.5rem;
+      font-size: 1rem;
+    }
+    .panel-interpretation p {
+      color: #475569;
+      line-height: 1.6;
+      margin: 0.5rem 0;
+    }
+    .stage-badge {
+      display: inline-block;
+      background: #dbeafe;
+      color: #1e40af;
+      padding: 0.25rem 0.75rem;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .loading-message {
+      text-align: center;
+      padding: 3rem;
+      color: #64748b;
+      font-size: 1.1rem;
+    }
+    #stageDetection {
+      background: #f0f9ff;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      color: #0369a1;
+      font-weight: 500;
+      display: none;
+    }
+  </style>
+</head>
+<body data-skoltyp="grundskola">
+  <h1 id="pageTitle">Skolenhetsdashboard för rektorer</h1>
+
+  <div class="kpi-selector">
+    <div class="selector-row">
+      <div class="selector-group">
+        <label for="kommunSelect">Välj kommun:</label>
+        <select id="kommunSelect"></select>
+      </div>
+      <div class="selector-group">
+        <label for="skolenhetSelect">Välj skolenhet:</label>
+        <select id="skolenhetSelect" disabled>
+          <option value="">Hämtar skolenheter...</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <a href="index.html" class="back-link">← Till startsidan</a>
+
+  <div id="stageDetection"></div>
+
+  <div id="dashboardContent" class="loading-message">
+    Välj en skolenhet för att visa data...
+  </div>
+
+  <script type="module" src="scripts/skolenhetsdashboard/dashboard.js"></script>
+</body>
+</html>
