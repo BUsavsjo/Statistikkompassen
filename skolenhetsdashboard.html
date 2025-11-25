@@ -65,13 +65,29 @@
       color: #16a34a;
       font-weight: 600;
     }
+    .trend-improving::before {
+      content: '▲';
+      font-size: 1rem;
+      margin-right: 0.25rem;
+    }
     .trend-declining {
       color: #dc2626;
       font-weight: 600;
     }
+    .trend-declining::before {
+      content: '▼';
+      font-size: 1rem;
+      margin-right: 0.25rem;
+    }
     .trend-stable {
       color: #64748b;
       font-weight: 600;
+    }
+    .trend-stable::before {
+      content: '●';
+      font-size: 0.7rem;
+      margin-right: 0.25rem;
+      opacity: 0.6;
     }
     .panel-interpretation {
       background: #eff6ff;
@@ -187,7 +203,7 @@
       card.className = 'kpi-item';
       const label = document.createElement('div'); label.className = 'kpi-label'; label.textContent = kpi.label;
       const value = document.createElement('div'); value.className = 'kpi-value'; value.textContent = `${kpi.value ?? '—'} ${kpi.unit || ''}`.trim();
-      const trend = document.createElement('div'); trend.className = `kpi-trend trend-${kpi.trendDirection}`; trend.innerHTML = `${kpi.trendArrow} ${kpi.trendText}`;
+      const trend = document.createElement('div'); trend.className = `kpi-trend trend-${kpi.trendDirection}`; trend.textContent = kpi.trendText;
       const analysis = document.createElement('div'); analysis.className = 'kpi-analysis'; analysis.textContent = kpi.analysis;
       card.append(label, value, trend, analysis);
       section.appendChild(card);
@@ -217,7 +233,8 @@
     const kpiDefsBaseline = () => ([
       { id: 'N15807', label: 'Antal elever', unit: 'st' },
       { id: 'N15034', label: 'Elever per lärare (heltidstjänst), kommunal grundskola åk 1–9', unit: 'st' },
-      { id: 'N15813', label: 'Andel legitimerade/behöriga lärare åk 1–9', unit: '%' }
+      { id: 'N15813', label: 'Andel legitimerade/behöriga lärare åk 1–9', unit: '%' },
+      { id: 'N15031', label: 'Lärare med pedagogisk högskoleexamen i kommunal grundskola åk 1–9', unit: '%' }
     ]);
     const kpiDefsOutcome = () => ([
       // F-6
@@ -246,46 +263,160 @@
 
     function beraknaTrendtext(unit, values) {
       const serie = (values || []).filter(v => v != null);
-      if (serie.length === 0) return { dir: 'stable', arrow: '→', text: 'Ingen data', analysis: 'Data saknas.', latest: null };
+      if (serie.length === 0) return { dir: 'stable', arrow: '→', text: 'Ingen data', analysis: 'Data saknas.', latest: null, diff1: null, diff3: null };
       const latest = serie[serie.length - 1];
       const prev = serie[serie.length - 2] ?? null;
       const idxMinus3 = serie.length - 4; const prev3 = idxMinus3 >= 0 ? serie[idxMinus3] : null;
       const unitSuffix = unit === '%' ? 'p.p.' : unit || '';
       let dir = 'stable', arrow = '→', text = 'Stabil';
-      if (prev !== null) { const diff = latest - prev; if (diff > 0.05) { dir='improving'; arrow='↑'; } else if (diff < -0.05) { dir='declining'; arrow='↓'; } }
-      if (prev3 !== null) { const diff3 = latest - prev3; const sign = diff3 > 0 ? '+' : ''; text = `${sign}${diff3.toFixed(1)} ${unitSuffix} på 3 år`; }
-      else if (prev !== null) { const diff1 = latest - prev; const sign = diff1 > 0 ? '+' : ''; text = `${sign}${diff1.toFixed(1)} ${unitSuffix} på 1 år`; }
+      let diff1 = null, diff3 = null;
+      if (prev !== null) { diff1 = latest - prev; if (diff1 > 0.05) { dir='improving'; arrow='↑'; } else if (diff1 < -0.05) { dir='declining'; arrow='↓'; } }
+      if (prev3 !== null) { diff3 = latest - prev3; const sign = diff3 > 0 ? '+' : ''; text = `${sign}${diff3.toFixed(1)} ${unitSuffix} på 3 år`; }
+      else if (prev !== null) { const sign = diff1 > 0 ? '+' : ''; text = `${sign}${diff1.toFixed(1)} ${unitSuffix} på 1 år`; }
       else { text = 'Ingen trenddata'; }
       const analysis = dir === 'improving' ? 'Förbättring över tid.' : dir === 'declining' ? 'Försämring över tid.' : 'Stabil nivå.';
-      return { dir, arrow, text, analysis, latest };
+      return { dir, arrow, text, analysis, latest, diff1, diff3 };
     }
     async function hamtaKpiCardData(ouId, def) {
       try {
         const data = await hamtaKoladaData(ouId, def.id, SKOLENHET_DATA_BASE);
         const hasAny = (data?.totalt || []).some(v => v != null);
-        if (!hasAny) return { label: def.label, value: '—', unit: def.unit, trendDirection: 'stable', trendArrow: '→', trendText: 'Ingen data', analysis: 'Data saknas för denna indikator.' };
+        if (!hasAny) return { label: def.label, value: '—', unit: def.unit, trendDirection: 'stable', trendArrow: '→', trendText: 'Ingen data', analysis: 'Data saknas för denna indikator.', trendData: { dir: null, latest: null, diff1: null, diff3: null } };
         const trend = beraknaTrendtext(def.unit, data.totalt);
-        return { label: def.label, value: trend.latest != null ? (def.unit === '%' ? Number(trend.latest).toFixed(1) : trend.latest) : '—', unit: def.unit, trendDirection: trend.dir, trendArrow: trend.arrow, trendText: trend.text, analysis: trend.analysis };
+        return { label: def.label, value: trend.latest != null ? (def.unit === '%' ? Number(trend.latest).toFixed(1) : trend.latest) : '—', unit: def.unit, trendDirection: trend.dir, trendArrow: trend.arrow, trendText: trend.text, analysis: trend.analysis, trendData: { dir: trend.dir, latest: trend.latest, diff1: trend.diff1, diff3: trend.diff3 } };
       } catch (e) {
         console.warn('KPI fetch failed', def.id, e);
-        return { label: def.label, value: '—', unit: def.unit, trendDirection: 'stable', trendArrow: '→', trendText: 'Kunde inte hämta', analysis: 'Kunde inte hämta data just nu.' };
+        return { label: def.label, value: '—', unit: def.unit, trendDirection: 'stable', trendArrow: '→', trendText: 'Kunde inte hämta', analysis: 'Kunde inte hämta data just nu.', trendData: { dir: null, latest: null, diff1: null, diff3: null } };
       }
+    }
+
+    // --- Analysis generation ---
+    function genereraAutomatiskAnalys(kpiData) {
+      const insights = [];
+      
+      // R1: Belastning (N15807, N15034)
+      const elevantal = kpiData['N15807'];
+      const elevPerLarare = kpiData['N15034'];
+      if (elevantal?.dir && elevPerLarare?.dir) {
+        if (elevantal.dir === 'improving' && elevPerLarare.dir === 'improving') {
+          insights.push('📊 <strong>Belastningen ökar.</strong> Risk för större grupper och mindre stöd per elev.');
+        } else if (elevantal.dir === 'declining' && (elevPerLarare.dir === 'declining' || elevPerLarare.dir === 'stable')) {
+          insights.push('📊 <strong>Minskad volym utan sämre täthet.</strong> Läge att se över organisation/resursfördelning.');
+        } else if (elevantal.dir === 'stable' && elevPerLarare.dir === 'declining') {
+          insights.push('📊 <strong>Tätheten förbättras.</strong> Ger bättre förutsättningar för stöd/arbetsro.');
+        }
+      }
+      
+      // R2: Behörighet (N15813)
+      const behoriga = kpiData['N15813'];
+      if (behoriga?.dir === 'improving' && behoriga.diff3 && behoriga.diff3 > 2) {
+        insights.push('👨‍🏫 <strong>Behörigheten förbättras,</strong> vilket stärker förutsättningarna för resultat över tid.');
+      } else if (behoriga?.latest && behoriga.latest < 85) {
+        insights.push('👨‍🏫 <strong>Behörigheten är låg.</strong> Kompetensförsörjning bör prioriteras.');
+      }
+      
+      // R3: Ämnesspecifikt vs brett (F-6: N15482, N15485, N15488)
+      const engelska = kpiData['N15482'];
+      const matteF6 = kpiData['N15485'];
+      const svenska = kpiData['N15488'];
+      const amnenF6 = [
+        { name: 'engelska', data: engelska },
+        { name: 'matematik', data: matteF6 },
+        { name: 'svenska', data: svenska }
+      ].filter(a => a.data?.dir);
+      const amnenNer = amnenF6.filter(a => a.data.dir === 'declining');
+      
+      if (amnenNer.length === 1) {
+        insights.push(`📚 <strong>Tapp i ${amnenNer[0].name} åk 6</strong> tyder på ämnesspecifik utmaning. Riktad didaktisk insats där.`);
+      } else if (amnenNer.length >= 2) {
+        insights.push('📚 <strong>Brett tapp i flera ämnen åk 6.</strong> Tyder på systemisk fråga (progression, stöd, studiero).');
+      }
+      
+      // R4: E-andel vs betygspoäng
+      const mattePoangF6 = kpiData['N15509'];
+      const svePoangF6 = kpiData['N15510'];
+      if (matteF6?.dir === 'stable' && mattePoangF6?.dir === 'declining') {
+        insights.push('📉 <strong>Matematik åk 6:</strong> Fler klarar E men betygspoäng sjunker. Fokus på progression mot C/A.');
+      } else if (matteF6?.dir === 'declining' && mattePoangF6?.dir === 'declining') {
+        insights.push('📉 <strong>Matematik åk 6:</strong> Kunskapstapp på bredd och djup. Prioritera tidiga insatser och undervisningskvalitet.');
+      }
+      if (svenska?.dir === 'stable' && svePoangF6?.dir === 'declining') {
+        insights.push('📉 <strong>Svenska åk 6:</strong> Fler klarar E men betygspoäng sjunker. Fokus på progression mot C/A.');
+      } else if (svenska?.dir === 'declining' && svePoangF6?.dir === 'declining') {
+        insights.push('📉 <strong>Svenska åk 6:</strong> Kunskapstapp på bredd och djup. Prioritera tidiga insatser och undervisningskvalitet.');
+      }
+      
+      // R5: Studiero som förklarare
+      const studiero = kpiData['N15603'];
+      if (amnenNer.length >= 2 && studiero?.dir === 'declining') {
+        insights.push('🔇 <strong>Resultattapp sammanfaller med sämre studiero.</strong> Klassrumsledarskap/arbetsro är trolig hävstång.');
+      }
+      
+      // R6: Trygghet/förtroende
+      const trygghet = kpiData['N15613'];
+      const vuxnaAgerande = kpiData['N15614'];
+      if (trygghet?.dir === 'declining') {
+        insights.push('⚠️ <strong>Minskad trygghet</strong> kan påverka både lärande och närvaro. Se över rastmiljö/relationsarbete.');
+      }
+      if (vuxnaAgerande?.dir === 'declining') {
+        insights.push('⚠️ <strong>Förtroendet för vuxnas agerande sjunker.</strong> Behöver tydligare rutiner och synligt ledarskap.');
+      }
+      
+      // Data-saknas fallback
+      const harSaknad = Object.values(kpiData).some(k => k?.latest === null);
+      if (harSaknad) {
+        insights.push('<em>OBS: Vissa indikatorer saknar OU-data för denna enhet och ingår därför inte i bedömningen.</em>');
+      }
+      
+      // Kohorteffekt (placeholder - kan utökas med faktiskt n-värde senare)
+      const elevantalValue = elevantal?.latest;
+      if (elevantalValue && elevantalValue < 50) {
+        insights.push('<em>Liten elevgrupp → resultat kan variera mycket mellan år.</em>');
+      }
+      
+      return insights.length > 0 ? insights : ['Ingen automatisk analys kunde genereras baserat på tillgänglig data.'];
     }
 
     // --- Rendering ---
     async function renderSections(ouId) {
+      const kpiData = {};
+      
       // Baseline
       setLoading('baselineKPIs', true); document.getElementById('baselineKPIs').innerHTML = '';
-      for (const def of kpiDefsBaseline()) { const card = await hamtaKpiCardData(ouId, def); addKPICard('baselineKPIs', card); }
+      for (const def of kpiDefsBaseline()) { 
+        const card = await hamtaKpiCardData(ouId, def); 
+        addKPICard('baselineKPIs', card);
+        kpiData[def.id] = card.trendData;
+      }
+      
       // Outcome (both F-6 and 7-9)
       setLoading('outcomeKPIs', true); document.getElementById('outcomeKPIs').innerHTML = '';
-      for (const def of kpiDefsOutcome()) { const card = await hamtaKpiCardData(ouId, def); addKPICard('outcomeKPIs', card); }
+      for (const def of kpiDefsOutcome()) { 
+        const card = await hamtaKpiCardData(ouId, def); 
+        addKPICard('outcomeKPIs', card);
+        kpiData[def.id] = card.trendData;
+      }
+      
       // SALSA
       setLoading('salsaKPIs', true); document.getElementById('salsaKPIs').innerHTML = '';
-      for (const def of kpiDefsSalsa()) { const card = await hamtaKpiCardData(ouId, def); addKPICard('salsaKPIs', card); }
+      for (const def of kpiDefsSalsa()) { 
+        const card = await hamtaKpiCardData(ouId, def); 
+        addKPICard('salsaKPIs', card);
+        kpiData[def.id] = card.trendData;
+      }
+      
       // Trygghet
       setLoading('trygghetsKPIs', true); document.getElementById('trygghetsKPIs').innerHTML = '';
-      for (const def of kpiDefsTrygghet()) { const card = await hamtaKpiCardData(ouId, def); addKPICard('trygghetsKPIs', card); }
+      for (const def of kpiDefsTrygghet()) { 
+        const card = await hamtaKpiCardData(ouId, def); 
+        addKPICard('trygghetsKPIs', card);
+        kpiData[def.id] = card.trendData;
+      }
+      
+      // Automatisk analys
+      const insights = genereraAutomatiskAnalys(kpiData);
+      const analysisEl = document.getElementById('analysisText');
+      analysisEl.innerHTML = '<h4>Automatisk analys</h4>' + insights.map(i => `<p>${i}</p>`).join('');
     }
 
     // --- Selectors init ---
