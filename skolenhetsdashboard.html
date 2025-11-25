@@ -13,11 +13,12 @@
     }
     
     #pageTitle {
-      color: white;
+      color: #1e3a8a;
       text-align: center;
       font-size: 2.5rem;
       margin-bottom: 2rem;
-      text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      text-shadow: 0 1px 2px rgba(255,255,255,0.5);
+      font-weight: 700;
     }
     
     .kpi-selector {
@@ -100,19 +101,21 @@
     
     .back-link {
       display: inline-block;
-      color: white;
+      color: #1e3a8a;
       text-decoration: none;
       margin-bottom: 1.5rem;
       padding: 0.5rem 1rem;
-      background: rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.9);
       border-radius: 8px;
       transition: all 0.2s;
-      font-weight: 500;
+      font-weight: 600;
+      border: 2px solid rgba(30, 58, 138, 0.2);
     }
     
     .back-link:hover {
-      background: rgba(255,255,255,0.3);
+      background: white;
       transform: translateX(-2px);
+      border-color: #1e3a8a;
     }
     
     .dashboard-section {
@@ -192,7 +195,7 @@
     
     .kpi-label {
       font-size: 0.9rem;
-      color: #64748b;
+      color: #475569;
       margin-bottom: 0.75rem;
       font-weight: 600;
       text-transform: uppercase;
@@ -260,7 +263,7 @@
     
     .kpi-analysis {
       font-size: 0.85rem;
-      color: #64748b;
+      color: #475569;
       line-height: 1.5;
     }
     
@@ -287,7 +290,7 @@
     }
     
     .panel-interpretation p {
-      color: #475569;
+      color: #334155;
       line-height: 1.8;
       margin: 0.75rem 0;
       padding: 0.75rem;
@@ -299,9 +302,9 @@
     .loading-message {
       text-align: center;
       padding: 2rem 2rem 1rem;
-      color: #64748b;
+      color: #475569;
       font-size: 1.1rem;
-      font-weight: 500;
+      font-weight: 600;
     }
     
     .progress-container {
@@ -333,11 +336,13 @@
       position: absolute;
       width: 100%;
       text-align: center;
-      font-size: 0.75rem;
+      font-size: 0.8rem;
       font-weight: 700;
-      color: #1e293b;
+      color: white;
       line-height: 24px;
-      z-index: 1;
+      z-index: 2;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+      letter-spacing: 0.5px;
     }
     
     @keyframes progressShimmer {
