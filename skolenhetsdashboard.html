@@ -159,6 +159,12 @@
       <div class="kpi-grid" id="salsaKPIs"></div>
     </div>
 
+    <!-- Trygghet Section -->
+    <div class="dashboard-section">
+      <h2>Trygghet åk 5</h2>
+      <div class="kpi-grid" id="trygghetsKPIs"></div>
+    </div>
+
     <!-- Automatisk Analys Section -->
     <div class="dashboard-section">
       <h2>Automatisk analys</h2>
@@ -210,22 +216,32 @@
     }
     const kpiDefsBaseline = () => ([
       { id: 'N15807', label: 'Antal elever', unit: 'st' },
-      { id: 'N15034', label: 'Elever per lärare', unit: 'st' },
-      { id: 'N15813', label: 'Behöriga lärare', unit: '%' }
+      { id: 'N15034', label: 'Elever per lärare (heltidstjänst), kommunal grundskola åk 1–9', unit: 'st' },
+      { id: 'N15813', label: 'Andel legitimerade/behöriga lärare åk 1–9', unit: '%' }
     ]);
     const kpiDefsOutcome = () => ([
       // F-6
       { id: 'N15482', label: 'Åk 6: Engelska minst E', unit: '%' },
       { id: 'N15485', label: 'Åk 6: Matematik minst E', unit: '%' },
       { id: 'N15488', label: 'Åk 6: Svenska minst E', unit: '%' },
+      { id: 'N15509', label: 'Åk 6: Betygspoäng i matematik', unit: 'poäng' },
+      { id: 'N15510', label: 'Åk 6: Betygspoäng i svenska', unit: 'poäng' },
       // 7-9
-      { id: 'N15508', label: 'Åk 9: Alla ämnen godkända', unit: '%' },
-      { id: 'N15504', label: 'Åk 9: Meritvärde (17 ämnen)', unit: 'poäng' },
-      { id: 'N15503', label: 'Åk 9: Betygspoäng matematik', unit: 'poäng' }
+      { id: 'N15419', label: 'Åk 9: Alla ämnen godkända', unit: '%' },
+      { id: 'N15436', label: 'Åk 9: Behöriga till yrkesprogram', unit: '%' },
+      { id: 'N15505', label: 'Åk 9: Meritvärde (17 ämnen)', unit: 'poäng' },
+      { id: 'N15503', label: 'Åk 9: Betygspoäng matematik', unit: 'poäng' },
+      { id: 'U15429', label: 'Åk 9: Högre slutbetyg än NP i matematik', unit: '%' },
+      { id: 'U15430', label: 'Åk 9: Lägre slutbetyg än NP i matematik', unit: '%' }
     ]);
     const kpiDefsSalsa = () => ([
       { id: 'U15414', label: 'Åk 9: Avvikelse SALSA (%)', unit: 'p.p.' },
       { id: 'U15416', label: 'Åk 9: Meritvärde avvikelse (SALSA)', unit: 'poäng' }
+    ]);
+    const kpiDefsTrygghet = () => ([
+      { id: 'N15613', label: 'Åk 5: Trygghet', unit: '%' },
+      { id: 'N15603', label: 'Åk 5: Studiero', unit: '%' },
+      { id: 'N15614', label: 'Åk 5: Vuxnas agerande mot kränkningar', unit: '%' }
     ]);
 
     function beraknaTrendtext(unit, values) {
@@ -267,6 +283,9 @@
       // SALSA
       setLoading('salsaKPIs', true); document.getElementById('salsaKPIs').innerHTML = '';
       for (const def of kpiDefsSalsa()) { const card = await hamtaKpiCardData(ouId, def); addKPICard('salsaKPIs', card); }
+      // Trygghet
+      setLoading('trygghetsKPIs', true); document.getElementById('trygghetsKPIs').innerHTML = '';
+      for (const def of kpiDefsTrygghet()) { const card = await hamtaKpiCardData(ouId, def); addKPICard('trygghetsKPIs', card); }
     }
 
     // --- Selectors init ---
@@ -284,7 +303,7 @@
       enheter.forEach(e => { const o=document.createElement('option'); o.value=e.id; o.textContent=e.title; skolenhetSelect.appendChild(o); });
       skolenhetSelect.disabled = false;
       // Clear sections when kommun changes
-      ['baselineKPIs','outcomeKPIs','salsaKPIs'].forEach(id => document.getElementById(id).innerHTML='');
+      ['baselineKPIs','outcomeKPIs','salsaKPIs','trygghetsKPIs'].forEach(id => document.getElementById(id).innerHTML='');
     }
     function onSkolenhetChange() {
       const ouId = skolenhetSelect.value; if (!ouId) return; renderSections(ouId);
