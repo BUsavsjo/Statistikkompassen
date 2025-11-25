@@ -71,7 +71,30 @@ function createKPICard(kpi) {
 
 function setLoading(sectionId, loading = true) {
   const el = document.getElementById(sectionId);
-  if (el) el.innerHTML = loading ? '<div class="loading-message">Laddar...</div>' : '';
+  if (!el) return;
+  if (loading) {
+    el.innerHTML = `
+      <div class="loading-message">Laddar data...</div>
+      <div class="progress-container">
+        <div class="progress-bar" style="width: 0%" data-section="${sectionId}"></div>
+        <div class="progress-text">0%</div>
+      </div>
+    `;
+  } else {
+    el.innerHTML = '';
+  }
+}
+
+function updateProgress(sectionId, current, total) {
+  const el = document.getElementById(sectionId);
+  if (!el) return;
+  const progressBar = el.querySelector(`[data-section="${sectionId}"]`);
+  const progressText = el.querySelector('.progress-text');
+  if (progressBar && progressText) {
+    const percent = Math.round((current / total) * 100);
+    progressBar.style.width = `${percent}%`;
+    progressText.textContent = `${percent}%`;
+  }
 }
 
 async function hamtaSkolenheterForKommun(kommunId) {
@@ -219,7 +242,17 @@ function genereraAutomatiskAnalys(kpiData) {
 async function renderSection(sectionId, defs, ouId, kpiData) {
   setLoading(sectionId, true);
   const sectionEl = document.getElementById(sectionId);
-  const cards = await Promise.all(defs.map(def => hamtaKpiCardData(ouId, def)));
+  const total = defs.length;
+  let completed = 0;
+  
+  const cardPromises = defs.map(async (def) => {
+    const card = await hamtaKpiCardData(ouId, def);
+    completed++;
+    updateProgress(sectionId, completed, total);
+    return card;
+  });
+  
+  const cards = await Promise.all(cardPromises);
   sectionEl.innerHTML = '';
   const frag = document.createDocumentFragment();
   cards.forEach((card, index) => {
