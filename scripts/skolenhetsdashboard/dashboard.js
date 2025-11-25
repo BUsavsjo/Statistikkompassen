@@ -32,7 +32,7 @@ const SEVEN_NINE_OUTCOME_KPIS = [
 let aktivKommun = DEFAULT_KOMMUN_ID;
 let aktivSkolenhet = null;
 let aktivSkolenhetNamn = '';
-let detectedStage = null;
+let valtStadium = '';
 const skolenhetCache = new Map();
 const dataCache = new Map();
 
@@ -139,42 +139,6 @@ function getTrendDirection(trend, munTrend) {
   // Simple trend without comparison
   if (Math.abs(change) < 1) return 'stable';
   return change > 0 ? 'improving' : 'declining';
-}
-
-// Detect school stage from name or by checking which grades have data
-function detectSchoolStage(ouName) {
-  const name = ouName.toLowerCase();
-  
-  // Explicit markers
-  if (name.includes('f-6') || name.includes('lågstadie') || name.includes('mellanstadie')) {
-    return 'F-6';
-  }
-  if (name.includes('7-9') || name.includes('högstadie')) {
-    return '7-9';
-  }
-  if (name.includes('f-9')) {
-    return 'F-9';
-  }
-  
-  // Default: will be determined by data availability
-  return null;
-}
-
-// Detect stage by checking which outcome data exists
-async function detectStageByData(ouId) {
-  // Check if grade 9 data exists
-  const grade9Test = await fetchKPIData(ouId, 'N15418');
-  const hasGrade9 = grade9Test.some(v => v.value !== null);
-  
-  // Check if grade 6 data exists
-  const grade6Test = await fetchKPIData(ouId, 'N15482');
-  const hasGrade6 = grade6Test.some(v => v.value !== null);
-  
-  if (hasGrade9 && hasGrade6) return 'F-9';
-  if (hasGrade9) return '7-9';
-  if (hasGrade6) return 'F-6';
-  
-  return 'F-6'; // Default
 }
 
 // Generate interpretation for baseline panel
@@ -343,18 +307,14 @@ async function renderBaselinePanel(ouId, asText = false) {
     { id: 'N15813', name: 'Behöriga lärare' }
   ];
 
-  const panelContent = [];
-
-  for (const kpi of baselineKPIs) {
+  const panelContent = await Promise.all(baselineKPIs.map(async kpi => {
     const data = await fetchKPIData(ouId, kpi.id);
     const latestValue = data.length > 0 ? data[0].value : 'Ingen data';
 
-    if (asText) {
-      panelContent.push(`<div>${kpi.name}: ${latestValue}</div>`);
-    } else {
-      panelContent.push(renderKPIItem(kpi, data));
-    }
-  }
+    return asText
+      ? `<div>${kpi.name}: ${latestValue}</div>`
+      : renderKPIItem(kpi, data);
+  }));
 
   return `<div class="panel baseline-panel">${panelContent.join('')}</div>`;
 }
@@ -368,18 +328,14 @@ async function renderF6OutcomesPanel(ouId, asText = false) {
     { id: 'N15516', name: 'Svenska som andraspråk' }
   ];
 
-  const panelContent = [];
-
-  for (const kpi of f6KPIs) {
+  const panelContent = await Promise.all(f6KPIs.map(async kpi => {
     const data = await fetchKPIData(ouId, kpi.id);
     const latestValue = data.length > 0 ? data[0].value : 'Ingen data';
 
-    if (asText) {
-      panelContent.push(`<div>${kpi.name}: ${latestValue}</div>`);
-    } else {
-      panelContent.push(renderKPIItem(kpi, data));
-    }
-  }
+    return asText
+      ? `<div>${kpi.name}: ${latestValue}</div>`
+      : renderKPIItem(kpi, data);
+  }));
 
   return `<div class="panel f6-panel">${panelContent.join('')}</div>`;
 }
@@ -394,25 +350,29 @@ async function render79OutcomesPanel(ouId, asText = false) {
     { id: 'U15416', name: 'SALSA-avvikelse' }
   ];
 
-  const panelContent = [];
-
-  for (const kpi of f9KPIs) {
+  const panelContent = await Promise.all(f9KPIs.map(async kpi => {
     const data = await fetchKPIData(ouId, kpi.id);
     const latestValue = data.length > 0 ? data[0].value : 'Ingen data';
 
-    if (asText) {
-      panelContent.push(`<div>${kpi.name}: ${latestValue}</div>`);
-    } else {
-      panelContent.push(renderKPIItem(kpi, data));
-    }
-  }
+    return asText
+      ? `<div>${kpi.name}: ${latestValue}</div>`
+      : renderKPIItem(kpi, data);
+  }));
 
   return `<div class="panel f9-panel">${panelContent.join('')}</div>`;
 }
 
 // Load and render full dashboard
-async function loadDashboard(ouId, ouName) {
+async function loadDashboard(ouId, ouName, stage) {
   const content = document.getElementById('dashboardContent');
+  const stageToUse = stage || valtStadium;
+
+  if (!stageToUse) {
+    content.innerHTML = '<div class="loading-message">Välj stadium för att visa data...</div>';
+    return;
+  }
+
+  valtStadium = stageToUse;
   content.innerHTML = '<div class="loading-message">Laddar data...</div>';
 
   console.log('=== LOADING DASHBOARD ===');
@@ -421,24 +381,12 @@ async function loadDashboard(ouId, ouName) {
   console.log('Municipality:', aktivKommun);
 
   try {
-    // Detect stage
-    let stage = detectSchoolStage(ouName);
-    console.log('Stage from name detection:', stage);
-
-    if (!stage) {
-      console.log('No stage from name, detecting from data...');
-      stage = await detectStageByData(ouId);
-      console.log('Stage from data detection:', stage);
-    }
-
-    detectedStage = stage;
-
-    // Show stage detection
+    // Show chosen stage
     const stageDetection = document.getElementById('stageDetection');
     stageDetection.style.display = 'block';
     stageDetection.innerHTML = `
-      <strong>Detekterat stadium:</strong> <span class="stage-badge">${stage}</span> 
-      <span style="margin-left: 1rem; color: #64748b;">Jämförelser görs endast inom ${stage}-enheter</span>
+      <strong>Valt stadium:</strong> <span class="stage-badge">${stageToUse}</span>
+      <span style="margin-left: 1rem; color: #64748b;">Jämförelser görs endast inom ${stageToUse}-enheter</span>
     `;
 
     // Render panels
@@ -452,17 +400,17 @@ async function loadDashboard(ouId, ouName) {
     console.log('Baseline panel complete');
 
     // Show relevant outcome panels based on stage
-    if (stage === 'F-6') {
+    if (stageToUse === 'F-6') {
       console.log('Rendering F-6 outcomes panel...');
       const f6Panel = await renderF6OutcomesPanel(ouId, true); // Pass true to render as text
       panels.push(f6Panel);
       console.log('F-6 panel complete');
-    } else if (stage === '7-9') {
+    } else if (stageToUse === '7-9') {
       console.log('Rendering 7-9 outcomes panel...');
       const f9Panel = await render79OutcomesPanel(ouId, true); // Pass true to render as text
       panels.push(f9Panel);
       console.log('7-9 panel complete');
-    } else if (stage === 'F-9') {
+    } else if (stageToUse === 'F-9') {
       console.log('Rendering both F-6 and 7-9 panels...');
       const [f6Panel, f9Panel] = await Promise.all([
         renderF6OutcomesPanel(ouId, true), // Pass true to render as text
@@ -593,32 +541,82 @@ function initKommunDropdown() {
   });
 }
 
+function initStageDropdown() {
+  const stageSelect = document.getElementById('stageSelect');
+  if (!stageSelect) return;
+
+  const options = [
+    { value: '', label: 'Välj stadium...' },
+    { value: 'F-6', label: 'F-6' },
+    { value: '7-9', label: '7-9' },
+    { value: 'F-9', label: 'F-9' }
+  ];
+
+  stageSelect.innerHTML = '';
+  options.forEach(({ value, label }) => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    stageSelect.appendChild(option);
+  });
+
+  stageSelect.disabled = true;
+}
+
 // Event handlers
 function bytKommun(kommunId) {
   aktivKommun = kommunId;
   aktivSkolenhet = null;
   aktivSkolenhetNamn = '';
+  valtStadium = '';
   console.log('Byte till kommun:', kommunId);
   uppdateraSkolenhetDropdown();
-  document.getElementById('dashboardContent').innerHTML = 
+  document.getElementById('dashboardContent').innerHTML =
     '<div class="loading-message">Välj en skolenhet för att visa data...</div>';
   document.getElementById('stageDetection').style.display = 'none';
+
+  const stageSelect = document.getElementById('stageSelect');
+  if (stageSelect) {
+    stageSelect.value = '';
+    stageSelect.disabled = true;
+  }
 }
 
 function bytSkolenhet(skolenhetId, skolenhetNamn) {
   if (!skolenhetId) {
     aktivSkolenhet = null;
     aktivSkolenhetNamn = '';
-    document.getElementById('dashboardContent').innerHTML = 
+    valtStadium = '';
+    document.getElementById('dashboardContent').innerHTML =
       '<div class="loading-message">Välj en skolenhet för att visa data...</div>';
     document.getElementById('stageDetection').style.display = 'none';
+
+    const stageSelect = document.getElementById('stageSelect');
+    if (stageSelect) {
+      stageSelect.value = '';
+      stageSelect.disabled = true;
+    }
     return;
   }
 
   aktivSkolenhet = skolenhetId;
   aktivSkolenhetNamn = skolenhetNamn || '';
   console.log('Byte till skolenhet:', aktivSkolenhetNamn);
-  loadDashboard(skolenhetId, skolenhetNamn);
+
+  const stageSelect = document.getElementById('stageSelect');
+  if (stageSelect) {
+    stageSelect.disabled = false;
+    stageSelect.value = '';
+
+    if (!stageSelect.value) {
+      document.getElementById('dashboardContent').innerHTML =
+        '<div class="loading-message">Välj stadium för att visa data...</div>';
+      document.getElementById('stageDetection').style.display = 'none';
+      return;
+    }
+  }
+
+  loadDashboard(skolenhetId, skolenhetNamn, stageSelect ? stageSelect.value : valtStadium);
 }
 
 // Initialize
@@ -627,7 +625,8 @@ function init() {
   
   initKommunDropdown();
   uppdateraSkolenhetDropdown();
-  
+  initStageDropdown();
+
   document.getElementById('kommunSelect')?.addEventListener('change', event => {
     bytKommun(event.target.value);
   });
@@ -636,7 +635,22 @@ function init() {
     const option = event.target.selectedOptions[0];
     bytSkolenhet(event.target.value, option ? option.textContent : '');
   });
-  
+
+  document.getElementById('stageSelect')?.addEventListener('change', event => {
+    valtStadium = event.target.value;
+
+    if (!valtStadium) {
+      document.getElementById('dashboardContent').innerHTML =
+        '<div class="loading-message">Välj stadium för att visa data...</div>';
+      document.getElementById('stageDetection').style.display = 'none';
+      return;
+    }
+
+    if (aktivSkolenhet) {
+      loadDashboard(aktivSkolenhet, aktivSkolenhetNamn, valtStadium);
+    }
+  });
+
   console.log('Initiering klar');
 }
 
