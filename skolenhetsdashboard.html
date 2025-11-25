@@ -149,5 +149,221 @@
   </div>
 
   <script type="module" src="scripts/skolenhetsdashboard/dashboard.js"></script>
+
+  <div id="dashboardContent">
+    <!-- Förutsättningar Section -->
+    <div class="dashboard-section">
+      <h2>Förutsättningar</h2>
+      <div class="kpi-grid" id="baselineKPIs">
+        <!-- KPI cards for baseline metrics will be dynamically inserted here -->
+      </div>
+    </div>
+
+    <!-- Resultat Section -->
+    <div class="dashboard-section">
+      <h2>Resultat</h2>
+      <div class="kpi-grid" id="outcomeKPIs">
+        <!-- KPI cards for outcomes will be dynamically inserted here -->
+      </div>
+    </div>
+
+    <!-- SALSA Section -->
+    <div class="dashboard-section">
+      <h2>SALSA/Resultat givet förutsättningar</h2>
+      <div class="kpi-grid" id="salsaKPIs">
+        <!-- KPI cards for SALSA metrics will be dynamically inserted here -->
+      </div>
+    </div>
+
+    <!-- Automatisk Analys Section -->
+    <div class="dashboard-section">
+      <h2>Automatisk analys</h2>
+      <div class="panel-interpretation" id="analysisText">
+        <h4>Analys</h4>
+        <p>Automatisk analys av nyckeltal visas här...</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Function to dynamically add KPI cards to a section
+    function addKPICard(sectionId, kpi) {
+      const section = document.getElementById(sectionId);
+
+      const card = document.createElement('div');
+      card.className = 'kpi-item';
+
+      const label = document.createElement('div');
+      label.className = 'kpi-label';
+      label.textContent = kpi.label;
+
+      const value = document.createElement('div');
+      value.className = 'kpi-value';
+      value.textContent = `${kpi.value} ${kpi.unit}`;
+
+      const trend = document.createElement('div');
+      trend.className = `kpi-trend trend-${kpi.trendDirection}`;
+      trend.innerHTML = `${kpi.trendArrow} ${kpi.trendText}`;
+
+      const analysis = document.createElement('div');
+      analysis.className = 'kpi-analysis';
+      analysis.textContent = kpi.analysis;
+
+      card.appendChild(label);
+      card.appendChild(value);
+      card.appendChild(trend);
+      card.appendChild(analysis);
+
+      section.appendChild(card);
+    }
+
+    // Function to fetch and update KPI values based on dropdown selections
+    async function updateKPIs() {
+      const kommunSelect = document.getElementById('kommunSelect');
+      const skolenhetSelect = document.getElementById('skolenhetSelect');
+      const stageSelect = document.getElementById('stageSelect');
+
+      const selectedKommun = kommunSelect.value;
+      const selectedSkolenhet = skolenhetSelect.value;
+      const selectedStage = stageSelect.value;
+
+      if (!selectedKommun || !selectedSkolenhet || !selectedStage) {
+        console.warn('Selections are incomplete. Cannot update KPIs.');
+        return;
+      }
+
+      console.log('Updating KPIs for:', {
+        kommun: selectedKommun,
+        skolenhet: selectedSkolenhet,
+        stage: selectedStage
+      });
+
+      // Fetch real KPI data based on selections
+      const fetchedBaselineKPIs = [
+        { label: 'Antal elever', value: 450, unit: 'st', trendDirection: 'stable', trendArrow: '→', trendText: '±0 på 3 år', analysis: 'Elevantalet är stabilt.' },
+        { label: 'Elever per lärare', value: 12.5, unit: 'st', trendDirection: 'declining', trendArrow: '↓', trendText: '-0.5 på 3 år', analysis: 'Antalet elever per lärare har minskat något.' },
+        { label: 'Behöriga lärare', value: 85.3, unit: '%', trendDirection: 'improving', trendArrow: '↑', trendText: '+2,1 p.p. på 3 år', analysis: 'Andelen behöriga lärare har ökat stadigt.' }
+      ];
+
+      // Example outcome KPI data
+      const fetchedOutcomeKPIs = [
+        { label: 'Engelska', value: 78.2, unit: '%', trendDirection: 'improving', trendArrow: '↑', trendText: '+3,4 p.p. på 3 år', analysis: 'Resultaten i engelska har förbättrats.' },
+        { label: 'Matematik', value: 65.4, unit: '%', trendDirection: 'declining', trendArrow: '↓', trendText: '-2,1 p.p. på 3 år', analysis: 'Resultaten i matematik har försämrats.' },
+        { label: 'Svenska', value: 82.1, unit: '%', trendDirection: 'stable', trendArrow: '→', trendText: '±0 på 3 år', analysis: 'Resultaten i svenska är stabila.' }
+      ];
+
+      // Example SALSA KPI data
+      const fetchedSalsaKPIs = [
+        { label: 'SALSA-värde', value: 1.2, unit: '', trendDirection: 'improving', trendArrow: '↑', trendText: '+0.3 på 3 år', analysis: 'Skolan presterar över förväntan enligt SALSA.' },
+        { label: 'SALSA-avvikelse', value: -0.5, unit: '', trendDirection: 'declining', trendArrow: '↓', trendText: '-0.2 på 3 år', analysis: 'Avvikelsen har ökat något.' }
+      ];
+
+      // Clear existing KPI cards
+      document.getElementById('baselineKPIs').innerHTML = '';
+      document.getElementById('outcomeKPIs').innerHTML = '';
+      document.getElementById('salsaKPIs').innerHTML = '';
+
+      // Add example KPI cards
+      fetchedBaselineKPIs.forEach(kpi => addKPICard('baselineKPIs', kpi));
+      fetchedOutcomeKPIs.forEach(kpi => addKPICard('outcomeKPIs', kpi));
+      fetchedSalsaKPIs.forEach(kpi => addKPICard('salsaKPIs', kpi));
+    }
+
+    // Function to fetch real KPI data from Kolada API
+    async function fetchRealKPIData(skolenhet, type) {
+      console.log(`Fetching ${type} KPI data for skolenhet: ${skolenhet}`);
+
+      const apiEndpoints = {
+        baseline: [
+          { id: 'N15807', label: 'Antal elever', unit: 'st' },
+          { id: 'N15034', label: 'Elever per lärare', unit: 'st' },
+          { id: 'N15813', label: 'Behöriga lärare', unit: '%' }
+        ],
+        outcome: [
+          { id: 'N15482', label: 'Engelska', unit: '%' },
+          { id: 'N15485', label: 'Matematik', unit: '%' },
+          { id: 'N15488', label: 'Svenska', unit: '%' }
+        ],
+        salsa: [
+          { id: 'U15414', label: 'SALSA-värde', unit: '' },
+          { id: 'U15416', label: 'SALSA-avvikelse', unit: '' }
+        ]
+      };
+
+      const kpis = apiEndpoints[type];
+      const results = [];
+
+      for (const kpi of kpis) {
+        try {
+          const response = await fetch(`https://api.kolada.se/v3/oudata/kpi/${kpi.id}/ou/${skolenhet}`);
+          const data = await response.json();
+
+          if (data.values && data.values.length > 0) {
+            const latestValue = data.values[0];
+            const trend = calculateTrend(data.values);
+
+            results.push({
+              label: kpi.label,
+              value: latestValue.value,
+              unit: kpi.unit,
+              trendDirection: trend.direction,
+              trendArrow: trend.arrow,
+              trendText: trend.text,
+              analysis: generateAnalysis(kpi.label, trend)
+            });
+          } else {
+            results.push({
+              label: kpi.label,
+              value: 'Ingen data',
+              unit: kpi.unit,
+              trendDirection: 'stable',
+              trendArrow: '→',
+              trendText: 'Ingen trenddata',
+              analysis: 'Data saknas för denna nyckeltal.'
+            });
+          }
+        } catch (error) {
+          console.error(`Error fetching data for KPI ${kpi.id}:`, error);
+        }
+      }
+
+      return results;
+    }
+
+    // Function to calculate trend based on data values
+    function calculateTrend(values) {
+      if (values.length < 2) {
+        return { direction: 'stable', arrow: '→', text: 'Ingen trenddata' };
+      }
+
+      const latest = values[0].value;
+      const previous = values[1].value;
+      const change = latest - previous;
+
+      if (change > 0) {
+        return { direction: 'improving', arrow: '↑', text: `+${change.toFixed(1)} på 3 år` };
+      } else if (change < 0) {
+        return { direction: 'declining', arrow: '↓', text: `${change.toFixed(1)} på 3 år` };
+      } else {
+        return { direction: 'stable', arrow: '→', text: '±0 på 3 år' };
+      }
+    }
+
+    // Function to generate analysis text based on KPI and trend
+    function generateAnalysis(label, trend) {
+      if (trend.direction === 'improving') {
+        return `${label} har förbättrats över de senaste åren.`;
+      } else if (trend.direction === 'declining') {
+        return `${label} har försämrats och kan behöva åtgärder.`;
+      } else {
+        return `${label} är stabilt utan större förändringar.`;
+      }
+    }
+
+    // Add event listeners to dropdowns
+    document.getElementById('kommunSelect').addEventListener('change', updateKPIs);
+    document.getElementById('skolenhetSelect').addEventListener('change', updateKPIs);
+    document.getElementById('stageSelect').addEventListener('change', updateKPIs);
+  </script>
 </body>
 </html>
