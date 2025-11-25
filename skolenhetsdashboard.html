@@ -6,129 +6,335 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="styles/betygkolada.css">
   <style>
-    .dashboard-panels {
-      display: grid;
-      gap: 1.5rem;
-      margin-top: 2rem;
+    body {
+      background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+      min-height: 100vh;
+      padding: 2rem 1rem;
     }
-    .panel {
+    
+    #pageTitle {
+      color: white;
+      text-align: center;
+      font-size: 2.5rem;
+      margin-bottom: 2rem;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .kpi-selector {
       background: white;
       padding: 1.5rem;
-      border-radius: 8px;
-      box-shadow: 0 0 10px #ccc;
-      border-left: 4px solid #2563eb;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      margin-bottom: 1.5rem;
     }
-    .panel h2 {
+    
+    .selector-row {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+    
+    .selector-group {
+      flex: 1;
+      min-width: 250px;
+    }
+    
+    .selector-group label {
+      display: block;
+      font-weight: 600;
       color: #1e40af;
-      margin-bottom: 1rem;
-      font-size: 1.3rem;
+      margin-bottom: 0.5rem;
+      font-size: 0.95rem;
+    }
+    
+    .selector-group select {
+      width: 100%;
+      padding: 0.75rem;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: all 0.2s;
+      background: white;
+    }
+    
+    .selector-group select:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .selector-group select:disabled {
+      background: #f1f5f9;
+      cursor: not-allowed;
+    }
+    
+    .filter-buttons {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+    
+    .filter-btn {
+      padding: 0.5rem 1rem;
+      border: 2px solid #e2e8f0;
+      background: white;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #64748b;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .filter-btn:hover {
+      border-color: #667eea;
+      color: #667eea;
+    }
+    
+    .filter-btn.active {
+      background: #667eea;
+      color: white;
+      border-color: #667eea;
+    }
+    
+    .back-link {
+      display: inline-block;
+      color: white;
+      text-decoration: none;
+      margin-bottom: 1.5rem;
+      padding: 0.5rem 1rem;
+      background: rgba(255,255,255,0.2);
+      border-radius: 8px;
+      transition: all 0.2s;
+      font-weight: 500;
+    }
+    
+    .back-link:hover {
+      background: rgba(255,255,255,0.3);
+      transform: translateX(-2px);
+    }
+    
+    .dashboard-section {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      margin-bottom: 2rem;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .dashboard-section:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 12px rgba(0,0,0,0.15);
+    }
+    
+    .dashboard-section h2 {
+      color: #1e40af;
+      font-size: 1.75rem;
+      margin-bottom: 0.5rem;
       display: flex;
       align-items: center;
       gap: 0.5rem;
+      border-bottom: 3px solid #667eea;
+      padding-bottom: 0.75rem;
     }
+    
     .panel-description {
-      color: #666;
-      font-size: 0.9rem;
-      margin-bottom: 1rem;
-      font-style: italic;
+      color: #64748b;
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+      line-height: 1.6;
+      background: #f8fafc;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      border-left: 4px solid #667eea;
     }
+    
     .kpi-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1rem;
-      margin-bottom: 1rem;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.25rem;
+      margin-top: 1.5rem;
     }
+    
     .kpi-item {
-      background: #f8fafc;
-      padding: 1rem;
-      border-radius: 6px;
-      border: 1px solid #e2e8f0;
+      background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+      padding: 1.5rem;
+      border-radius: 10px;
+      border: 2px solid #e2e8f0;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
     }
+    
+    .kpi-item::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    
+    .kpi-item:hover {
+      border-color: #667eea;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+      transform: translateY(-2px);
+    }
+    
+    .kpi-item:hover::before {
+      opacity: 1;
+    }
+    
     .kpi-label {
-      font-size: 0.85rem;
+      font-size: 0.9rem;
       color: #64748b;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
+    
     .kpi-value {
-      font-size: 1.8rem;
+      font-size: 2.25rem;
       font-weight: bold;
-      color: #1e40af;
-      margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.75rem;
+      line-height: 1.2;
     }
+    
     .kpi-trend {
-      font-size: 0.85rem;
+      font-size: 0.9rem;
       display: flex;
       align-items: center;
       gap: 0.5rem;
+      margin-bottom: 0.5rem;
+      padding: 0.5rem;
+      border-radius: 6px;
+      background: #f8fafc;
     }
+    
     .trend-improving {
       color: #16a34a;
       font-weight: 600;
+      background: #f0fdf4;
     }
+    
     .trend-improving::before {
       content: '▲';
-      font-size: 1rem;
+      font-size: 1.1rem;
       margin-right: 0.25rem;
     }
+    
     .trend-declining {
       color: #dc2626;
       font-weight: 600;
+      background: #fef2f2;
     }
+    
     .trend-declining::before {
       content: '▼';
-      font-size: 1rem;
+      font-size: 1.1rem;
       margin-right: 0.25rem;
     }
+    
     .trend-stable {
       color: #64748b;
       font-weight: 600;
+      background: #f8fafc;
     }
+    
     .trend-stable::before {
       content: '●';
-      font-size: 0.7rem;
+      font-size: 0.8rem;
       margin-right: 0.25rem;
       opacity: 0.6;
     }
-    .panel-interpretation {
-      background: #eff6ff;
-      padding: 1rem;
-      border-radius: 6px;
-      border-left: 3px solid #3b82f6;
-      margin-top: 1rem;
+    
+    .kpi-analysis {
+      font-size: 0.85rem;
+      color: #64748b;
+      line-height: 1.5;
     }
+    
+    .panel-interpretation {
+      background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+      padding: 1.5rem;
+      border-radius: 10px;
+      border: 2px solid #93c5fd;
+      margin-top: 1.5rem;
+    }
+    
     .panel-interpretation h4 {
       color: #1e40af;
-      margin-bottom: 0.5rem;
-      font-size: 1rem;
+      margin-bottom: 1rem;
+      font-size: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
     }
+    
+    .panel-interpretation h4::before {
+      content: '💡';
+      font-size: 1.5rem;
+    }
+    
     .panel-interpretation p {
       color: #475569;
-      line-height: 1.6;
-      margin: 0.5rem 0;
+      line-height: 1.8;
+      margin: 0.75rem 0;
+      padding: 0.75rem;
+      background: white;
+      border-radius: 6px;
+      border-left: 4px solid #667eea;
     }
-    .stage-badge {
-      display: inline-block;
-      background: #dbeafe;
-      color: #1e40af;
-      padding: 0.25rem 0.75rem;
-      border-radius: 12px;
-      font-size: 0.85rem;
-      font-weight: 600;
-    }
+    
     .loading-message {
       text-align: center;
-      padding: 3rem;
+      padding: 4rem 2rem;
       color: #64748b;
       font-size: 1.1rem;
-    }
-    #stageDetection {
-      background: #f0f9ff;
-      padding: 0.75rem 1rem;
-      border-radius: 6px;
-      margin-bottom: 1rem;
-      color: #0369a1;
       font-weight: 500;
-      display: none;
+    }
+    
+    .loading-message::after {
+      content: '...';
+      animation: loading 1.5s infinite;
+    }
+    
+    @keyframes loading {
+      0%, 20% { content: '.'; }
+      40% { content: '..'; }
+      60%, 100% { content: '...'; }
+    }
+    
+    @media (max-width: 768px) {
+      body {
+        padding: 1rem 0.5rem;
+      }
+      
+      #pageTitle {
+        font-size: 1.75rem;
+      }
+      
+      .dashboard-section {
+        padding: 1.25rem;
+      }
+      
+      .kpi-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .selector-row {
+        flex-direction: column;
+      }
     }
   </style>
 </head>
@@ -147,6 +353,10 @@
           <option value="">Hämtar skolenheter...</option>
         </select>
       </div>
+    </div>
+    <div class="filter-buttons">
+      <button class="filter-btn" id="filterF6" data-filter="f6">Dölj F-6</button>
+      <button class="filter-btn" id="filter79" data-filter="79">Dölj åk 7-9</button>
     </div>
   </div>
 
@@ -232,30 +442,39 @@
       return enheter;
     }
     const kpiDefsBaseline = () => ([
-      { id: 'N15807', label: 'Antal elever', unit: 'st' },
+      { id: 'N11805', label: 'Antal elever i förskoleklass', unit: 'st' },
+      { id: 'N15807', label: 'Antal elever åk 1–9', unit: 'st' },
       { id: 'N15034', label: 'Elever per lärare (heltidstjänst), kommunal grundskola åk 1–9', unit: 'st' },
       { id: 'N15813', label: 'Andel legitimerade/behöriga lärare åk 1–9', unit: '%' },
       { id: 'N15031', label: 'Lärare med pedagogisk högskoleexamen i kommunal grundskola åk 1–9', unit: '%' }
     ]);
-    const kpiDefsOutcome = () => ([
-      // F-6
-      { id: 'N15482', label: 'Åk 6: Engelska minst E', unit: '%' },
-      { id: 'N15485', label: 'Åk 6: Matematik minst E', unit: '%' },
-      { id: 'N15488', label: 'Åk 6: Svenska minst E', unit: '%' },
-      { id: 'N15509', label: 'Åk 6: Betygspoäng i matematik', unit: 'poäng' },
-      { id: 'N15510', label: 'Åk 6: Betygspoäng i svenska', unit: 'poäng' },
-      // 7-9
-      { id: 'N15419', label: 'Åk 9: Alla ämnen godkända', unit: '%' },
-      { id: 'N15436', label: 'Åk 9: Behöriga till yrkesprogram', unit: '%' },
-      { id: 'N15505', label: 'Åk 9: Meritvärde (17 ämnen)', unit: 'poäng' },
-      { id: 'N15503', label: 'Åk 9: Betygspoäng matematik', unit: 'poäng' },
-      { id: 'U15429', label: 'Åk 9: Högre slutbetyg än NP i matematik', unit: '%' },
-      { id: 'U15430', label: 'Åk 9: Lägre slutbetyg än NP i matematik', unit: '%' },
-      { id: 'U15431', label: 'Åk 9: Högre slutbetyg än NP i engelska', unit: '%' },
-      { id: 'U15432', label: 'Åk 9: Lägre slutbetyg än NP i engelska', unit: '%' },
-      { id: 'U15433', label: 'Åk 9: Högre slutbetyg än NP i svenska', unit: '%' },
-      { id: 'U15434', label: 'Åk 9: Lägre slutbetyg än NP i svenska', unit: '%' }
-    ]);
+    const kpiDefsOutcome = () => {
+      const allKpis = [
+        // F-6
+        { id: 'N15482', label: 'Åk 6: Engelska minst E', unit: '%', stage: 'f6' },
+        { id: 'N15485', label: 'Åk 6: Matematik minst E', unit: '%', stage: 'f6' },
+        { id: 'N15488', label: 'Åk 6: Svenska minst E', unit: '%', stage: 'f6' },
+        { id: 'N15509', label: 'Åk 6: Betygspoäng i matematik', unit: 'poäng', stage: 'f6' },
+        { id: 'N15510', label: 'Åk 6: Betygspoäng i svenska', unit: 'poäng', stage: 'f6' },
+        // 7-9
+        { id: 'N15419', label: 'Åk 9: Alla ämnen godkända', unit: '%', stage: '79' },
+        { id: 'N15436', label: 'Åk 9: Behöriga till yrkesprogram', unit: '%', stage: '79' },
+        { id: 'N15505', label: 'Åk 9: Meritvärde (17 ämnen)', unit: 'poäng', stage: '79' },
+        { id: 'N15503', label: 'Åk 9: Betygspoäng matematik', unit: 'poäng', stage: '79' },
+        { id: 'U15429', label: 'Åk 9: Högre slutbetyg än NP i matematik', unit: '%', stage: '79' },
+        { id: 'U15430', label: 'Åk 9: Lägre slutbetyg än NP i matematik', unit: '%', stage: '79' },
+        { id: 'U15431', label: 'Åk 9: Högre slutbetyg än NP i engelska', unit: '%', stage: '79' },
+        { id: 'U15432', label: 'Åk 9: Lägre slutbetyg än NP i engelska', unit: '%', stage: '79' },
+        { id: 'U15433', label: 'Åk 9: Högre slutbetyg än NP i svenska', unit: '%', stage: '79' },
+        { id: 'U15434', label: 'Åk 9: Lägre slutbetyg än NP i svenska', unit: '%', stage: '79' }
+      ];
+      
+      return allKpis.filter(kpi => {
+        if (filterState.hideF6 && kpi.stage === 'f6') return false;
+        if (filterState.hide79 && kpi.stage === '79') return false;
+        return true;
+      });
+    };
     const kpiDefsSalsa = () => ([
       { id: 'U15413', label: 'Åk 9: SALSA modellberäknad andel alla ämnen', unit: '%' },
       { id: 'U15414', label: 'Åk 9: Avvikelse SALSA (%)', unit: 'p.p.' },
@@ -490,9 +709,14 @@
       analysisEl.innerHTML = '<h4>Automatisk analys</h4>' + insights.map(i => `<p>${i}</p>`).join('');
     }
 
+    // --- Filter state ---
+    const filterState = { hideF6: false, hide79: false };
+    
     // --- Selectors init ---
     const kommunSelect = document.getElementById('kommunSelect');
     const skolenhetSelect = document.getElementById('skolenhetSelect');
+    const filterF6Btn = document.getElementById('filterF6');
+    const filter79Btn = document.getElementById('filter79');
     function initKommuner(defaultId = '0684') {
       kommunSelect.innerHTML = '';
       ALLA_KOMMUNER.forEach(k => { const opt = document.createElement('option'); opt.value=k.id; opt.textContent=k.title; if (k.id===defaultId) opt.selected=true; kommunSelect.appendChild(opt); });
@@ -512,6 +736,22 @@
     }
     kommunSelect.addEventListener('change', onKommunChange);
     skolenhetSelect.addEventListener('change', onSkolenhetChange);
+    
+    // Filter button handlers
+    filterF6Btn.addEventListener('click', () => {
+      filterState.hideF6 = !filterState.hideF6;
+      filterF6Btn.classList.toggle('active', filterState.hideF6);
+      const ouId = skolenhetSelect.value;
+      if (ouId) renderSections(ouId);
+    });
+    
+    filter79Btn.addEventListener('click', () => {
+      filterState.hide79 = !filterState.hide79;
+      filter79Btn.classList.toggle('active', filterState.hide79);
+      const ouId = skolenhetSelect.value;
+      if (ouId) renderSections(ouId);
+    });
+    
     // Init
     initKommuner(); onKommunChange();
   </script>
