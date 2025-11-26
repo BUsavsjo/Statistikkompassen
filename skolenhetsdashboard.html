@@ -156,9 +156,51 @@
       color: #1e293b;
     }
     
+    .sektion-status-card .status-icon {
+      font-size: 2rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+      text-align: center;
+    }
+    
+    .sektion-status-card .status-word {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #1e293b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.5rem;
+      text-align: center;
+    }
+    
     .sektion-status-card .status-summary {
       font-size: 0.85rem;
       color: #64748b;
+      margin-bottom: 0.5rem;
+    }
+    
+    .sektion-status-card .status-trend {
+      font-size: 0.8rem;
+      color: #64748b;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+    
+    .sektion-status-card .status-explanation {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      font-style: italic;
+      margin-bottom: 0.5rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid rgba(0,0,0,0.05);
+    }
+    
+    .sektion-status-card .comparison-base {
+      font-size: 0.7rem;
+      color: #94a3b8;
+      margin-top: 0.5rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid rgba(0,0,0,0.05);
     }
     
     /* Insiktsruta */
@@ -208,10 +250,35 @@
     }
     
     .insikt-card p {
-      margin: 0;
+      margin: 0 0 0.75rem 0;
       font-size: 0.95rem;
       color: #475569;
       line-height: 1.6;
+    }
+    
+    .insikt-card .insikt-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 0.75rem;
+      margin-bottom: 0.25rem;
+    }
+    
+    .insikt-card .insikt-consequence {
+      font-style: italic;
+      color: #64748b;
+      font-size: 0.9rem;
+    }
+    
+    .insikt-card .insikt-action {
+      font-weight: 600;
+      color: #1e293b;
+      background: rgba(255,255,255,0.5);
+      padding: 0.5rem;
+      border-radius: 4px;
+      font-size: 0.9rem;
     }
     
     /* Narrativ text */
@@ -223,6 +290,35 @@
       font-size: 1rem;
       line-height: 1.8;
       color: #1e293b;
+    }
+    
+    .narrativ-text h4 {
+      margin-top: 0;
+      margin-bottom: 1rem;
+      color: #0284c7;
+      font-size: 1.1rem;
+    }
+    
+    .narrative-bullets {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    
+    .narrative-bullets li {
+      padding: 0.75rem 0;
+      border-bottom: 1px solid rgba(2, 132, 199, 0.1);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+    
+    .narrative-bullets li:last-child {
+      border-bottom: none;
+    }
+    
+    .narrative-bullets li strong {
+      color: #0284c7;
+      font-weight: 700;
     }
     
     .back-link {

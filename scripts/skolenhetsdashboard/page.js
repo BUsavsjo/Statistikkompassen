@@ -208,18 +208,43 @@ function beraknaSektionStatus(kpiList, kpiData, groupAvgs = {}) {
   // Gult: Allt annat
   let status = 'yellow';
   let summary = 'Blandat läge';
+  let statusWord = 'UPPMÄRKSAMHET';
+  let statusExplanation = 'Gult = Följ utvecklingen';
+  let icon = '●';
+  let actionText = 'Följ upp regelbundet';
+  
+  const totalCount = greenCount + yellowCount + redCount;
   
   if (redCount >= 2 || (redCount >= 1 && decliningCount >= 1)) {
     status = 'red';
-    summary = `${redCount} röda indikatorer`;
+    summary = `${redCount} av ${totalCount} indikatorer under snitt`;
+    statusWord = 'ÅTGÄRDSBEHOV';
+    statusExplanation = 'Rött = Kräver åtgärd nu';
+    icon = '✕';
+    actionText = 'Prioritera åtgärder omgående';
   } else if (greenCount > (yellowCount + redCount) && redCount === 0) {
     status = 'green';
-    summary = `${greenCount} gröna indikatorer`;
+    summary = `${greenCount} av ${totalCount} indikatorer över snitt`;
+    statusWord = 'STABILITET';
+    statusExplanation = 'Grönt = Fortsätt arbetet';
+    icon = '✓';
+    actionText = 'Behåll nuvarande arbetssätt';
   } else {
-    summary = `${greenCount} gröna, ${yellowCount} gula, ${redCount} röda`;
+    summary = `${greenCount} över, ${yellowCount} på, ${redCount} under snitt`;
   }
   
-  return { status, summary };
+  // Beräkna trend
+  let trendIcon = '→';
+  let trendText = 'Stabil';
+  if (decliningCount > greenCount) {
+    trendIcon = '↘';
+    trendText = 'Försämras';
+  } else if (greenCount > decliningCount && decliningCount === 0) {
+    trendIcon = '↗';
+    trendText = 'Förbättras';
+  }
+  
+  return { status, summary, statusWord, statusExplanation, icon, actionText, trendIcon, trendText };
 }
 
 /**
@@ -689,20 +714,40 @@ async function renderSections(ouId) {
   const sektionStatusGrid = document.getElementById('sektionStatusGrid');
   sektionStatusGrid.innerHTML = `
     <div class="sektion-status-card ${baselineStatus.status}">
+      <div class="status-icon">${baselineStatus.icon}</div>
       <h4>Förutsättningar</h4>
+      <div class="status-word">${baselineStatus.statusWord}</div>
       <div class="status-summary">${baselineStatus.summary}</div>
+      <div class="status-trend">${baselineStatus.trendIcon} ${baselineStatus.trendText} senaste året</div>
+      <div class="status-explanation">${baselineStatus.statusExplanation}</div>
+      <div class="comparison-base">Jämfört med: Liknande skolor (F-9)</div>
     </div>
     <div class="sektion-status-card ${outcomeStatus.status}">
+      <div class="status-icon">${outcomeStatus.icon}</div>
       <h4>Resultat</h4>
+      <div class="status-word">${outcomeStatus.statusWord}</div>
       <div class="status-summary">${outcomeStatus.summary}</div>
+      <div class="status-trend">${outcomeStatus.trendIcon} ${outcomeStatus.trendText} senaste året</div>
+      <div class="status-explanation">${outcomeStatus.statusExplanation}</div>
+      <div class="comparison-base">Jämfört med: Liknande skolor (F-9)</div>
     </div>
     <div class="sektion-status-card ${salsaStatus.status}">
-      <h4>SALSA</h4>
+      <div class="status-icon">${salsaStatus.icon}</div>
+      <h4>Värdeskapande</h4>
+      <div class="status-word">${salsaStatus.statusWord}</div>
       <div class="status-summary">${salsaStatus.summary}</div>
+      <div class="status-trend">${salsaStatus.trendIcon} ${salsaStatus.trendText} senaste året</div>
+      <div class="status-explanation">${salsaStatus.statusExplanation}</div>
+      <div class="comparison-base">Resultat i relation till förutsättningar</div>
     </div>
     <div class="sektion-status-card ${tryggStatus.status}">
-      <h4>Trygghet</h4>
+      <div class="status-icon">${tryggStatus.icon}</div>
+      <h4>Trygghet & Studiero</h4>
+      <div class="status-word">${tryggStatus.statusWord}</div>
       <div class="status-summary">${tryggStatus.summary}</div>
+      <div class="status-trend">${tryggStatus.trendIcon} ${tryggStatus.trendText} senaste året</div>
+      <div class="status-explanation">${tryggStatus.statusExplanation}</div>
+      <div class="comparison-base">Jämfört med: Liknande skolor (F-9)</div>
     </div>
   `;
   
@@ -712,22 +757,49 @@ async function renderSections(ouId) {
   insiktGrid.innerHTML = `
     <div class="insikt-card styrka">
       <h4>💪 Styrka</h4>
+      <div class="insikt-label">VAD:</div>
       <p>${insikter.styrka}</p>
+      <div class="insikt-label">KONSEKVENS:</div>
+      <p class="insikt-consequence">Detta ger stabilitet och goda förutsättningar för fortsatt utveckling.</p>
+      <div class="insikt-label">REKOMMENDATION:</div>
+      <p class="insikt-action">Dokumentera och sprid framgångsfaktorer till andra delar av verksamheten.</p>
     </div>
     <div class="insikt-card risk">
       <h4>⚠️ Risk</h4>
+      <div class="insikt-label">VAD:</div>
       <p>${insikter.risk}</p>
+      <div class="insikt-label">KONSEKVENS:</div>
+      <p class="insikt-consequence">Risk för försämrade resultat om inget görs. Eleverna påverkas direkt.</p>
+      <div class="insikt-label">REKOMMENDATION:</div>
+      <p class="insikt-action">Prioritera detta i nästa arbetsplansperiod. Avsätt tid och resurser.</p>
     </div>
     <div class="insikt-card havstang">
-      <h4>🎯 Hävstång</h4>
+      <h4>🎯 Åtgärd nu</h4>
+      <div class="insikt-label">VAD:</div>
       <p>${insikter.havstang}</p>
+      <div class="insikt-label">KONSEKVENS:</div>
+      <p class="insikt-consequence">Detta är den mest effektiva vägen till förbättring baserat på data.</p>
+      <div class="insikt-label">REKOMMENDATION:</div>
+      <p class="insikt-action">Starta arbete omgående. Följ upp efter 3 månader.</p>
     </div>
   `;
   
-  // 3. Generera narrativ text
+  // 3. Generera narrativ text som punktlista
   const narrativText = genereraNarrativText(kpiData, groupAvgs);
   const narrativEl = document.getElementById('narrativText');
-  narrativEl.innerHTML = `<p>${narrativText}</p>`;
+  
+  // Konvertera till strukturerad punktlista
+  const meningar = narrativText.split('. ').filter(m => m.length > 10);
+  const struktureradSammanfattning = `
+    <h4>Sammanfattning – Vad du behöver veta</h4>
+    <ul class="narrative-bullets">
+      <li><strong>📊 Nuläge:</strong> ${meningar[0] || 'Data analyseras...'}.</li>
+      <li><strong>⚡ Konsekvens:</strong> ${meningar[1] || 'Följ utvecklingen noga'}.</li>
+      <li><strong>✅ Positivt:</strong> ${meningar.find(m => m.includes('god') || m.includes('starka') || m.includes('över')) || 'Fortsätt nuvarande arbetssätt'}.</li>
+      <li><strong>🎯 Fokus framåt:</strong> ${meningar[meningar.length - 1] || 'Prioritera enligt rekommendationerna ovan'}.</li>
+    </ul>
+  `;
+  narrativEl.innerHTML = struktureradSammanfattning;
   
   // Visa analysen
   styrandeAnalysContainer.style.display = 'block';
