@@ -99,6 +99,132 @@
       border-color: #667eea;
     }
     
+    /* === STYRANDE ANALYS CSS === */
+    .styrande-analys-container {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      margin-bottom: 2rem;
+    }
+    
+    .styrande-analys-container h2 {
+      color: #1e3a8a;
+      margin-bottom: 1.5rem;
+      font-size: 1.8rem;
+    }
+    
+    /* Sektionsstatus grid (trafikljus) */
+    .sektion-status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    
+    .sektion-status-card {
+      padding: 1rem;
+      border-radius: 8px;
+      border-left: 5px solid;
+      background: #f8fafc;
+      transition: transform 0.2s;
+    }
+    
+    .sektion-status-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .sektion-status-card.green {
+      border-left-color: #10b981;
+      background: linear-gradient(135deg, #d1fae5 0%, #f0fdf4 100%);
+    }
+    
+    .sektion-status-card.yellow {
+      border-left-color: #f59e0b;
+      background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%);
+    }
+    
+    .sektion-status-card.red {
+      border-left-color: #ef4444;
+      background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%);
+    }
+    
+    .sektion-status-card h4 {
+      margin: 0 0 0.5rem 0;
+      font-size: 1rem;
+      color: #1e293b;
+    }
+    
+    .sektion-status-card .status-summary {
+      font-size: 0.85rem;
+      color: #64748b;
+    }
+    
+    /* Insiktsruta */
+    .insikts-ruta {
+      margin-bottom: 2rem;
+    }
+    
+    .insikts-ruta h3 {
+      color: #1e3a8a;
+      margin-bottom: 1rem;
+      font-size: 1.4rem;
+    }
+    
+    .insikt-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+    }
+    
+    .insikt-card {
+      padding: 1.5rem;
+      border-radius: 8px;
+      border-left: 5px solid;
+      background: #f8fafc;
+    }
+    
+    .insikt-card.styrka {
+      border-left-color: #10b981;
+      background: linear-gradient(135deg, #d1fae5 0%, #f0fdf4 100%);
+    }
+    
+    .insikt-card.risk {
+      border-left-color: #ef4444;
+      background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%);
+    }
+    
+    .insikt-card.havstang {
+      border-left-color: #3b82f6;
+      background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+    }
+    
+    .insikt-card h4 {
+      margin: 0 0 0.75rem 0;
+      font-size: 1.1rem;
+      color: #1e293b;
+      font-weight: 700;
+    }
+    
+    .insikt-card p {
+      margin: 0;
+      font-size: 0.95rem;
+      color: #475569;
+      line-height: 1.6;
+    }
+    
+    /* Narrativ text */
+    .narrativ-text {
+      padding: 1.5rem;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+      border-left: 5px solid #0284c7;
+      font-size: 1rem;
+      line-height: 1.8;
+      color: #1e293b;
+    }
+    
     .back-link {
       display: inline-block;
       color: #1e3a8a;
@@ -413,6 +539,24 @@
   <!-- Dashboard content rendered below -->
 
   <div id="dashboardContent">
+
+    <!-- Styrande analys section (visas före KPI-kort) -->
+    <div id="styrandeAnalys" class="styrande-analys-container" style="display:none;">
+      <h2>Styrande skolbild</h2>
+      
+      <!-- Sektionsstatus med trafikljus -->
+      <div class="sektion-status-grid" id="sektionStatusGrid"></div>
+      
+      <!-- Insiktsruta med Styrka/Risk/Hävstång -->
+      <div class="insikts-ruta" id="insiktsRuta">
+        <h3>Nyckelinsikter</h3>
+        <div class="insikt-grid" id="insiktGrid"></div>
+      </div>
+      
+      <!-- Narrativ text (3-6 meningar) -->
+      <div class="narrativ-text" id="narrativText"></div>
+    </div>
+
     <!-- Förutsättningar Section -->
     <div class="dashboard-section">
       <h2>Förutsättningar</h2>
@@ -437,8 +581,9 @@
       <h2>Trygghet åk 5</h2>
       <div class="kpi-grid" id="trygghetsKPIs"></div>
     </div>
+  </div>
 
-    <!-- Automatisk Analys Section -->
+    <!-- Automatisk Analys längst ner -->
     <div class="dashboard-section">
       <h2>Automatisk analys</h2>
       <div class="panel-interpretation" id="analysisText">
@@ -446,7 +591,6 @@
         <p>Automatisk analys av nyckeltal visas här...</p>
       </div>
     </div>
-  </div>
 
     <script type="module" src="scripts/skolenhetsdashboard/page.js"></script>
 </body>
