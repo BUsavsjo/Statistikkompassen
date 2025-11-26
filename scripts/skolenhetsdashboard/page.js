@@ -49,6 +49,67 @@ const skolenhetCache = new Map();
 const kpiCache = new Map();
 
 /**
+ * Väljer rätt baseline för en KPI baserat på jämförelseregel
+ * @param {object} def - KPI-definition
+ * @param {object} comp - Comparison data från createKPIComparison
+ * @returns {number|null} - Valt baseline-värde
+ */
+function pickBaseline(def, comp) {
+  if (!comp || !comp.available) return null;
+  
+  const rule = comp.rule_bucket;
+  const isScaleDependent = def.scaleDependent || false;
+  
+  // Resultat: Liknande primärt, annars riket
+  if (rule === 'resultat') {
+    if (comp.values.liknande && comp.values.liknande.length > 0) {
+      return comp.values.liknande[0];
+    }
+    if (comp.values.riket && comp.values.riket.length > 0) {
+      return comp.values.riket[comp.values.riket.length - 1];
+    }
+  }
+  
+  // Förutsättningar: Kommun primärt, men om scaleDependent → liknande
+  else if (rule === 'forutsattningar') {
+    if (isScaleDependent) {
+      if (comp.values.liknande && comp.values.liknande.length > 0) {
+        return comp.values.liknande[0];
+      }
+      if (comp.values.kommun && comp.values.kommun.length > 0) {
+        return comp.values.kommun[comp.values.kommun.length - 1];
+      }
+    } else {
+      if (comp.values.kommun && comp.values.kommun.length > 0) {
+        return comp.values.kommun[comp.values.kommun.length - 1];
+      }
+      if (comp.values.riket && comp.values.riket.length > 0) {
+        return comp.values.riket[comp.values.riket.length - 1];
+      }
+    }
+  }
+  
+  // Trygghet: Riket primärt, annars kommun
+  else if (rule === 'trygghet') {
+    if (comp.values.riket && comp.values.riket.length > 0) {
+      return comp.values.riket[comp.values.riket.length - 1];
+    }
+    if (comp.values.kommun && comp.values.kommun.length > 0) {
+      return comp.values.kommun[comp.values.kommun.length - 1];
+    }
+  }
+  
+  // SALSA: Använd förväntat värde som baseline
+  else if (rule === 'salsa') {
+    if (comp.values.forvantad && comp.values.forvantad.length > 0) {
+      return comp.values.forvantad[comp.values.forvantad.length - 1];
+    }
+  }
+  
+  return null;
+}
+
+/**
  * Formaterar differens enhetsmedvetet
  * @param {number} diff - Differensvärde
  * @param {string} unit - Enhet (%, st, poäng)
@@ -77,6 +138,23 @@ function formatDiff(diff, unit) {
 function createKPICard(kpi) {
   const card = document.createElement('div');
   card.className = 'kpi-item';
+  
+  // Bestäm färgindikator baserat på trend-status (förbättring, försämring, stabil)
+  let colorClass = '';
+  if (kpi.trendData) {
+    const dir = kpi.trendData.dir;
+    if (dir === 'improving') {
+      colorClass = 'status-green'; // Förbättring
+    } else if (dir === 'declining') {
+      colorClass = 'status-red'; // Försämring
+    } else {
+      colorClass = 'status-lightgreen'; // Stabil eller okänt
+    }
+  }
+  
+  if (colorClass) {
+    card.classList.add(colorClass);
+  }
 
   const label = document.createElement('div');
   label.className = 'kpi-label';
@@ -396,10 +474,10 @@ function beraknaSektionStatus(kpiList, kpiData, groupAvgs = {}) {
  */
 function genereraInsikter(kpiData, groupAvgs = {}) {
   // Hitta bästa och sämsta KPIer baserat på diff och trend
-  let bestKPI = { id: null, diff: -Infinity, label: '' };
-  let worstKPI = { id: null, diff: Infinity, label: '' };
-  let bestTrendKPI = { id: null, trend3y: -Infinity, label: '' };
-  let worstTrendKPI = { id: null, trend3y: Infinity, label: '' };
+  let bestKPI = { id: null, diff: -Infinity, label: '', unit: '' };
+  let worstKPI = { id: null, diff: Infinity, label: '', unit: '' };
+  let bestTrendKPI = { id: null, trend3y: -Infinity, label: '', unit: '' };
+  let worstTrendKPI = { id: null, trend3y: Infinity, label: '', unit: '' };
   
   const allKPIs = [...BASELINE_KPIS, ...OUTCOME_KPIS, ...SALSA_KPIS, ...TRYG_KPIS];
   
@@ -411,33 +489,33 @@ function genereraInsikter(kpiData, groupAvgs = {}) {
     const klassif = klassificeraKPI(data, groupAvg);
     
     if (klassif.diff > bestKPI.diff) {
-      bestKPI = { id: kpiDef.id, diff: klassif.diff, label: kpiDef.label };
+      bestKPI = { id: kpiDef.id, diff: klassif.diff, label: kpiDef.label, unit: data.unit || kpiDef.unit };
     }
     if (klassif.diff < worstKPI.diff) {
-      worstKPI = { id: kpiDef.id, diff: klassif.diff, label: kpiDef.label };
+      worstKPI = { id: kpiDef.id, diff: klassif.diff, label: kpiDef.label, unit: data.unit || kpiDef.unit };
     }
     if (klassif.trend3y > bestTrendKPI.trend3y) {
-      bestTrendKPI = { id: kpiDef.id, trend3y: klassif.trend3y, label: kpiDef.label };
+      bestTrendKPI = { id: kpiDef.id, trend3y: klassif.trend3y, label: kpiDef.label, unit: data.unit || kpiDef.unit };
     }
     if (klassif.trend3y < worstTrendKPI.trend3y) {
-      worstTrendKPI = { id: kpiDef.id, trend3y: klassif.trend3y, label: kpiDef.label };
+      worstTrendKPI = { id: kpiDef.id, trend3y: klassif.trend3y, label: kpiDef.label, unit: data.unit || kpiDef.unit };
     }
   });
   
-  // Styrka: Den indikator med bäst diff eller trend
+  // Styrka: Den indikator med bäst diff eller trend (enhetsanpassad)
   let styrka = 'Ingen tydlig styrka identifierad.';
   if (bestKPI.diff > 2) {
-    styrka = `<strong>${bestKPI.label}</strong> ligger ${bestKPI.diff.toFixed(1)} procentenheter över gruppsnitt.`;
+    styrka = `<strong>${bestKPI.label}</strong> ligger ${formatDiff(bestKPI.diff, bestKPI.unit)} över gruppsnitt.`;
   } else if (bestTrendKPI.trend3y > 3) {
-    styrka = `<strong>${bestTrendKPI.label}</strong> har förbättrats med ${bestTrendKPI.trend3y.toFixed(1)} procentenheter på 3 år.`;
+    styrka = `<strong>${bestTrendKPI.label}</strong> har förbättrats med ${formatDiff(bestTrendKPI.trend3y, bestTrendKPI.unit)} på 3 år.`;
   }
   
-  // Risk: Den indikator med sämst diff eller trend
+  // Risk: Den indikator med sämst diff eller trend (enhetsanpassad)
   let risk = 'Ingen tydlig risk identifierad.';
   if (worstKPI.diff < -2) {
-    risk = `<strong>${worstKPI.label}</strong> ligger ${Math.abs(worstKPI.diff).toFixed(1)} procentenheter under gruppsnitt.`;
+    risk = `<strong>${worstKPI.label}</strong> ligger ${formatDiff(Math.abs(worstKPI.diff), worstKPI.unit)} under gruppsnitt.`;
   } else if (worstTrendKPI.trend3y < -3) {
-    risk = `<strong>${worstTrendKPI.label}</strong> har försämrats med ${Math.abs(worstTrendKPI.trend3y).toFixed(1)} procentenheter på 3 år.`;
+    risk = `<strong>${worstTrendKPI.label}</strong> har försämrats med ${formatDiff(Math.abs(worstTrendKPI.trend3y), worstTrendKPI.unit)} på 3 år.`;
   }
   
   // Hävstång: Smart rekommendation baserad på data
@@ -881,17 +959,10 @@ async function renderSection(sectionId, defs, ouId, kpiData, municipalityCode = 
   
   results.forEach(({ card, def }) => {
     if (card.comparisonData && card.comparisonData.available) {
-      const comp = card.comparisonData;
-      // Använd liknande som baseline (mest relevant jämförelse)
-      if (comp.values.liknande && comp.values.liknande.length > 0) {
-        realAvgs[def.id] = comp.values.liknande[0];
-        sourceAvgs[def.id] = 'liknande';
-      } else if (comp.values.riket && comp.values.riket.length > 0) {
-        realAvgs[def.id] = comp.values.riket[comp.values.riket.length - 1];
-        sourceAvgs[def.id] = 'riket';
-      } else if (comp.values.kommun && comp.values.kommun.length > 0) {
-        realAvgs[def.id] = comp.values.kommun[comp.values.kommun.length - 1];
-        sourceAvgs[def.id] = 'kommun';
+      const baseline = pickBaseline(def, card.comparisonData);
+      if (baseline !== null) {
+        realAvgs[def.id] = baseline;
+        sourceAvgs[def.id] = card.comparisonData.rule_bucket;
       } else {
         realAvgs[def.id] = mockAvgs[def.id] || null;
         sourceAvgs[def.id] = 'mock';
@@ -920,7 +991,13 @@ async function renderSection(sectionId, defs, ouId, kpiData, municipalityCode = 
   const frag = document.createDocumentFragment();
   results.forEach(({ card, def }) => {
     frag.appendChild(createKPICard(card));
-    kpiData[def.id] = card.trendData;
+    // Spara både trendData OCH regel/unit för styrande analys
+    kpiData[def.id] = {
+      ...card.trendData,
+      rule_bucket: card.comparisonData?.rule_bucket || null,
+      unit: def.unit,
+      scaleDependent: def.scaleDependent || false
+    };
   });
   sectionEl.appendChild(frag);
   return { cards: results.map(r => r.card), realAvgs, sourceAvgs, sectionHasMock };

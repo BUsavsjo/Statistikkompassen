@@ -392,6 +392,36 @@
       position: relative;
       overflow: hidden;
     }
+
+    .kpi-item.status-green {
+      border-color: #16a34a;
+      background: linear-gradient(135deg, #f0fdf4 0%, #bbf7d0 100%);
+    }
+
+    .kpi-item.status-green::before {
+      background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+      opacity: 1;
+    }
+
+    .kpi-item.status-red {
+      border-color: #dc2626;
+      background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
+    }
+
+    .kpi-item.status-red::before {
+      background: linear-gradient(135deg, #b91c1c 0%, #ef4444 100%);
+      opacity: 1;
+    }
+
+    .kpi-item.status-lightgreen {
+      border-color: #4ade80;
+      background: linear-gradient(135deg, #ecfccb 0%, #bbf7d0 100%);
+    }
+
+    .kpi-item.status-lightgreen::before {
+      background: linear-gradient(135deg, #22c55e 0%, #4ade80 100%);
+      opacity: 1;
+    }
     
     .kpi-item::before {
       content: '';

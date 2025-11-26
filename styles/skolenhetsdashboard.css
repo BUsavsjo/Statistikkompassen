@@ -239,3 +239,19 @@ h2 {
     font-size: 1.75em;
   }
 }
+
+/* Färgindikatorer för KPI-kort */
+.kpi-item.status-green {
+  border-left: 4px solid #4caf50;
+  background: linear-gradient(to right, rgba(76, 175, 80, 0.05), transparent);
+}
+
+.kpi-item.status-red {
+  border-left: 4px solid #f44336;
+  background: linear-gradient(to right, rgba(244, 67, 54, 0.05), transparent);
+}
+
+.kpi-item.status-lightgreen {
+  border-left: 4px solid #8bc34a;
+  background: linear-gradient(to right, rgba(139, 195, 74, 0.05), transparent);
+}
