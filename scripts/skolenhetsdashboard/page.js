@@ -91,6 +91,9 @@ const TRYG_KPIS = [
 const filterState = { hideF6: false, hide79: false };
 const skolenhetCache = new Map();
 const kpiCache = new Map();
+const progressUpdateState = {};
+const PROGRESS_UPDATE_INTERVAL = 3;
+let lastRenderedContext = { ouId: null, municipalityCode: null };
 
 /**
  * Selects the appropriate baseline for a KPI based on comparison rules
@@ -282,12 +285,19 @@ function setLoading(sectionId, loading = true) {
 function updateProgress(sectionId, current, total) {
   const el = document.getElementById(sectionId);
   if (!el) return;
+
+  const shouldUpdate = current === total || current % PROGRESS_UPDATE_INTERVAL === 0;
+  const state = progressUpdateState[sectionId] || { last: 0 };
+
+  if (!shouldUpdate && current - state.last < PROGRESS_UPDATE_INTERVAL && state.last !== 0) return;
+
   const progressBar = el.querySelector(`[data-section="${sectionId}"]`);
   const progressText = el.querySelector('.progress-text');
   if (progressBar && progressText) {
     const percent = Math.round((current / total) * 100);
     progressBar.style.width = `${percent}%`;
     progressText.textContent = `${percent}%`;
+    progressUpdateState[sectionId] = { last: current };
   }
 }
 
@@ -327,7 +337,24 @@ async function hamtaSkolenheterForKommun(kommunId) {
 }
 
 function kpiDefsOutcome() {
-  return OUTCOME_KPIS;
+  const seen = new Set();
+  return OUTCOME_KPIS.filter(def => {
+    if (seen.has(def.id)) return false;
+    seen.add(def.id);
+    return true;
+  });
+}
+
+function applyFilters() {
+  const groups = document.querySelectorAll('.subject-group-header, .subject-group-cards');
+  groups.forEach(group => {
+    const stage = group.dataset.stage;
+    if ((stage === 'f6' && filterState.hideF6) || (stage === '79' && filterState.hide79)) {
+      group.style.display = 'none';
+    } else {
+      group.style.display = '';
+    }
+  });
 }
 
 // ===== ANALYSMOTOR: Klassificering och beräkningar =====
@@ -971,18 +998,22 @@ function renderGroupedOutcomeKPIs(sectionId, results, kpiData, realAvgs, schoolT
     
     // Skapa grupp-header
     if (groupStatus) {
-      frag.appendChild(skapaGruppHeader(group.title, groupStatus));
+      const header = skapaGruppHeader(group.title, groupStatus);
+      header.dataset.stage = group.stage;
+      frag.appendChild(header);
     } else {
       // Summary-grupper får enkel header
       const summaryHeader = document.createElement('div');
       summaryHeader.className = 'subject-group-header summary';
+      summaryHeader.dataset.stage = group.stage;
       summaryHeader.innerHTML = `<h3>${group.title}</h3>`;
       frag.appendChild(summaryHeader);
     }
-    
+
     // Skapa grupp-container
     const groupContainer = document.createElement('div');
     groupContainer.className = 'subject-group-cards';
+    groupContainer.dataset.stage = group.stage;
     
     // Lägg till kort
     sortedCards.forEach(({ card, def }) => {
@@ -1622,6 +1653,7 @@ function extractNPGapPairs(results) {
 
 async function renderSection(sectionId, defs, ouId, kpiData, municipalityCode = '0684') {
   setLoading(sectionId, true);
+  progressUpdateState[sectionId] = { last: 0 };
   const sectionEl = document.getElementById(sectionId);
   const total = defs.length;
   let completed = 0;
@@ -1670,15 +1702,18 @@ async function renderSections(ouId, municipalityCode = null) {
   const kpiData = {};
 
   showAnalysLoadingState();
-  
+
   // Hämta kommunkod från dropdown om inte angiven
   if (!municipalityCode) {
     const kommunSelect = document.getElementById('kommunSelect');
     municipalityCode = kommunSelect?.value || '0684';
   }
-  
-  // Rensa comparison cache när kommun/enhet ändras
-  clearCache();
+
+  // Rensa comparison cache endast när kommun/enhet ändras
+  if (lastRenderedContext.ouId !== ouId || lastRenderedContext.municipalityCode !== municipalityCode) {
+    clearCache();
+    lastRenderedContext = { ouId, municipalityCode };
+  }
   
   // Hämta skoltyp för filtrering av resultatgrupper
   const schoolType = await detectSchoolType(ouId);
@@ -1727,6 +1762,7 @@ async function renderSections(ouId, municipalityCode = null) {
   
   // Rendera grupperade resultat-KPIer
   renderGroupedOutcomeKPIs('outcomeKPIs', outcomeCards, kpiData, groupAvgs, schoolType);
+  applyFilters();
   // setLoading redan hanterad i renderGroupedOutcomeKPIs genom sectionEl.innerHTML = ''
 
   // Data-kvalitet: markera om ersättningsvärden (mock) användes i någon sektion
@@ -2026,15 +2062,13 @@ function initFilterButtons(filterF6Btn, filter79Btn, skolenhetSelect) {
   filterF6Btn.addEventListener('click', () => {
     filterState.hideF6 = !filterState.hideF6;
     filterF6Btn.classList.toggle('active', filterState.hideF6);
-    const ouId = skolenhetSelect.value;
-    if (ouId) renderSections(ouId);
+    applyFilters();
   });
 
   filter79Btn.addEventListener('click', () => {
     filterState.hide79 = !filterState.hide79;
     filter79Btn.classList.toggle('active', filterState.hide79);
-    const ouId = skolenhetSelect.value;
-    if (ouId) renderSections(ouId);
+    applyFilters();
   });
 }
 
