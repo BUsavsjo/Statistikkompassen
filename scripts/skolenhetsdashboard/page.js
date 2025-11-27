@@ -429,7 +429,7 @@ function beraknaSektionStatus(kpiList, kpiData, groupAvgs = {}) {
   let summary = 'Blandat läge';
   let statusWord = 'UPPMÄRKSAMHET';
   let statusExplanation = 'Gult = Följ utvecklingen';
-  let icon = '●';
+  let icon = '🟡';
   let actionText = 'Följ upp regelbundet';
   
   const totalCount = greenCount + yellowCount + redCount;
@@ -439,14 +439,14 @@ function beraknaSektionStatus(kpiList, kpiData, groupAvgs = {}) {
     summary = `${redCount} av ${totalCount} indikatorer under snitt`;
     statusWord = 'ÅTGÄRDSBEHOV';
     statusExplanation = 'Rött = Kräver åtgärd nu';
-    icon = '✕';
+    icon = '⛔';
     actionText = 'Prioritera åtgärder omgående';
   } else if (greenCount > (yellowCount + redCount) && redCount === 0) {
     status = 'green';
     summary = `${greenCount} av ${totalCount} indikatorer över snitt`;
     statusWord = 'STABILITET';
     statusExplanation = 'Grönt = Fortsätt arbetet';
-    icon = '✓';
+    icon = '✅';
     actionText = 'Behåll nuvarande arbetssätt';
   } else {
     summary = `${greenCount} över, ${yellowCount} på, ${redCount} under snitt`;
