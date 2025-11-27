@@ -2,16 +2,118 @@
  * JÄMFÖRELSESYSTEM FÖR STYRANDE SKOLBILD
  * 
  * Implementerar strukturerade jämförelseregler per indikatortyp enligt specifikation:
- * - Resultatindikatorer: Riket + Liknande skolor/kommuner + Trend (3 år)
- * - Förutsättningar: Kommun + Riket + Trend (3 år)  
- * - Trygghet/studiero: Riket + Kommun + Trend (3 år)
- * - SALSA: Förväntat vs faktiskt + Liknande kommuner som kontext
+ * - PRIMÄR JÄMFÖRELSE: Kommungenomsnitt inom samma skolform (F-6, 7-9, F-9)
+ * - SEKUNDÄR REFERENS: Riksgenomsnitt inom samma skolform (endast visning, ej för färger/badges)
+ * - Resultatindikatorer: Kommungenomsnitt samma skolform + Riket som referens + Trend (3 år)
+ * - Förutsättningar: Kommungenomsnitt samma skolform + Riket som referens + Trend (3 år)  
+ * - Trygghet/studiero: Kommungenomsnitt samma skolform + Riket som referens + Trend (3 år)
+ * - SALSA: Förväntat vs faktiskt + Kommun som kontext
+ * 
+ * OBS: Om kommungruppen är för liten (<3 enheter), använd neutral status och visa endast riket som referens.
  */
 
-import { API_BASE, SKOLENHET_DATA_BASE } from '../constants.js';
+import { API_BASE, SKOLENHET_DATA_BASE, SKOLENHET_SEARCH_API } from '../constants.js';
 
 const RIKET_ID = '0000';
 const CACHE = new Map();
+const MIN_GROUP_SIZE = 3; // Minsta antal enheter för stabil jämförelse
+
+/**
+ * Detekterar skolform från OU-data
+ * @param {string} ouId - OU-ID för skolenheten
+ * @returns {Promise<string>} - 'F-6', '7-9', 'F-9', eller null
+ */
+export async function detectSchoolType(ouId) {
+  const cacheKey = `schooltype_${ouId}`;
+  if (CACHE.has(cacheKey)) {
+    return CACHE.get(cacheKey);
+  }
+  
+  try {
+    // Hämta skolenhetens information från Kolada API
+    const response = await fetch(`${SKOLENHET_SEARCH_API}?id=${ouId}`, {
+      headers: { Accept: 'application/json' }
+    });
+    
+    if (!response.ok) {
+      console.warn(`Could not fetch school info for ${ouId}`);
+      return null;
+    }
+    
+    const data = await response.json();
+    const results = data.results || data.values || [];
+    
+    if (results.length === 0) return null;
+    
+    const school = results[0];
+    const typeName = (school.type || school.type_name || '').toLowerCase();
+    
+    // Mappa typer till skolform
+    let schoolType = null;
+    if (typeName.includes('f-6') || typeName.includes('f6') || typeName.includes('förskoleklass och grundskola f-6')) {
+      schoolType = 'F-6';
+    } else if (typeName.includes('7-9') || typeName.includes('79') || typeName.includes('grundskola 7-9')) {
+      schoolType = '7-9';
+    } else if (typeName.includes('f-9') || typeName.includes('f9') || typeName.includes('förskoleklass och grundskola f-9')) {
+      schoolType = 'F-9';
+    }
+    
+    CACHE.set(cacheKey, schoolType);
+    return schoolType;
+    
+  } catch (error) {
+    console.error(`Error detecting school type for ${ouId}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Hämtar alla skolenheter i kommunen med samma skolform
+ * @param {string} municipalityCode - Kommunkod
+ * @param {string} schoolType - Skolform ('F-6', '7-9', 'F-9')
+ * @returns {Promise<Array>} - Lista med OU-ID för enheter med samma skolform
+ */
+async function fetchSchoolsInMunicipalityByType(municipalityCode, schoolType) {
+  const cacheKey = `schools_${municipalityCode}_${schoolType}`;
+  if (CACHE.has(cacheKey)) {
+    return CACHE.get(cacheKey);
+  }
+  
+  try {
+    let url = `${SKOLENHET_SEARCH_API}?municipality=${municipalityCode}&per_page=500`;
+    const schools = [];
+    
+    while (url) {
+      const response = await fetch(url, { headers: { Accept: 'application/json' } });
+      if (!response.ok) break;
+      
+      const data = await response.json();
+      const results = data.results || data.values || [];
+      
+      results.forEach(school => {
+        const typeName = (school.type || school.type_name || '').toLowerCase();
+        let matchType = null;
+        
+        if (typeName.includes('f-6') || typeName.includes('f6')) matchType = 'F-6';
+        else if (typeName.includes('7-9') || typeName.includes('79')) matchType = '7-9';
+        else if (typeName.includes('f-9') || typeName.includes('f9')) matchType = 'F-9';
+        
+        if (matchType === schoolType) {
+          schools.push(school.id);
+        }
+      });
+      
+      url = data.next_page || data.next || null;
+    }
+    
+    CACHE.set(cacheKey, schools);
+    return schools;
+    
+  } catch (error) {
+    console.error(`Error fetching schools in ${municipalityCode} of type ${schoolType}:`, error);
+    return [];
+  }
+}
 
 /**
  * Bestämmer vilken jämförelseregel som gäller för en given KPI
@@ -159,6 +261,55 @@ async function calculateGroupAverage(kpiId, municipalityCodes, year = null) {
 }
 
 /**
+ * Beräknar kommungenomsnitt för skolenheter med samma skolform
+ * @param {string} kpiId - KPI-ID
+ * @param {string} municipalityCode - Kommunkod
+ * @param {string} schoolType - Skolform ('F-6', '7-9', 'F-9')
+ * @param {number} year - Vilket år (senaste om null)
+ * @returns {Promise<Object>} - { average: number|null, count: number, schoolIds: Array }
+ */
+async function calculateMunicipalityAverageBySchoolType(kpiId, municipalityCode, schoolType, year = null) {
+  // Hämta alla skolenheter i kommunen med samma skolform
+  const schoolIds = await fetchSchoolsInMunicipalityByType(municipalityCode, schoolType);
+  
+  if (schoolIds.length < MIN_GROUP_SIZE) {
+    return { average: null, count: schoolIds.length, schoolIds, insufficient: true };
+  }
+  
+  // Hämta KPI-data för alla skolenheter
+  const dataPromises = schoolIds.map(ouId => 
+    fetchKoladaData(kpiId, ouId, 'ou', 4)
+  );
+  
+  const results = await Promise.all(dataPromises);
+  
+  // Hitta senaste året om inget angivet
+  const targetYear = year || Math.max(...results.flatMap(r => r.years));
+  
+  // Samla värden för målåret
+  const values = results
+    .map(r => {
+      const idx = r.years.indexOf(targetYear);
+      return idx >= 0 ? r.values[idx] : null;
+    })
+    .filter(v => v !== null);
+  
+  if (values.length === 0) {
+    return { average: null, count: 0, schoolIds, insufficient: true };
+  }
+  
+  // Kontrollera om vi har tillräckligt med data
+  if (values.length < MIN_GROUP_SIZE) {
+    return { average: null, count: values.length, schoolIds, insufficient: true };
+  }
+  
+  // Beräkna medelvärde
+  const average = values.reduce((sum, val) => sum + val, 0) / values.length;
+  
+  return { average, count: values.length, schoolIds, insufficient: false };
+}
+
+/**
  * Beräknar trend från tidsseriedata
  * @param {Array<number>} values - Värden i kronologisk ordning
  * @returns {Object} - { direction: 'up'|'down'|'flat', change: number }
@@ -192,6 +343,7 @@ function calculateTrend(values) {
 
 /**
  * Hämtar fullständiga jämförelsedata för en KPI enligt regelverket
+ * UPPDATERAD: Använder kommungenomsnitt inom samma skolform som primär jämförelse
  * @param {string} kpiId - KPI-ID
  * @param {string} entityId - Kommun- eller OU-ID  
  * @param {string} municipalityCode - Kommunkod (för gruppjämförelse)
@@ -212,12 +364,20 @@ export async function fetchComparisonData(kpiId, entityId, municipalityCode, ent
       deltas: {},
       trend: { direction: 'flat', change: 0 },
       rule_bucket: rule,
-      available: false
+      available: false,
+      schoolType: null,
+      groupInsufficient: false
     };
   }
   
   const latestYear = mainData.years[mainData.years.length - 1];
   const latestValue = mainData.values[mainData.values.length - 1];
+  
+  // Detektera skolform för OU
+  let schoolType = null;
+  if (entityType === 'ou') {
+    schoolType = await detectSchoolType(entityId);
+  }
   
   const result = {
     kpi_id: kpiId,
@@ -228,122 +388,45 @@ export async function fetchComparisonData(kpiId, entityId, municipalityCode, ent
     deltas: {},
     trend: calculateTrend(mainData.values),
     rule_bucket: rule,
-    available: true
+    available: true,
+    schoolType: schoolType,
+    groupInsufficient: false
   };
   
-  // Hämta jämförelsedata baserat på regel
-  switch (rule) {
-    case 'resultat':
-      // Riket + Liknande skolor/kommuner + Trend
-      const riketData = await fetchKoladaData(kpiId, RIKET_ID, 'municipality', 4);
-      result.values.riket = riketData.values;
+  // Hämta riksdata som sekundär referens (visas alltid men används ej för färger)
+  const riketData = await fetchKoladaData(kpiId, RIKET_ID, 'municipality', 4);
+  result.values.riket_reference = riketData.values;
+  
+  if (riketData.values.length > 0) {
+    const riketLatest = riketData.values[riketData.values.length - 1];
+    if (riketLatest !== null && latestValue !== null) {
+      result.deltas.main_vs_riket_reference = latestValue - riketLatest;
+    }
+  }
+  
+  // Hämta kommungenomsnitt inom samma skolform (PRIMÄR JÄMFÖRELSE)
+  if (entityType === 'ou' && schoolType) {
+    const municipalityAvg = await calculateMunicipalityAverageBySchoolType(
+      kpiId, 
+      municipalityCode, 
+      schoolType, 
+      latestYear
+    );
+    
+    if (municipalityAvg.insufficient) {
+      // För liten grupp - använd neutral status
+      result.groupInsufficient = true;
+      result.values.kommun_schooltype = null;
+      result.municipalityGroupSize = municipalityAvg.count;
+    } else {
+      // Tillräcklig gruppstorlek - använd som primär jämförelse
+      result.values.kommun_schooltype = [municipalityAvg.average];
+      result.municipalityGroupSize = municipalityAvg.count;
       
-      if (riketData.values.length > 0) {
-        const riketLatest = riketData.values[riketData.values.length - 1];
-        if (riketLatest !== null && latestValue !== null) {
-          result.deltas.main_vs_riket = latestValue - riketLatest;
-        }
+      if (latestValue !== null) {
+        result.deltas.main_vs_kommun_schooltype = latestValue - municipalityAvg.average;
       }
-      
-      // Liknande kommuner
-      const similarMunicipalities = await fetchSimilarMunicipalities(municipalityCode);
-      if (similarMunicipalities.length > 0) {
-        const groupAvg = await calculateGroupAverage(kpiId, similarMunicipalities, latestYear);
-        if (groupAvg !== null) {
-          result.values.liknande = [groupAvg]; // Endast senaste året för liknande
-          if (latestValue !== null) {
-            result.deltas.main_vs_liknande = latestValue - groupAvg;
-          }
-        }
-      }
-      
-      // Kommun som sekundärt värde
-      if (entityType === 'ou') {
-        const kommunData = await fetchKoladaData(kpiId, municipalityCode, 'municipality', 4);
-        result.values.kommun_secondary = kommunData.values;
-      }
-      break;
-      
-    case 'forutsattningar':
-      // Kommun + Riket + Trend
-      if (entityType === 'ou') {
-        const kommunData = await fetchKoladaData(kpiId, municipalityCode, 'municipality', 4);
-        result.values.kommun = kommunData.values;
-        
-        if (kommunData.values.length > 0) {
-          const kommunLatest = kommunData.values[kommunData.values.length - 1];
-          if (kommunLatest !== null && latestValue !== null) {
-            result.deltas.main_vs_kommun = latestValue - kommunLatest;
-          }
-        }
-      }
-      
-      const riketDataForutsattningar = await fetchKoladaData(kpiId, RIKET_ID, 'municipality', 4);
-      result.values.riket = riketDataForutsattningar.values;
-      
-      if (riketDataForutsattningar.values.length > 0) {
-        const riketLatest = riketDataForutsattningar.values[riketDataForutsattningar.values.length - 1];
-        if (riketLatest !== null && latestValue !== null) {
-          result.deltas.main_vs_riket = latestValue - riketLatest;
-        }
-      }
-      break;
-      
-    case 'trygghet':
-      // Riket + Kommun + Trend
-      const riketDataTrygghet = await fetchKoladaData(kpiId, RIKET_ID, 'municipality', 4);
-      result.values.riket = riketDataTrygghet.values;
-      
-      if (riketDataTrygghet.values.length > 0) {
-        const riketLatest = riketDataTrygghet.values[riketDataTrygghet.values.length - 1];
-        if (riketLatest !== null && latestValue !== null) {
-          result.deltas.main_vs_riket = latestValue - riketLatest;
-        }
-      }
-      
-      if (entityType === 'ou') {
-        const kommunDataTrygghet = await fetchKoladaData(kpiId, municipalityCode, 'municipality', 4);
-        result.values.kommun = kommunDataTrygghet.values;
-        
-        if (kommunDataTrygghet.values.length > 0) {
-          const kommunLatest = kommunDataTrygghet.values[kommunDataTrygghet.values.length - 1];
-          if (kommunLatest !== null && latestValue !== null) {
-            result.deltas.main_vs_kommun = latestValue - kommunLatest;
-          }
-        }
-      }
-      break;
-      
-    case 'salsa':
-      // Förväntat vs faktiskt (SALSA är redan avvikelse i vissa KPIer)
-      // U15414 = Avvikelse från SALSA (redan beräknad)
-      // U15413 = SALSA modellberäknad andel (förväntad)
-      // Hämta motsvarande faktiskt resultat för kontext
-      
-      if (kpiId === 'U15414' || kpiId === 'U15416') {
-        // Detta är redan avvikelsen, visa som är
-        result.values.avvikelse = mainData.values;
-        
-        // Hämta förväntat värde (U15413 för U15414, U15415 för U15416)
-        const expectedKpiId = kpiId === 'U15414' ? 'U15413' : 'U15415';
-        const expectedData = await fetchKoladaData(expectedKpiId, entityId, entityType, 4);
-        result.values.forvantad = expectedData.values;
-        
-        // Hämta faktiskt värde (N15419 för U15414, N15505 för U15416)
-        const actualKpiId = kpiId === 'U15414' ? 'N15419' : 'N15505';
-        const actualData = await fetchKoladaData(actualKpiId, entityId, entityType, 4);
-        result.values.faktisk = actualData.values;
-      }
-      
-      // Liknande kommuner som kontext
-      const similarForSalsa = await fetchSimilarMunicipalities(municipalityCode);
-      if (similarForSalsa.length > 0) {
-        const groupAvg = await calculateGroupAverage(kpiId, similarForSalsa, latestYear);
-        if (groupAvg !== null) {
-          result.values.liknande = [groupAvg];
-        }
-      }
-      break;
+    }
   }
   
   return result;

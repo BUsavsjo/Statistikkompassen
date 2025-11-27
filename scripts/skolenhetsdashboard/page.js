@@ -1,7 +1,7 @@
 import { ALLA_KOMMUNER } from '../kommuner.js';
 import { SKOLENHET_SEARCH_API, SKOLENHET_DATA_BASE } from '../constants.js';
 import { hamtaKoladaData } from '../chartHelpers.js';
-import { createKPIComparison, formatComparisonText, getComparisonRule, clearCache } from './comparisons.js';
+import { createKPIComparison, formatComparisonText, getComparisonRule, clearCache, detectSchoolType } from './comparisons.js';
 
 const BASELINE_KPIS = [
   { id: 'N11805', label: 'Antal elever i förskoleklass', unit: 'st', scaleDependent: true },
@@ -12,17 +12,29 @@ const BASELINE_KPIS = [
 ];
 
 const OUTCOME_KPIS = [
+  // Åk 6 helhetsmått
+  { id: 'N15539', label: 'Åk 6: Elever i alla ämnen som uppnått kunskapskraven, %', unit: '%', stage: 'f6' },
+  // Åk 6 kärnämnen
   { id: 'N15482', label: 'Åk 6: Engelska minst E', unit: '%', stage: 'f6' },
   { id: 'N15485', label: 'Åk 6: Matematik minst E', unit: '%', stage: 'f6' },
   { id: 'N15488', label: 'Åk 6: Svenska minst E', unit: '%', stage: 'f6' },
   { id: 'N15509', label: 'Åk 6: Betygspoäng i matematik', unit: 'poäng', stage: 'f6' },
   { id: 'N15510', label: 'Åk 6: Betygspoäng i svenska', unit: 'poäng', stage: 'f6' },
-  // Ny KPI: Elever i åk 6 som uppnått kunskapskraven i alla ämnen
-  { id: 'N15539', label: 'Åk 6: Elever i alla ämnen som uppnått kunskapskraven, %', unit: '%', stage: 'f6' },
+  { id: 'N15516', label: 'Åk 6: Svenska som andraspråk minst E', unit: '%', stage: 'f6' },
+  // Åk 9 helhetsmått
+  { id: 'N15418', label: 'Åk 9: Elever i alla ämnen som uppnått kunskapskraven, %', unit: '%', stage: '79' },
+  { id: 'N15503', label: 'Åk 9: Meritvärde (17 ämnen)', unit: 'poäng', stage: '79' },
+  { id: 'N15504', label: 'Åk 9: Behöriga till yrkesprogram', unit: '%', stage: '79' },
+  // Åk 9 kärnämnen (gamla KPIer behålls för bakåtkompatibilitet)
   { id: 'N15419', label: 'Åk 9: Alla ämnen godkända', unit: '%', stage: '79' },
   { id: 'N15436', label: 'Åk 9: Behöriga till yrkesprogram', unit: '%', stage: '79' },
   { id: 'N15505', label: 'Åk 9: Meritvärde (17 ämnen)', unit: 'poäng', stage: '79' },
-  { id: 'N15503', label: 'Åk 9: Betygspoäng matematik', unit: 'poäng', stage: '79' },
+  { id: 'N15482', label: 'Åk 9: Engelska minst E', unit: '%', stage: '79' },
+  { id: 'N15485', label: 'Åk 9: Matematik minst E', unit: '%', stage: '79' },
+  { id: 'N15488', label: 'Åk 9: Svenska minst E', unit: '%', stage: '79' },
+  { id: 'N15516', label: 'Åk 9: Svenska som andraspråk minst E', unit: '%', stage: '79' },
+  { id: 'N15523', label: 'Åk 9: Betygspoäng i matematik', unit: 'poäng', stage: '79' },
+  // NP-gap
   { id: 'U15429', label: 'Åk 9: Högre slutbetyg än NP i matematik', unit: '%', stage: '79' },
   { id: 'U15430', label: 'Åk 9: Lägre slutbetyg än NP i matematik', unit: '%', stage: '79' },
   { id: 'U15431', label: 'Åk 9: Högre slutbetyg än NP i engelska', unit: '%', stage: '79' },
@@ -50,6 +62,7 @@ const kpiCache = new Map();
 
 /**
  * Väljer rätt baseline för en KPI baserat på jämförelseregel
+ * UPPDATERAD: Prioriterar kommungenomsnitt inom samma skolform
  * @param {object} def - KPI-definition
  * @param {object} comp - Comparison data från createKPIComparison
  * @returns {number|null} - Valt baseline-värde
@@ -57,53 +70,19 @@ const kpiCache = new Map();
 function pickBaseline(def, comp) {
   if (!comp || !comp.available) return null;
   
-  const rule = comp.rule_bucket;
-  const isScaleDependent = def.scaleDependent || false;
-  
-  // Resultat: Liknande primärt, annars riket
-  if (rule === 'resultat') {
-    if (comp.values.liknande && comp.values.liknande.length > 0) {
-      return comp.values.liknande[0];
-    }
-    if (comp.values.riket && comp.values.riket.length > 0) {
-      return comp.values.riket[comp.values.riket.length - 1];
-    }
+  // Om kommungruppen är för liten, returnera null (neutral status)
+  if (comp.groupInsufficient) {
+    return null;
   }
   
-  // Förutsättningar: Kommun primärt, men om scaleDependent → liknande
-  else if (rule === 'forutsattningar') {
-    if (isScaleDependent) {
-      if (comp.values.liknande && comp.values.liknande.length > 0) {
-        return comp.values.liknande[0];
-      }
-      if (comp.values.kommun && comp.values.kommun.length > 0) {
-        return comp.values.kommun[comp.values.kommun.length - 1];
-      }
-    } else {
-      if (comp.values.kommun && comp.values.kommun.length > 0) {
-        return comp.values.kommun[comp.values.kommun.length - 1];
-      }
-      if (comp.values.riket && comp.values.riket.length > 0) {
-        return comp.values.riket[comp.values.riket.length - 1];
-      }
-    }
+  // PRIMÄR JÄMFÖRELSE: Kommungenomsnitt inom samma skolform
+  if (comp.values.kommun_schooltype && comp.values.kommun_schooltype.length > 0) {
+    return comp.values.kommun_schooltype[0];
   }
   
-  // Trygghet: Riket primärt, annars kommun
-  else if (rule === 'trygghet') {
-    if (comp.values.riket && comp.values.riket.length > 0) {
-      return comp.values.riket[comp.values.riket.length - 1];
-    }
-    if (comp.values.kommun && comp.values.kommun.length > 0) {
-      return comp.values.kommun[comp.values.kommun.length - 1];
-    }
-  }
-  
-  // SALSA: Använd förväntat värde som baseline
-  else if (rule === 'salsa') {
-    if (comp.values.forvantad && comp.values.forvantad.length > 0) {
-      return comp.values.forvantad[comp.values.forvantad.length - 1];
-    }
+  // Fallback: riket som referens (om kommundata saknas helt)
+  if (comp.values.riket_reference && comp.values.riket_reference.length > 0) {
+    return comp.values.riket_reference[comp.values.riket_reference.length - 1];
   }
   
   return null;
@@ -139,9 +118,15 @@ function createKPICard(kpi) {
   const card = document.createElement('div');
   card.className = 'kpi-item';
   
+  // KPIer som ska ha neutral färg (ingen automatisk grön/röd)
+  const isNPGap = kpi.id && (kpi.id.startsWith('U1542') || kpi.id.startsWith('U1543'));
+  const isBaselineCount = kpi.id && (kpi.id === 'N11805' || kpi.id === 'N15807'); // Elevantal
+  const isSALSA = kpi.id && kpi.id.startsWith('U154') && ['U15413', 'U15414', 'U15415', 'U15416'].includes(kpi.id);
+  
   // Bestäm färgindikator baserat på trend-status (förbättring, försämring, stabil)
+  // SKIP för NP-gap, elevantal och SALSA
   let colorClass = '';
-  if (kpi.trendData) {
+  if (!isNPGap && !isBaselineCount && !isSALSA && kpi.trendData) {
     const dir = kpi.trendData.dir;
     if (dir === 'improving') {
       colorClass = 'status-green'; // Förbättring
@@ -154,6 +139,16 @@ function createKPICard(kpi) {
   
   if (colorClass) {
     card.classList.add(colorClass);
+  }
+  
+  // Om det är ett NP-gap kort, använd neutral styling
+  if (isNPGap) {
+    card.classList.add('np-gap-individual');
+  }
+  
+  // Om det är elevantal eller SALSA, använd neutral styling
+  if (isBaselineCount || isSALSA) {
+    card.classList.add('neutral-kpi');
   }
 
   const label = document.createElement('div');
@@ -176,95 +171,33 @@ function createKPICard(kpi) {
     const rule = comp.rule_bucket;
     const isScaleDependent = kpi.scaleDependent || false;
     
-    // Formatera jämförelser baserat på regel
+    // Formatera jämförelser baserat på ny logik
     const compLines = [];
     
-    // Resultatindikatorer: Riket + Liknande + Trend (skippa Riket för scaleDependent)
-    if (rule === 'resultat') {
-      if (!isScaleDependent && comp.deltas.main_vs_riket !== undefined) {
-        const riketVal = comp.values.riket[comp.values.riket.length - 1];
-        const diff = comp.deltas.main_vs_riket;
-        compLines.push(`Riket ${riketVal.toFixed(1)}${kpi.unit} (${formatDiff(diff, kpi.unit)})`);
-      }
-      if (comp.deltas.main_vs_liknande !== undefined) {
-        const liknandeVal = comp.values.liknande[0];
-        const diff = comp.deltas.main_vs_liknande;
-        compLines.push(`Liknande ${liknandeVal.toFixed(1)}${kpi.unit} (${formatDiff(diff, kpi.unit)})`);
-      }
-    }
-    
-    // Förutsättningar: Kommun + Riket + Trend (för scaleDependent: Kommun + Liknande)
-    else if (rule === 'forutsattningar') {
-      if (comp.deltas.main_vs_kommun !== undefined) {
-        const kommunVal = comp.values.kommun[comp.values.kommun.length - 1];
-        const diff = comp.deltas.main_vs_kommun;
-        compLines.push(`Kommun ${kommunVal.toFixed(1)}${kpi.unit} (${formatDiff(diff, kpi.unit)})`);
-      }
-      if (isScaleDependent) {
-        // För scaleDependent: visa Liknande istället för Riket
-        if (comp.deltas.main_vs_liknande !== undefined) {
-          const liknandeVal = comp.values.liknande[0];
-          const diff = comp.deltas.main_vs_liknande;
-          compLines.push(`Liknande ${liknandeVal.toFixed(1)}${kpi.unit} (${formatDiff(diff, kpi.unit)})`);
-        }
-      } else {
-        if (comp.deltas.main_vs_riket !== undefined) {
-          const riketVal = comp.values.riket[comp.values.riket.length - 1];
-          const diff = comp.deltas.main_vs_riket;
-          compLines.push(`Riket ${riketVal.toFixed(1)}${kpi.unit} (${formatDiff(diff, kpi.unit)})`);
-        }
-      }
-    }
-    
-    // Trygghet: Riket + Kommun + Trend
-    else if (rule === 'trygghet') {
-      if (comp.deltas.main_vs_riket !== undefined) {
-        const riketVal = comp.values.riket[comp.values.riket.length - 1];
-        const diff = comp.deltas.main_vs_riket;
-        compLines.push(`Riket ${riketVal.toFixed(1)}${kpi.unit} (${formatDiff(diff, kpi.unit)})`);
-      }
-      if (comp.deltas.main_vs_kommun !== undefined) {
-        const kommunVal = comp.values.kommun[comp.values.kommun.length - 1];
-        const diff = comp.deltas.main_vs_kommun;
-        compLines.push(`Kommun ${kommunVal.toFixed(1)}${kpi.unit} (${formatDiff(diff, kpi.unit)})`);
-      }
-    }
-    
-    // SALSA: Modellberäknad vs Faktisk (från comparisons.js)
-    else if (rule === 'salsa') {
-      let modellberaknad = null;
-      let faktisk = null;
+    // Kontrollera om gruppen är för liten
+    if (comp.groupInsufficient) {
+      compLines.push(`⚠ För få enheter (${comp.municipalityGroupSize || 0}) i kommunen med samma skolform för jämförelse`);
       
-      // För SALSA: comp.values.forvantad = modellberäknad, comp.values.faktisk = faktiskt resultat
-      if (comp.values.forvantad && comp.values.faktisk) {
-        modellberaknad = comp.values.forvantad[comp.values.forvantad.length - 1];
-        faktisk = comp.values.faktisk[comp.values.faktisk.length - 1];
-        
-        const avvikelse = faktisk - modellberaknad;
-        const statusText = avvikelse >= 0 ? '(Bättre än modell ✓)' : '(Sämre än modell)';
-        
-        // Visa % för nivåer (inte procentenheter)
-        const displayUnit = kpi.unit === 'procentenheter' ? '%' : kpi.unit;
-        compLines.push(`SALSA-modell ${modellberaknad.toFixed(1)} ${displayUnit}`);
-        compLines.push(`Faktiskt ${faktisk.toFixed(1)} ${displayUnit} ${statusText}`);
-        compLines.push(`Avvikelse ${formatDiff(avvikelse, kpi.unit)}`);
+      // Visa riket som referens
+      if (comp.deltas.main_vs_riket_reference !== undefined) {
+        const riketVal = comp.values.riket_reference[comp.values.riket_reference.length - 1];
+        const diff = comp.deltas.main_vs_riket_reference;
+        compLines.push(`Riket (referens) ${riketVal.toFixed(1)}${kpi.unit} (${formatDiff(diff, kpi.unit)})`);
+      }
+    } else {
+      // PRIMÄR JÄMFÖRELSE: Kommungenomsnitt inom samma skolform
+      if (comp.deltas.main_vs_kommun_schooltype !== undefined) {
+        const kommunVal = comp.values.kommun_schooltype[0];
+        const diff = comp.deltas.main_vs_kommun_schooltype;
+        const schoolTypeLabel = comp.schoolType ? ` (${comp.schoolType})` : '';
+        compLines.push(`Kommun${schoolTypeLabel} ${kommunVal.toFixed(1)}${kpi.unit} (${formatDiff(diff, kpi.unit)})`);
       }
       
-      // Om detta är en avvikelse-KPI (U15414/U15416), visa beräknad avvikelse som huvudvärde
-      if ((kpi.id === 'U15414' || kpi.id === 'U15416') && modellberaknad != null && faktisk != null) {
-        const beraknadAvvikelse = faktisk - modellberaknad;
-        value.textContent = `${beraknadAvvikelse.toFixed(1)} ${kpi.unit || ''}`.trim();
-        
-        const seriesLatest = kpi.trendData?.latest;
-        if (typeof seriesLatest === 'number' && Math.abs(seriesLatest - beraknadAvvikelse) > 0.5) {
-          const displayUnit = kpi.unit === 'procentenheter' ? '%' : kpi.unit;
-          compLines.push(`⚠ Avvikelse i KPI-serien är ${seriesLatest.toFixed(1)} ${displayUnit} – stämmer inte med beräknad diff. Kontrollera att samma år och serier jämförs.`);
-        }
-      }
-      
-      if (comp.values.liknande) {
-        const liknande = comp.values.liknande[0];
-        compLines.push(`Liknande ${liknande.toFixed(1)}${kpi.unit} (kontext)`);
+      // SEKUNDÄR REFERENS: Riket (grå, endast visning)
+      if (comp.deltas.main_vs_riket_reference !== undefined) {
+        const riketVal = comp.values.riket_reference[comp.values.riket_reference.length - 1];
+        const diff = comp.deltas.main_vs_riket_reference;
+        compLines.push(`<span style="color: #94a3b8;">Riket (ref) ${riketVal.toFixed(1)}${kpi.unit} (${formatDiff(diff, kpi.unit)})</span>`);
       }
     }
     
@@ -276,7 +209,7 @@ function createKPICard(kpi) {
       compLines.push('→ stabilt (3 år)');
     }
     
-    comparisonDiv.textContent = compLines.join(' | ');
+    comparisonDiv.innerHTML = compLines.join(' | ');
   } else {
     // Fallback till gammal trendtext om ingen comparisonData
     comparisonDiv.textContent = kpi.trendText || 'Ingen jämförelsedata';
@@ -343,14 +276,193 @@ async function hamtaSkolenheterForKommun(kommunId) {
 }
 
 function kpiDefsOutcome() {
-  return OUTCOME_KPIS.filter(kpi => {
-    if (filterState.hideF6 && kpi.stage === 'f6') return false;
-    if (filterState.hide79 && kpi.stage === '79') return false;
-    return true;
-  });
+  return OUTCOME_KPIS;
 }
 
 // ===== ANALYSMOTOR: Klassificering och beräkningar =====
+
+/**
+ * Analyserar NP-gap (slutbetyg vs nationella prov)
+ * @param {object} hogreData - KPI för högre slutbetyg än NP
+ * @param {object} lagreData - KPI för lägre slutbetyg än NP
+ * @param {string} amne - Ämnesnamn (matematik/engelska/svenska)
+ * @returns {object} NP-gap analys med risknivå, riktning, badges
+ */
+function analyseraNPGap(hogreData, lagreData, amne) {
+  // Kontrollera om data finns
+  if (!hogreData?.latest || !lagreData?.latest) {
+    return {
+      nettoGap: null,
+      riskNiva: 'okänd',
+      riktning: 'Saknar data',
+      badge: 'neutral',
+      trendText: 'Ingen data',
+      kohortVarning: false,
+      hogreAndel: null,
+      lagreAndel: null,
+      analysText: 'Data saknas för NP-gap analys.'
+    };
+  }
+
+  const hogreAndel = hogreData.latest;
+  const lagreAndel = lagreData.latest;
+  const nettoGap = hogreAndel - lagreAndel;
+  
+  // Beräkna 3-års trendförändring för netto-gap
+  const hogreTrend3y = hogreData.diff3 || 0;
+  const lagreTrend3y = lagreData.diff3 || 0;
+  const nettoGapTrend3y = hogreTrend3y - lagreTrend3y;
+  
+  // Basrisknivå baserat på absolut netto-gap
+  const absGap = Math.abs(nettoGap);
+  let riskNiva = 'kalibrerat'; // <5 p.p
+  if (absGap >= 15) {
+    riskNiva = 'hög risk';
+  } else if (absGap >= 10) {
+    riskNiva = 'uppmärksamhet';
+  } else if (absGap >= 5) {
+    riskNiva = 'bevaka';
+  }
+  
+  // Justera risknivå baserat på trend
+  if (Math.abs(nettoGapTrend3y) >= 3) {
+    if (nettoGapTrend3y >= 3) {
+      // Gap ökar - höj risk
+      if (riskNiva === 'kalibrerat') riskNiva = 'bevaka';
+      else if (riskNiva === 'bevaka') riskNiva = 'uppmärksamhet';
+      else if (riskNiva === 'uppmärksamhet') riskNiva = 'hög risk';
+    } else if (nettoGapTrend3y <= -3) {
+      // Gap minskar - sänk risk
+      if (riskNiva === 'hög risk') riskNiva = 'uppmärksamhet';
+      else if (riskNiva === 'uppmärksamhet') riskNiva = 'bevaka';
+      else if (riskNiva === 'bevaka') riskNiva = 'kalibrerat';
+    }
+  }
+  
+  // Klassificera riktning
+  let riktning = 'Kalibrerat';
+  let badge = 'neutral';
+  if (nettoGap > 5) {
+    riktning = 'Lutar mot inflation';
+    badge = 'inflation';
+  } else if (nettoGap < -5) {
+    riktning = 'Lutar mot deflation';
+    badge = 'deflation';
+  }
+  
+  // Trendtext
+  let trendText = 'Stabilt';
+  if (nettoGapTrend3y >= 3) {
+    trendText = 'Gapet ökar';
+  } else if (nettoGapTrend3y <= -3) {
+    trendText = 'Gapet minskar';
+  }
+  
+  // Kohortvarning (mockad för nu - kan läggas till när n finns)
+  const kohortVarning = false; // Sätt till true om n < 15
+  
+  // Generera analys och åtgärdstext
+  let analysText = '';
+  if (riktning === 'Lutar mot inflation') {
+    analysText = `<strong>${amne}:</strong> Slutbetyg systematiskt högre än NP-resultat. Kan indikera behov av <em>gemensam kalibrering, provmatchning och bedömningssamtal</em>.`;
+  } else if (riktning === 'Lutar mot deflation') {
+    analysText = `<strong>${amne}:</strong> Slutbetyg systematiskt lägre än NP-resultat. Undersök om eleverna får tillräckligt <em>underlag för bedömning, uppföljning och uthållighet över tid</em>.`;
+  } else {
+    analysText = `<strong>${amne}:</strong> Bedömning väl kalibrerad med NP-resultat.`;
+  }
+  
+  return {
+    nettoGap,
+    riskNiva,
+    riktning,
+    badge,
+    trendText,
+    kohortVarning,
+    hogreAndel,
+    lagreAndel,
+    analysText
+  };
+}
+
+/**
+ * Skapar NP-gap kort med special rendering (neutral färg + badges)
+ * @param {object} hogreKPI - KPI för högre slutbetyg än NP
+ * @param {object} lagreKPI - KPI för lägre slutbetyg än NP
+ * @param {string} amne - Ämnesnamn
+ * @returns {HTMLElement} NP-gap kort
+ */
+function createNPGapCard(hogreKPI, lagreKPI, amne) {
+  const npAnalys = analyseraNPGap(hogreKPI.trendData, lagreKPI.trendData, amne);
+  
+  const card = document.createElement('div');
+  card.className = 'kpi-item np-gap-card'; // Neutral basfärg via CSS
+  
+  // Risk-based coloring (gul för uppmärksamhet/hög risk)
+  if (npAnalys.riskNiva === 'hög risk' || npAnalys.riskNiva === 'uppmärksamhet') {
+    card.classList.add('np-attention');
+  }
+  
+  const label = document.createElement('div');
+  label.className = 'kpi-label';
+  label.textContent = `${amne}: NP-gap analys`;
+  
+  // Visa båda andelar + netto-gap
+  const value = document.createElement('div');
+  value.className = 'kpi-value np-gap-value';
+  if (npAnalys.hogreAndel != null && npAnalys.lagreAndel != null) {
+    value.innerHTML = `
+      <div class="np-components">
+        <span class="np-hogre">↑ ${npAnalys.hogreAndel.toFixed(1)}%</span>
+        <span class="np-lagre">↓ ${npAnalys.lagreAndel.toFixed(1)}%</span>
+      </div>
+      <div class="np-netto">Netto: ${npAnalys.nettoGap > 0 ? '+' : ''}${npAnalys.nettoGap.toFixed(1)} p.p</div>
+    `;
+  } else {
+    value.textContent = '— Saknar data';
+  }
+  
+  // Badges och riskindikatorer
+  const badgesDiv = document.createElement('div');
+  badgesDiv.className = 'np-badges';
+  
+  // Riktningsbadge
+  const riktningBadge = document.createElement('span');
+  riktningBadge.className = `np-badge badge-${npAnalys.badge}`;
+  riktningBadge.textContent = npAnalys.riktning;
+  badgesDiv.appendChild(riktningBadge);
+  
+  // Risklampa
+  const riskBadge = document.createElement('span');
+  riskBadge.className = `np-risk risk-${npAnalys.riskNiva.replace(' ', '-')}`;
+  riskBadge.textContent = npAnalys.riskNiva.charAt(0).toUpperCase() + npAnalys.riskNiva.slice(1);
+  badgesDiv.appendChild(riskBadge);
+  
+  // Trendtext
+  const trendBadge = document.createElement('span');
+  trendBadge.className = 'np-trend';
+  trendBadge.textContent = npAnalys.trendText;
+  badgesDiv.appendChild(trendBadge);
+  
+  // Kohortvarning
+  if (npAnalys.kohortVarning) {
+    const varning = document.createElement('span');
+    varning.className = 'np-warning';
+    varning.textContent = '⚠ Liten kohort - tolka försiktigt';
+    badgesDiv.appendChild(varning);
+  }
+  
+  // Analys/åtgärdstext
+  const analysis = document.createElement('div');
+  analysis.className = 'kpi-analysis';
+  analysis.innerHTML = npAnalys.analysText;
+  
+  card.appendChild(label);
+  card.appendChild(value);
+  card.appendChild(badgesDiv);
+  card.appendChild(analysis);
+  
+  return card;
+}
 
 /**
  * Klassificerar en KPI baserat på nivå och trend
@@ -546,6 +658,247 @@ function genereraInsikter(kpiData, groupAvgs = {}) {
 }
 
 /**
+ * Beräknar gruppstatus för kärnämnesgrupp
+ * @param {Array} cards - Lista med kort i gruppen
+ * @param {Object} realAvgs - Gruppgenomsnitt
+ * @returns {Object} - { status, badge, label }
+ */
+function beraknaGruppStatus(cards, realAvgs) {
+  let hasRed = false;
+  let hasYellow = false;
+  let hasGreen = false;
+  let hasDecline = false;
+  
+  cards.forEach(({ card, def }) => {
+    const groupAvg = realAvgs[def.id] || null;
+    const klassif = klassificeraKPI(card.trendData, groupAvg);
+    
+    if (klassif.nivaStatus === 'red' || klassif.trendStatus === 'ner') {
+      hasRed = true;
+      if (klassif.trendStatus === 'ner') hasDecline = true;
+    } else if (klassif.nivaStatus === 'yellow') {
+      hasYellow = true;
+    } else if (klassif.nivaStatus === 'green') {
+      hasGreen = true;
+    }
+  });
+  
+  let status = 'green';
+  let badge = 'Över kommunens snitt';
+  let label = '✅';
+  
+  if (hasRed) {
+    status = 'red';
+    badge = hasDecline ? 'Under snitt och försämras' : 'Under kommunens snitt';
+    label = '⛔';
+  } else if (hasYellow) {
+    status = 'yellow';
+    badge = 'I nivå med kommunens snitt';
+    label = '🟡';
+  }
+  
+  return { status, badge, label };
+}
+
+/**
+ * Sorterar kort efter uppmärksamhetsnivå (röd/ner först, gul i mitten, grön/upp sist)
+ * @param {Array} cards - Lista med kort
+ * @param {Object} realAvgs - Gruppgenomsnitt
+ * @returns {Array} - Sorterad lista
+ */
+function sorteraEfterUppmarksamhet(cards, realAvgs) {
+  return cards.sort((a, b) => {
+    const klassifA = klassificeraKPI(a.card.trendData, realAvgs[a.def.id]);
+    const klassifB = klassificeraKPI(b.card.trendData, realAvgs[b.def.id]);
+    
+    // Prioritet: röd/ner > gul > grön/upp
+    const scoreA = (klassifA.nivaStatus === 'red' || klassifA.trendStatus === 'ner') ? 3 
+                 : klassifA.nivaStatus === 'yellow' ? 2 : 1;
+    const scoreB = (klassifB.nivaStatus === 'red' || klassifB.trendStatus === 'ner') ? 3 
+                 : klassifB.nivaStatus === 'yellow' ? 2 : 1;
+    
+    return scoreB - scoreA;
+  });
+}
+
+/**
+ * Skapar en grupp-header för kärnämne
+ * @param {string} amne - Ämnesnamn
+ * @param {Object} status - Status från beraknaGruppStatus
+ * @returns {HTMLElement}
+ */
+function skapaGruppHeader(amne, status) {
+  const header = document.createElement('div');
+  header.className = `subject-group-header ${status.status}`;
+  header.innerHTML = `
+    <div class="subject-title">
+      <span class="subject-icon">${status.label}</span>
+      <h3>${amne}</h3>
+    </div>
+    <div class="subject-badge ${status.status}">${status.badge}</div>
+  `;
+  return header;
+}
+
+/**
+ * Renderar grupperade resultatkort med kärnämnesstruktur
+ * @param {string} sectionId - ID för sektion
+ * @param {Array} results - Alla kortresultat
+ * @param {Object} kpiData - KPI-data objekt
+ * @param {Object} realAvgs - Gruppgenomsnitt
+ * @param {string} schoolType - Skolform ('F-6', '7-9', 'F-9')
+ */
+function renderGroupedOutcomeKPIs(sectionId, results, kpiData, realAvgs, schoolType) {
+  const sectionEl = document.getElementById(sectionId);
+  if (!sectionEl) {
+    console.error(`Element with id '${sectionId}' not found`);
+    return;
+  }
+  
+  console.log('DEBUG renderGroupedOutcomeKPIs called:', {
+    resultsCount: results?.length,
+    resultIds: results?.map(r => r.def?.id),
+    schoolType
+  });
+  
+  if (!results || results.length === 0) {
+    console.error('renderGroupedOutcomeKPIs: No results provided!');
+    sectionEl.innerHTML = '<p style="padding: 20px; color: red;">Inga resultatdata tillgängliga</p>';
+    return;
+  }
+  
+  sectionEl.innerHTML = '';
+  
+  // Definiera gruppstruktur
+  const groups = {
+    'summary_f6': {
+      title: 'Samlad signal åk 6',
+      kpis: ['N15539'],
+      stage: 'f6',
+      isSummary: true
+    },
+    'summary_79': {
+      title: 'Samlad signal åk 9',
+      kpis: ['N15418', 'N15503', 'N15504'],
+      stage: '79',
+      isSummary: true
+    },
+    'svenska_f6': {
+      title: 'Svenska åk 6',
+      kpis: ['N15488', 'N15516', 'N15510'],
+      npGap: { hogre: 'U15433', lagre: 'U15434', amne: 'Svenska' },
+      stage: 'f6'
+    },
+    'matematik_f6': {
+      title: 'Matematik åk 6',
+      kpis: ['N15485', 'N15509'],
+      npGap: { hogre: 'U15429', lagre: 'U15430', amne: 'Matematik' },
+      stage: 'f6'
+    },
+    'engelska_f6': {
+      title: 'Engelska åk 6',
+      kpis: ['N15482'],
+      npGap: { hogre: 'U15431', lagre: 'U15432', amne: 'Engelska' },
+      stage: 'f6'
+    },
+    'svenska_79': {
+      title: 'Svenska åk 9',
+      kpis: ['N15488', 'N15516'],
+      npGap: { hogre: 'U15433', lagre: 'U15434', amne: 'Svenska' },
+      stage: '79'
+    },
+    'matematik_79': {
+      title: 'Matematik åk 9',
+      kpis: ['N15485', 'N15523'],
+      npGap: { hogre: 'U15429', lagre: 'U15430', amne: 'Matematik' },
+      stage: '79'
+    },
+    'engelska_79': {
+      title: 'Engelska åk 9',
+      kpis: ['N15482'],
+      npGap: { hogre: 'U15431', lagre: 'U15432', amne: 'Engelska' },
+      stage: '79'
+    }
+  };
+  
+  const frag = document.createDocumentFragment();
+  
+  // Iterera genom alla grupper och dölj tomma
+  Object.entries(groups).forEach(([groupKey, group]) => {
+    // Hitta kort som hör till gruppen
+    const groupCards = results.filter(({ def }) => group.kpis.includes(def.id));
+    
+    console.log(`DEBUG Group ${groupKey} processing:`, {
+      groupTitle: group.title,
+      groupKPIs: group.kpis,
+      foundCards: groupCards.map(c => c.def.id),
+      allAvailableCards: results.map(r => r.def.id)
+    });
+    
+    // Dölj grupper utan kort (data saknas)
+    if (groupCards.length === 0) return;
+    
+    // Sortera kort efter uppmärksamhet
+    const sortedCards = sorteraEfterUppmarksamhet(groupCards, realAvgs);
+    
+    // Beräkna gruppstatus (skippa för summary-grupper)
+    let groupStatus = null;
+    if (!group.isSummary) {
+      groupStatus = beraknaGruppStatus(sortedCards, realAvgs);
+    }
+    
+    // Skapa grupp-header
+    if (groupStatus) {
+      frag.appendChild(skapaGruppHeader(group.title, groupStatus));
+    } else {
+      // Summary-grupper får enkel header
+      const summaryHeader = document.createElement('div');
+      summaryHeader.className = 'subject-group-header summary';
+      summaryHeader.innerHTML = `<h3>${group.title}</h3>`;
+      frag.appendChild(summaryHeader);
+    }
+    
+    // Skapa grupp-container
+    const groupContainer = document.createElement('div');
+    groupContainer.className = 'subject-group-cards';
+    
+    // Lägg till kort
+    sortedCards.forEach(({ card, def }) => {
+      groupContainer.appendChild(createKPICard(card));
+      kpiData[def.id] = {
+        ...card.trendData,
+        rule_bucket: card.comparisonData?.rule_bucket || null,
+        unit: def.unit,
+        scaleDependent: def.scaleDependent || false
+      };
+    });
+    
+    // Lägg till NP-gap kalibrering om det finns
+    if (group.npGap) {
+      const hogreCard = results.find(r => r.def.id === group.npGap.hogre);
+      const lagreCard = results.find(r => r.def.id === group.npGap.lagre);
+      
+      if (hogreCard && lagreCard) {
+        // Skapa kalibrerings-header
+        const calibHeader = document.createElement('div');
+        calibHeader.className = 'calibration-header';
+        calibHeader.innerHTML = `<h4>📊 Kalibrering (NP-gap)</h4>`;
+        groupContainer.appendChild(calibHeader);
+        
+        groupContainer.appendChild(createNPGapCard(hogreCard.card, lagreCard.card, group.npGap.amne));
+        
+        kpiData[group.npGap.hogre] = { ...hogreCard.card.trendData, unit: '%' };
+        kpiData[group.npGap.lagre] = { ...lagreCard.card.trendData, unit: '%' };
+      }
+    }
+    
+    frag.appendChild(groupContainer);
+  });
+  
+  sectionEl.appendChild(frag);
+}
+
+/**
  * Genererar narrativ text (3-6 meningar) baserat på regelmallar
  * @param {object} kpiData - All KPI-data
  * @param {object} groupAvgs - Gruppgenomsnitt
@@ -701,7 +1054,7 @@ function genereraNarrativText(kpiData, groupAvgs = {}) {
   })).filter(item => item.data?.latest != null);
   
   const salsaNegative = salsaKPIs.filter(item => item.klassif.diff < -2);
-  const salsaPositive = salsaKPIs.filter(item => item.klassif.diff > 2);
+  const salsaPositive = salsaKPIS.filter(item => item.klassif.diff > 2);
   
   if (salsaNegative.length >= 2) {
     meningar.push(`SALSA visar att skolan presterar under förväntan givet elevförutsättningarna, vilket indikerar outnyttjad potential i undervisningsstrukturen.`);
@@ -860,7 +1213,7 @@ async function hamtaKpiCardData(ouId, def, municipalityCode = '0684') {
 
 function genereraAutomatiskAnalys(kpiData) {
   const insights = [];
-  const { elevantal, eleverPerLarare, behorighetLarare, allaAmnen, yrkesprog, meritvarde, trygghet, studiero, engHogreNP, engLagreNP, sveHogreNP, sveLagreNP, engelska, matematik, svenska } = {
+  const { elevantal, eleverPerLarare, behorighetLarare, allaAmnen, yrkesprog, meritvarde, trygghet, studiero, matHogreNP, matLagreNP, engHogreNP, engLagreNP, sveHogreNP, sveLagreNP, engelska, matematik, svenska } = {
     elevantal: kpiData['N15807'],
     eleverPerLarare: kpiData['N15034'],
     behorighetLarare: kpiData['N15813'],
@@ -869,6 +1222,8 @@ function genereraAutomatiskAnalys(kpiData) {
     meritvarde: kpiData['N15505'],
     trygghet: kpiData['N15613'],
     studiero: kpiData['N15603'],
+    matHogreNP: kpiData['U15429'],
+    matLagreNP: kpiData['U15430'],
     engHogreNP: kpiData['U15431'],
     engLagreNP: kpiData['U15432'],
     sveHogreNP: kpiData['U15433'],
@@ -902,17 +1257,36 @@ function genereraAutomatiskAnalys(kpiData) {
   if (engelska?.dir === 'declining' || matematik?.dir === 'declining' || svenska?.dir === 'declining') {
     insights.push('📚 <strong>Kärnämnen:</strong> Fallande trend i något av kärnämnena. Fokusera på formativ bedömning och stödinsatser.');
   }
-  if (engHogreNP?.latest && engHogreNP.latest > 15 && engelska?.dir === 'declining') {
-    insights.push('⚖️ <strong>Engelska:</strong> Hög andel högre slutbetyg än NP + fallande resultat → risk för glapp i bedömning/NP-matchning.');
+  
+  // NP-gap analys med systemisk vs ämnesspecifik klassificering
+  const npAnalyser = [];
+  if (matHogreNP && matLagreNP) {
+    npAnalyser.push(analyseraNPGap(matHogreNP, matLagreNP, 'Matematik'));
   }
-  if (engLagreNP?.latest && engLagreNP.latest > 15) {
-    insights.push('⚖️ <strong>Engelska:</strong> Hög andel lägre slutbetyg än NP → elever presterar på prov men tappar över tid.');
+  if (engHogreNP && engLagreNP) {
+    npAnalyser.push(analyseraNPGap(engHogreNP, engLagreNP, 'Engelska'));
   }
-  if (sveHogreNP?.latest && sveHogreNP.latest > 15 && svenska?.dir === 'declining') {
-    insights.push('⚖️ <strong>Svenska:</strong> Hög andel högre slutbetyg än NP + fallande resultat → risk för glapp i bedömning/NP-matchning.');
+  if (sveHogreNP && sveLagreNP) {
+    npAnalyser.push(analyseraNPGap(sveHogreNP, sveLagreNP, 'Svenska'));
   }
-  if (sveLagreNP?.latest && sveLagreNP.latest > 15) {
-    insights.push('⚖️ <strong>Svenska:</strong> Hög andel lägre slutbetyg än NP → elever presterar på prov men tappar över tid.');
+  
+  // Räkna ämnen med hög risk i samma riktning
+  const hogRiskInflation = npAnalyser.filter(a => a.riskNiva === 'hög risk' && a.badge === 'inflation');
+  const hogRiskDeflation = npAnalyser.filter(a => a.riskNiva === 'hög risk' && a.badge === 'deflation');
+  
+  // Systemisk kalibreringsfråga om 2+ ämnen har hög risk samma riktning
+  if (hogRiskInflation.length >= 2) {
+    const amnen = hogRiskInflation.map((_, i) => ['Matematik', 'Engelska', 'Svenska'][i]).join(', ');
+    insights.push(`🔍 <strong>Systemisk kalibreringsfråga - Inflation:</strong> Två eller fler ämnen visar systematiskt högre slutbetyg än NP. Prioritera <em>gemensamma bedömningssamtal, kalibrering mellan lärare och matchning mot proven</em>.`);
+  } else if (hogRiskDeflation.length >= 2) {
+    insights.push(`🔍 <strong>Systemisk kalibreringsfråga - Deflation:</strong> Två eller fler ämnen visar systematiskt lägre slutbetyg än NP. Undersök om eleverna får tillräckligt <em>bedömningsunderlag över tid, likvärdighet i bedömning och uthållig progression</em>.`);
+  } else {
+    // Ämnesspecifik kalibrering om endast 1 ämne sticker ut
+    npAnalyser.forEach(analys => {
+      if (analys.riskNiva === 'hög risk' || analys.riskNiva === 'uppmärksamhet') {
+        insights.push(`⚖️ ${analys.analysText}`);
+      }
+    });
   }
 
   const harSaknad = Object.values(kpiData).some(k => k?.latest === null);
@@ -950,8 +1324,8 @@ async function renderSection(sectionId, defs, ouId, kpiData, municipalityCode = 
   const mockAvgs = {
     'N15807': 300, 'N15034': 13, 'N15813': 75, 'N15031': 90, 'N11805': 95,
     'N15482': 85, 'N15485': 80, 'N15488': 82, 'N15509': 65, 'N15510': 90,
-    'N15539': 85, 'N15516': 80,
-    'N15419': 88, 'N15436': 85, 'N15505': 220, 'N15503': 65, 
+    'N15539': 85, 'N15516': 80, 'N15523': 65,
+    'N15418': 88, 'N15419': 88, 'N15436': 85, 'N15503': 220, 'N15504': 85, 'N15505': 220,
     'U15429': 10, 'U15430': 10, 'U15431': 10, 'U15432': 10,
     'U15433': 10, 'U15434': 10, 'U15413': 0, 'U15414': 0, 'U15415': 0, 'U15416': 0,
     'N15613': 82, 'N15603': 80, 'N15614': 85
@@ -989,7 +1363,39 @@ async function renderSection(sectionId, defs, ouId, kpiData, municipalityCode = 
   
   sectionEl.innerHTML = '';
   const frag = document.createDocumentFragment();
+  
+  // Gruppera NP-gap KPIer för speciell rendering
+  const npGapPairs = [];
+  const npGapIds = new Set();
+  const regularCards = [];
+  
+  // Identifiera NP-gap par
+  const npPairs = [
+    { hogre: 'U15429', lagre: 'U15430', amne: 'Matematik' },
+    { hogre: 'U15431', lagre: 'U15432', amne: 'Engelska' },
+    { hogre: 'U15433', lagre: 'U15434', amne: 'Svenska' }
+  ];
+  
+  npPairs.forEach(pair => {
+    const hogreCard = results.find(r => r.def.id === pair.hogre);
+    const lagreCard = results.find(r => r.def.id === pair.lagre);
+    
+    if (hogreCard && lagreCard) {
+      npGapPairs.push({ hogre: hogreCard.card, lagre: lagreCard.card, amne: pair.amne });
+      npGapIds.add(pair.hogre);
+      npGapIds.add(pair.lagre);
+    }
+  });
+  
+  // Separera reguljära kort från NP-gap kort
   results.forEach(({ card, def }) => {
+    if (!npGapIds.has(def.id)) {
+      regularCards.push({ card, def });
+    }
+  });
+  
+  // Rendera reguljära kort först
+  regularCards.forEach(({ card, def }) => {
     frag.appendChild(createKPICard(card));
     // Spara både trendData OCH regel/unit för styrande analys
     kpiData[def.id] = {
@@ -999,6 +1405,15 @@ async function renderSection(sectionId, defs, ouId, kpiData, municipalityCode = 
       scaleDependent: def.scaleDependent || false
     };
   });
+  
+  // Rendera NP-gap kort som kombinerade kort
+  npGapPairs.forEach(({ hogre, lagre, amne }) => {
+    frag.appendChild(createNPGapCard(hogre, lagre, amne));
+    // Spara data för båda KPIerna
+    kpiData[hogre.id] = { ...hogre.trendData, unit: '%' };
+    kpiData[lagre.id] = { ...lagre.trendData, unit: '%' };
+  });
+  
   sectionEl.appendChild(frag);
   return { cards: results.map(r => r.card), realAvgs, sourceAvgs, sectionHasMock };
 }
@@ -1015,28 +1430,87 @@ async function renderSections(ouId, municipalityCode = null) {
   // Rensa comparison cache när kommun/enhet ändras
   clearCache();
   
-  // Hämta alla KPI-data och bygg realAvgs från comparisonData
-  const [baselineResult, salsaResult, tryggResult, outcomeResult] = await Promise.all([
+  // Hämta skoltyp för filtrering av resultatgrupper
+  const schoolType = await detectSchoolType(ouId);
+  
+  // Hämta baseline, SALSA och trygghet med vanlig rendering
+  const [baselineResult, salsaResult, tryggResult] = await Promise.all([
     renderSection('baselineKPIs', BASELINE_KPIS, ouId, kpiData, municipalityCode),
     renderSection('salsaKPIs', SALSA_KPIS, ouId, kpiData, municipalityCode),
-    renderSection('trygghetsKPIs', TRYG_KPIS, ouId, kpiData, municipalityCode),
-    renderSection('outcomeKPIs', kpiDefsOutcome(), ouId, kpiData, municipalityCode)
+    renderSection('trygghetsKPIs', TRYG_KPIS, ouId, kpiData, municipalityCode)
   ]);
+  
+  // Hämta outcome-kort manuellt för grupperad rendering
+  setLoading('outcomeKPIs', true);
+  const outcomeDefs = kpiDefsOutcome();
+  console.log('DEBUG kpiDefsOutcome returned:', outcomeDefs.length, 'definitions');
+  console.log('DEBUG KPI IDs:', outcomeDefs.map(d => d.id));
+  
+  const outcomeCardPromises = outcomeDefs.map(async (def) => {
+    const card = await hamtaKpiCardData(ouId, def, municipalityCode);
+    return { card, def };
+  });
+  const outcomeCards = await Promise.all(outcomeCardPromises);
+  
+  console.log('DEBUG outcomeCards loaded:', outcomeCards.length, 'cards');
+  if (outcomeCards.length === 0) {
+    console.error('No outcome cards loaded!');
+  }
+  
+  // Bygg realAvgs för outcome KPIs
+  const mockAvgs = {
+    'N15807': 300, 'N15034': 13, 'N15813': 75, 'N15031': 90, 'N11805': 95,
+    'N15482': 85, 'N15485': 80, 'N15488': 82, 'N15509': 65, 'N15510': 90,
+    'N15539': 85, 'N15516': 80, 'N15523': 65,
+    'N15418': 88, 'N15419': 88, 'N15436': 85, 'N15503': 220, 'N15504': 85, 'N15505': 220,
+    'U15429': 10, 'U15430': 10, 'U15431': 10, 'U15432': 10,
+    'U15433': 10, 'U15434': 10, 'U15413': 0, 'U15414': 0, 'U15415': 0, 'U15416': 0,
+    'N15613': 82, 'N15603': 80, 'N15614': 85
+  };
+  
+  const outcomeRealAvgs = {};
+  let outcomeHasMock = false;
+  
+  outcomeCards.forEach(({ card, def }) => {
+    if (card.comparisonData && card.comparisonData.available) {
+      const baseline = pickBaseline(def, card.comparisonData);
+      if (baseline !== null) {
+        outcomeRealAvgs[def.id] = baseline;
+      } else {
+        outcomeRealAvgs[def.id] = mockAvgs[def.id] || null;
+        outcomeHasMock = true;
+      }
+    } else {
+      outcomeRealAvgs[def.id] = mockAvgs[def.id] || null;
+      outcomeHasMock = true;
+    }
+  });
   
   // Slå ihop alla realAvgs från sektionerna
   const groupAvgs = {
     ...baselineResult.realAvgs,
     ...salsaResult.realAvgs,
     ...tryggResult.realAvgs,
-    ...outcomeResult.realAvgs
+    ...outcomeRealAvgs
   };
+  
+  console.log('DEBUG before renderGroupedOutcomeKPIs:', {
+    outcomeCardsCount: outcomeCards.length,
+    outcomeCardIds: outcomeCards.map(c => c.def.id),
+    schoolType,
+    groupAvgsKeys: Object.keys(groupAvgs)
+  });
+  
+  // Rendera grupperade resultat-KPIer
+  renderGroupedOutcomeKPIs('outcomeKPIs', outcomeCards, kpiData, groupAvgs, schoolType);
+  // setLoading redan hanterad i renderGroupedOutcomeKPIs genom sectionEl.innerHTML = ''
 
   // Data-kvalitet: markera om ersättningsvärden (mock) användes i någon sektion
   const anyMockBaseline = (
     baselineResult.sectionHasMock ||
     salsaResult.sectionHasMock ||
     tryggResult.sectionHasMock ||
-    outcomeResult.sectionHasMock
+    outcomeHasMock
   );
 
   // === GENERERA OCH VISA STYRANDE ANALYS ===
@@ -1052,7 +1526,7 @@ async function renderSections(ouId, municipalityCode = null) {
   const baselineBaseNote = baselineResult.sectionHasMock
     ? 'Jämfört med: Liknande skolor (F-9) + ersättningsvärde för saknade'
     : 'Jämfört med: Liknande skolor (F-9)';
-  const outcomeBaseNote = outcomeResult.sectionHasMock
+  const outcomeBaseNote = outcomeHasMock
     ? 'Jämfört med: Liknande skolor (F-9) + ersättningsvärde för saknade'
     : 'Jämfört med: Liknande skolor (F-9)';
   const salsaBaseNote = salsaResult.sectionHasMock
