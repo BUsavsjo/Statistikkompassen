@@ -24,7 +24,7 @@ const MOCK_AVERAGES = {
   'N15418': 88, 'N15419': 88, 'N15436': 85, 'N15503': 220, 'N15504': 85, 'N15505': 220,
   'U15429': 10, 'U15430': 10, 'U15431': 10, 'U15432': 10,
   'U15433': 10, 'U15434': 10, 'U15413': 0, 'U15414': 0, 'U15415': 0, 'U15416': 0,
-  'N15613': 82, 'N15603': 80, 'N15614': 85
+  'N15613': 82, 'N15603': 80, 'N15602': 78, 'N15614': 85
 };
 
 // NP-gap subject configurations
@@ -55,10 +55,10 @@ const OUTCOME_KPIS = [
   // Åk 9 helhetsmått
   { id: 'N15418', label: 'Åk 9: Elever i alla ämnen som uppnått kunskapskraven, %', unit: '%', stage: '79' },
   { id: 'N15503', label: 'Åk 9: Meritvärde (17 ämnen)', unit: 'poäng', stage: '79' },
-  { id: 'N15504', label: 'Åk 9: Behöriga till yrkesprogram', unit: '%', stage: '79' },
+  { id: 'N15504', label: 'Åk 9: Meritvärde i kommun', unit: 'poäng', stage: '79' },
   // Åk 9 kärnämnen (gamla KPIer behålls för bakåtkompatibilitet)
   { id: 'N15419', label: 'Åk 9: Alla ämnen godkända', unit: '%', stage: '79' },
-  { id: 'N15436', label: 'Åk 9: Behöriga till yrkesprogram', unit: '%', stage: '79' },
+  { id: 'N15436', label: 'Åk 9: Behöriga till yrkesprogram (kommun)', unit: '%', stage: '79' },
   { id: 'N15505', label: 'Åk 9: Meritvärde (17 ämnen)', unit: 'poäng', stage: '79' },
   { id: 'N15482', label: 'Åk 9: Engelska minst E', unit: '%', stage: '79' },
   { id: 'N15485', label: 'Åk 9: Matematik minst E', unit: '%', stage: '79' },
@@ -84,6 +84,7 @@ const SALSA_KPIS = [
 const TRYG_KPIS = [
   { id: 'N15613', label: 'Åk 5: Trygghet', unit: '%' },
   { id: 'N15603', label: 'Åk 5: Studiero', unit: '%' },
+  { id: 'N15602', label: 'Åk 5: Stimulans', unit: '%', description: 'Elever i åk 5 upplever att lärarna gör skolarbetet intressant' },
   { id: 'N15614', label: 'Åk 5: Vuxnas agerande mot kränkningar', unit: '%' }
 ];
 
@@ -152,11 +153,12 @@ function createKPICard(kpi) {
   const isNPGap = kpi.id && (kpi.id.startsWith('U1542') || kpi.id.startsWith('U1543'));
   const isBaselineCount = kpi.id && (kpi.id === 'N11805' || kpi.id === 'N15807'); // Elevantal
   const isSALSA = kpi.id && kpi.id.startsWith('U154') && ['U15413', 'U15414', 'U15415', 'U15416'].includes(kpi.id);
+  const isStimulans = kpi.id && kpi.id === 'N15602'; // Stimulans - förklarare/klimatindikator
   
   // Bestäm färgindikator baserat på trend-status (förbättring, försämring, stabil)
-  // SKIP för NP-gap, elevantal och SALSA
+  // SKIP för NP-gap, elevantal, SALSA och Stimulans
   let colorClass = '';
-  if (!isNPGap && !isBaselineCount && !isSALSA && kpi.trendData) {
+  if (!isNPGap && !isBaselineCount && !isSALSA && !isStimulans && kpi.trendData) {
     const dir = kpi.trendData.dir;
     if (dir === 'improving') {
       colorClass = 'status-green'; // Förbättring
@@ -176,14 +178,22 @@ function createKPICard(kpi) {
     card.classList.add('np-gap-individual');
   }
   
-  // Om det är elevantal eller SALSA, använd neutral styling
-  if (isBaselineCount || isSALSA) {
+  // Om det är elevantal, SALSA eller Stimulans, använd neutral styling
+  if (isBaselineCount || isSALSA || isStimulans) {
     card.classList.add('neutral-kpi');
   }
 
   const label = document.createElement('div');
   label.className = 'kpi-label';
   label.textContent = kpi.label;
+  
+  // Add KPI ID below label in small text
+  const kpiId = document.createElement('div');
+  kpiId.className = 'kpi-id';
+  kpiId.textContent = `ID: ${kpi.id || ''}`;
+  kpiId.style.fontSize = '0.75rem';
+  kpiId.style.color = '#64748b';
+  kpiId.style.marginTop = '2px';
 
   const value = document.createElement('div');
   value.className = 'kpi-value';
@@ -249,7 +259,7 @@ function createKPICard(kpi) {
   analysis.className = 'kpi-analysis';
   analysis.textContent = kpi.analysis || '';
 
-  card.append(label, value, comparisonDiv, analysis);
+  card.append(label, kpiId, value, comparisonDiv, analysis);
   return card;
 }
 
@@ -436,6 +446,14 @@ function createNPGapCard(hogreKPI, lagreKPI, amne) {
   label.className = 'kpi-label';
   label.textContent = `${amne}: NP-gap analys`;
   
+  // Add KPI IDs for NP-gap
+  const kpiId = document.createElement('div');
+  kpiId.className = 'kpi-id';
+  kpiId.textContent = `ID: ${hogreKPI.id || ''}, ${lagreKPI.id || ''}`;
+  kpiId.style.fontSize = '0.75rem';
+  kpiId.style.color = '#64748b';
+  kpiId.style.marginTop = '2px';
+  
   // Visa båda andelar + netto-gap
   const value = document.createElement('div');
   value.className = 'kpi-value np-gap-value';
@@ -445,7 +463,7 @@ function createNPGapCard(hogreKPI, lagreKPI, amne) {
         <span class="np-hogre">↑ ${npAnalys.hogreAndel.toFixed(1)}%</span>
         <span class="np-lagre">↓ ${npAnalys.lagreAndel.toFixed(1)}%</span>
       </div>
-      <div class="np-netto">Netto: ${npAnalys.nettoGap > 0 ? '+' : ''}${npAnalys.nettoGap.toFixed(1)} p.p</div>
+      <div class="np-netto">Netto: ${npAnalys.nettoGap > 0 ? '+' : ''}${npAnalys.nettoGap.toFixed(1)} procentenheter</div>
     `;
   } else {
     value.textContent = '— Saknar data';
@@ -487,6 +505,7 @@ function createNPGapCard(hogreKPI, lagreKPI, amne) {
   analysis.innerHTML = npAnalys.analysText;
   
   card.appendChild(label);
+  card.appendChild(kpiId);
   card.appendChild(value);
   card.appendChild(badgesDiv);
   card.appendChild(analysis);
@@ -650,12 +669,32 @@ function genereraInsikter(kpiData, groupAvgs = {}) {
   // Hävstång: Smart rekommendation baserad på data
   let havstang = 'Fortsätt arbeta med nuvarande prioriteringar.';
   
-  // Kontrollera studiero och trygghet
+  // Kontrollera studiero, trygghet och stimulans
   const studiero = kpiData['N15603'];
   const trygghet = kpiData['N15613'];
-  if (studiero?.latest && studiero.latest < 80) {
+  const stimulans = kpiData['N15602'];
+  const allaAmnenF6 = kpiData['N15539'];
+  
+  // Prioritet 1: Stimulans + studiero båda låga (systemiskt problem)
+  if (studiero?.latest && studiero.latest < 80 && stimulans?.latest && stimulans.latest < 80) {
+    havstang = 'Fokusera på <strong>tydligare lektionsstruktur och mer elevaktiva arbetssätt</strong> – både stimulans och studiero behöver förbättras.';
+  }
+  // Prioritet 2: Stimulans låg men trygghet/studiero ok (didaktiskt problem)
+  else if (stimulans?.latest && stimulans.latest < 80 && 
+           (!studiero?.latest || studiero.latest >= 80) && 
+           (!trygghet?.latest || trygghet.latest >= 80)) {
+    havstang = 'Miljön är trygg och lugn, men undervisningen upplevs inte engagerande. Fokusera på <strong>variation och utmanande uppgifter</strong>.';
+  }
+  // Prioritet 3: F-6 resultat dåliga + stimulans låg (motivation som nyckelfaktor)
+  else if (allaAmnenF6?.latest && allaAmnenF6.latest < 75 && stimulans?.latest && stimulans.latest < 80) {
+    havstang = 'Resultattapp sammanfaller med minskad stimulans. <strong>Motivation och undervisningsupplägg</strong> kan vara en nyckelfaktor.';
+  }
+  // Prioritet 4: Studiero låg (ursprunglig regel)
+  else if (studiero?.latest && studiero.latest < 80) {
     havstang = 'Fokusera på <strong>studiero och tydliga strukturer</strong> – lågåterkommande grund för lärande.';
-  } else if (trygghet?.latest && trygghet.latest < 80) {
+  }
+  // Prioritet 5: Trygghet låg
+  else if (trygghet?.latest && trygghet.latest < 80) {
     havstang = 'Prioritera <strong>trygghetsskapande åtgärder</strong> – förutsättning för resultat.';
   }
   // Kontrollera kärnämnen
@@ -1243,7 +1282,9 @@ async function hamtaKpiCardData(ouId, def, municipalityCode = '0684') {
 
 function genereraAutomatiskAnalys(kpiData) {
   const insights = [];
-  const { elevantal, eleverPerLarare, behorighetLarare, allaAmnen, yrkesprog, meritvarde, trygghet, studiero, matHogreNP, matLagreNP, engHogreNP, engLagreNP, sveHogreNP, sveLagreNP, engelska, matematik, svenska } = {
+  
+  // Extrahera nyckeldata
+  const { elevantal, eleverPerLarare, behorighetLarare, allaAmnen, yrkesprog, meritvarde, trygghet, studiero, stimulans, allaAmnenF6, matHogreNP, matLagreNP, engHogreNP, engLagreNP, sveHogreNP, sveLagreNP, engelska, matematik, svenska } = {
     elevantal: kpiData['N15807'],
     eleverPerLarare: kpiData['N15034'],
     behorighetLarare: kpiData['N15813'],
@@ -1252,6 +1293,8 @@ function genereraAutomatiskAnalys(kpiData) {
     meritvarde: kpiData['N15505'],
     trygghet: kpiData['N15613'],
     studiero: kpiData['N15603'],
+    stimulans: kpiData['N15602'],
+    allaAmnenF6: kpiData['N15539'],
     matHogreNP: kpiData['U15429'],
     matLagreNP: kpiData['U15430'],
     engHogreNP: kpiData['U15431'],
@@ -1263,73 +1306,166 @@ function genereraAutomatiskAnalys(kpiData) {
     svenska: kpiData['N15488']
   };
 
-  if (allaAmnen?.dir === 'declining' || meritvarde?.dir === 'declining') {
-    insights.push('📉 <strong>Fallande resultat:</strong> Andelen elever med godkända betyg eller meritvärde sjunker. Prioritera tidiga stödinsatser och uppföljning av undervisningskvalitet.');
-  }
+  // === INSIKTER (Positiva signaler) ===
+  const insikterSection = [];
+  
   if (allaAmnen?.dir === 'improving' && meritvarde?.dir === 'improving') {
-    insights.push('📈 <strong>Positiv trend:</strong> Både andel godkända och meritvärde stiger. Fortsätt arbetet med effektiva lärstrategier.');
-  }
-  if (yrkesprog?.latest && yrkesprog.latest < 80) {
-    insights.push('🎯 <strong>Behörighet yrkesprogram:</strong> Andelen behöriga till yrkesprogram är under 80%. Säkerställ att eleverna får stöd i kärnämnena.');
-  }
-  if (eleverPerLarare?.latest && eleverPerLarare.latest > THRESHOLDS.STUDENTS_PER_TEACHER) {
-    insights.push('👩‍🏫 <strong>Resurstryck:</strong> Hög elevtäthet per lärare kan påverka undervisningskvaliteten. Överväg resursförstärkning eller omfördelning.');
-  }
-  if (behorighetLarare?.latest && behorighetLarare.latest < THRESHOLDS.TEACHER_QUALIFICATION) {
-    insights.push('📚 <strong>Lärarbehörighet:</strong> Andelen behöriga lärare är under 70%. Prioritera kompetensförsörjning och rekrytering.');
-  }
-  if (trygghet?.latest && trygghet.latest < THRESHOLDS.SAFETY) {
-    insights.push('🧭 <strong>Trygghet åk 5:</strong> Elevernas upplevda trygghet är låg. Öka trygghetsskapande åtgärder och elevinflytande.');
-  }
-  if (studiero?.latest && studiero.latest < THRESHOLDS.SAFETY) {
-    insights.push('🧠 <strong>Studiero åk 5:</strong> Låg studiero signalerar behov av tydligare struktur och ordningsregler.');
-  }
-  if (engelska?.dir === 'declining' || matematik?.dir === 'declining' || svenska?.dir === 'declining') {
-    insights.push('📚 <strong>Kärnämnen:</strong> Fallande trend i något av kärnämnena. Fokusera på formativ bedömning och stödinsatser.');
+    insikterSection.push('📈 <strong>Stark positiv trend:</strong> Både andel godkända och meritvärde ökar över tid. Fortsätt med nuvarande framgångsrika arbetssätt.');
   }
   
-  // NP-gap analys med systemisk vs ämnesspecifik klassificering
-  const npAnalyser = [];
-  if (matHogreNP && matLagreNP) {
-    npAnalyser.push(analyseraNPGap(matHogreNP, matLagreNP, 'Matematik'));
-  }
-  if (engHogreNP && engLagreNP) {
-    npAnalyser.push(analyseraNPGap(engHogreNP, engLagreNP, 'Engelska'));
-  }
-  if (sveHogreNP && sveLagreNP) {
-    npAnalyser.push(analyseraNPGap(sveHogreNP, sveLagreNP, 'Svenska'));
+  if (trygghet?.latest && trygghet.latest >= 85 && studiero?.latest && studiero.latest >= 85) {
+    insikterSection.push('✅ <strong>Trygg lärmiljö:</strong> Hög trygghet och studiero skapar goda förutsättningar för lärande.');
   }
   
-  // Räkna ämnen med hög risk i samma riktning
-  const hogRiskInflation = npAnalyser.filter(a => a.riskNiva === 'hög risk' && a.badge === 'inflation');
-  const hogRiskDeflation = npAnalyser.filter(a => a.riskNiva === 'hög risk' && a.badge === 'deflation');
+  if (stimulans?.latest && stimulans.latest >= 85) {
+    insikterSection.push('🌟 <strong>Engagerande undervisning:</strong> Eleverna upplever att skolarbetet är intressant, vilket främjar motivation.');
+  }
   
-  // Systemisk kalibreringsfråga om 2+ ämnen har hög risk samma riktning
-  if (hogRiskInflation.length >= 2) {
-    const amnen = hogRiskInflation.map((_, i) => ['Matematik', 'Engelska', 'Svenska'][i]).join(', ');
-    insights.push(`🔍 <strong>Systemisk kalibreringsfråga - Inflation:</strong> Två eller fler ämnen visar systematiskt högre slutbetyg än NP. Prioritera <em>gemensamma bedömningssamtal, kalibrering mellan lärare och matchning mot proven</em>.`);
-  } else if (hogRiskDeflation.length >= 2) {
-    insights.push(`🔍 <strong>Systemisk kalibreringsfråga - Deflation:</strong> Två eller fler ämnen visar systematiskt lägre slutbetyg än NP. Undersök om eleverna får tillräckligt <em>bedömningsunderlag över tid, likvärdighet i bedömning och uthållig progression</em>.`);
+  if (behorighetLarare?.latest && behorighetLarare.latest >= 80) {
+    insikterSection.push('👩‍🏫 <strong>Hög lärarkompetens:</strong> God andel behöriga lärare stärker undervisningskvaliteten.');
+  }
+  
+  if (allaAmnenF6?.latest && allaAmnenF6.latest >= 85) {
+    insikterSection.push('🎯 <strong>Stark grund i F-6:</strong> Hög måluppfyllelse i årskurs 6 ger goda förutsättningar för högstadiet.');
+  }
+  
+  // Lägg till insikter om det finns några
+  if (insikterSection.length > 0) {
+    insights.push('<h4 style="color: #059669; margin-top: 20px;">💡 Insikter - Vad fungerar bra</h4>');
+    insights.push(...insikterSection);
   } else {
-    // Ämnesspecifik kalibrering om endast 1 ämne sticker ut
-    npAnalyser.forEach(analys => {
-      if (analys.riskNiva === 'hög risk' || analys.riskNiva === 'uppmärksamhet') {
-        insights.push(`⚖️ ${analys.analysText}`);
-      }
-    });
+    insights.push('<h4 style="color: #059669; margin-top: 20px;">💡 Insikter</h4>');
+    insights.push('<p><em>Inga tydliga styrkor kunde identifieras i tillgänglig data. Fokusera på att bygga stabilitet.</em></p>');
   }
 
+  // === RISKFAKTORER ===
+  const riskSection = [];
+  
+  if (allaAmnen?.dir === 'declining' || meritvarde?.dir === 'declining') {
+    riskSection.push('⚠️ <strong>Fallande resultat:</strong> Nedåtgående trend i slutbetyg. Prioritera tidiga stödinsatser och uppföljning av undervisningskvalitet.');
+  }
+  
+  if (yrkesprog?.latest && yrkesprog.latest < 75) {
+    riskSection.push('🎯 <strong>Risk för icke-behörighet:</strong> Mindre än 75% blir behöriga till yrkesprogram. Fokusera på att säkra godkänt i kärnämnena.');
+  }
+  
+  if (eleverPerLarare?.latest && eleverPerLarare.latest > THRESHOLDS.STUDENTS_PER_TEACHER) {
+    riskSection.push(`👥 <strong>Högt resurstryck:</strong> ${eleverPerLarare.latest.toFixed(1)} elever per lärare kan begränsa möjligheten till individuellt stöd. Överväg resursomfördelning.`);
+  }
+  
+  if (behorighetLarare?.latest && behorighetLarare.latest < THRESHOLDS.TEACHER_QUALIFICATION) {
+    riskSection.push(`📚 <strong>Kompetensbrist:</strong> Endast ${behorighetLarare.latest.toFixed(0)}% behöriga lärare. Prioritera rekrytering och kompetensutveckling.`);
+  }
+  
+  if (trygghet?.latest && trygghet.latest < 75) {
+    riskSection.push(`🛡️ <strong>Låg trygghet:</strong> Trygghetsnivå på ${trygghet.latest.toFixed(0)}% kräver förstärkta trygghetsskapande åtgärder.`);
+  }
+  
+  if (studiero?.latest && studiero.latest < 75) {
+    riskSection.push(`🔇 <strong>Studierobrist:</strong> Studiero på ${studiero.latest.toFixed(0)}% påverkar lärmiljön negativt. Behov av tydligare strukturer och klassrumsledarskap.`);
+  }
+  
+  if (stimulans?.latest && stimulans.latest < 70) {
+    riskSection.push(`💤 <strong>Låg stimulans:</strong> Eleverna upplever inte undervisningen som engagerande (${stimulans.latest.toFixed(0)}%). Behov av mer varierade arbetssätt.`);
+  }
+  
+  // NP-gap riskfaktorer
+  if (matHogreNP && matLagreNP) {
+    const matGap = analyseraNPGap(matHogreNP, matLagreNP, 'Matematik');
+    if (matGap.riskNiva === 'hög risk' || matGap.riskNiva === 'uppmärksamhet') {
+      riskSection.push(`⚖️ <strong>Matematikbedömning:</strong> NP-gap visar ${matGap.riktning.toLowerCase()} - behov av kalibrering mellan lärare.`);
+    }
+  }
+  
+  if (engelska?.dir === 'declining' || matematik?.dir === 'declining' || svenska?.dir === 'declining') {
+    riskSection.push('📉 <strong>Kärnämnen försämras:</strong> Negativ trend i kärnämne(n). Stärk formativ bedömning och tidiga stödinsatser.');
+  }
+  
+  // Lägg till riskfaktorer
+  if (riskSection.length > 0) {
+    insights.push('<h4 style="color: #dc2626; margin-top: 20px;">⚠️ Riskfaktorer - Vad kräver uppmärksamhet</h4>');
+    insights.push(...riskSection);
+  } else {
+    insights.push('<h4 style="color: #dc2626; margin-top: 20px;">⚠️ Riskfaktorer</h4>');
+    insights.push('<p><em>Inga akuta riskfaktorer identifierade i tillgänglig data.</em></p>');
+  }
+
+  // === HÄVSTÅNGSEFFEKTER ===
+  const havstangSection = [];
+  
+  // R1: Stimulans + studiero båda låga (systemiskt problem)
+  if (stimulans?.latest && stimulans.latest < 75 && studiero?.latest && studiero.latest < 75) {
+    havstangSection.push('🎯 <strong>PRIORITET 1 - Klassrumsmiljö:</strong> Både stimulans och studiero är låga. Fokusera på <em>tydligare lektionsstruktur + mer elevaktiva arbetssätt</em>. Detta påverkar både arbetsro och motivation.');
+  }
+  // R2: Studiero låg men trygghet ok
+  else if (studiero?.latest && studiero.latest < 80 && (!trygghet?.latest || trygghet.latest >= 80)) {
+    havstangSection.push('📋 <strong>PRIORITET 1 - Studiero:</strong> Arbetsron behöver förbättras. Implementera <em>tydliga strukturer, rutiner och förutsägbarhet</em> i klassrummet.');
+  }
+  // R3: Trygghet låg
+  else if (trygghet?.latest && trygghet.latest < 75) {
+    havstangSection.push('🛡️ <strong>PRIORITET 1 - Trygghet:</strong> Grundläggande trygghet saknas. Starta med <em>trygghetsarbete, relationsbyggande och elevhälsoinsatser</em>.');
+  }
+  
+  // R4: F-6 resultat dåliga + stimulans låg
+  if (allaAmnenF6?.latest && allaAmnenF6.latest < 75 && stimulans?.latest && stimulans.latest < 75) {
+    havstangSection.push('🔄 <strong>HÄVSTÅNG - Motivation:</strong> Resultat och stimulans hänger ihop. Använd <em>formativ bedömning, tydlig återkoppling och meningsfullt lärande</em> för att öka både resultat och engagemang.');
+  }
+  
+  // R5: Behörighet + kärnämnen
+  if (yrkesprog?.latest && yrkesprog.latest < 80 && (engelska?.latest || matematik?.latest || svenska?.latest)) {
+    const lagtKarnamne = [];
+    if (matematik?.latest && matematik.latest < 75) lagtKarnamne.push('matematik');
+    if (svenska?.latest && svenska.latest < 75) lagtKarnamne.push('svenska');
+    if (engelska?.latest && engelska.latest < 75) lagtKarnamne.push('engelska');
+    
+    if (lagtKarnamne.length > 0) {
+      havstangSection.push(`📚 <strong>HÄVSTÅNG - Kärnämnen:</strong> Fokusera särskilt på <em>${lagtKarnamne.join(', ')}</em>. Använd <em>systematisk kartläggning, anpassad undervisning och extra stödgrupper</em>.`);
+    }
+  }
+  
+  // R6: Lärarkompetens som hävstång
+  if (behorighetLarare?.latest && behorighetLarare.latest < 75 && (allaAmnen?.latest && allaAmnen.latest < 80)) {
+    havstangSection.push('👨‍🏫 <strong>HÄVSTÅNG - Kompetensförsörjning:</strong> Öka andelen behöriga lärare genom <em>riktad rekrytering, kollegialt lärande och fortbildning</em>. Detta påverkar direkt undervisningskvaliteten.');
+  }
+  
+  // R7: NP-gap som hävstång
+  if (matHogreNP && matLagreNP && engHogreNP && engLagreNP && sveHogreNP && sveLagreNP) {
+    const npRisker = [
+      analyseraNPGap(matHogreNP, matLagreNP, 'Matematik'),
+      analyseraNPGap(engHogreNP, engLagreNP, 'Engelska'),
+      analyseraNPGap(sveHogreNP, sveLagreNP, 'Svenska')
+    ].filter(a => a.riskNiva === 'hög risk' || a.riskNiva === 'uppmärksamhet');
+    
+    if (npRisker.length >= 2) {
+      havstangSection.push('⚖️ <strong>HÄVSTÅNG - Likvärdighet:</strong> Flera ämnen visar NP-gap. Starta <em>strukturerade bedömningssamtal, gemensam kalibrering och provmatchning</em> mellan lärare.');
+    }
+  }
+  
+  // Allmän hävstång om inget specifikt
+  if (havstangSection.length === 0) {
+    if (studiero?.latest && studiero.latest >= 80 && trygghet?.latest && trygghet.latest >= 80) {
+      havstangSection.push('🚀 <strong>HÄVSTÅNG - Progression:</strong> God grundmiljö finns. Fokusera nu på <em>höjd ambitionsnivå, progression mot högre betyg och utmaningar för alla elever</em>.');
+    } else {
+      havstangSection.push('📊 <strong>HÄVSTÅNG - Systematik:</strong> Fortsätt med <em>datadrivet förbättringsarbete, regelbunden uppföljning och kontinuerlig utvärdering</em> av insatser.');
+    }
+  }
+  
+  // Lägg till hävstångseffekter
+  insights.push('<h4 style="color: #2563eb; margin-top: 20px;">🎯 Hävstångseffekter - Var ska ni börja?</h4>');
+  insights.push(...havstangSection);
+
+  // === DATAKVALITET ===
   const harSaknad = Object.values(kpiData).some(k => k?.latest === null);
   if (harSaknad) {
-    insights.push('<em>OBS: Vissa indikatorer saknar OU-data för denna enhet och ingår därför inte i bedömningen.</em>');
+    insights.push('<p style="margin-top: 20px; padding: 15px; background: #fef3c7; border-left: 4px solid #f59e0b; font-size: 0.9rem;"><strong>⚠️ Datakvalitet:</strong> <em>Vissa indikatorer saknar OU-data för denna enhet och ingår därför inte i bedömningen.</em></p>');
   }
 
   const elevantalValue = elevantal?.latest;
   if (elevantalValue && elevantalValue < 50) {
-    insights.push('<em>Liten elevgrupp → resultat kan variera mycket mellan år.</em>');
+    insights.push('<p style="margin-top: 10px; padding: 15px; background: #e0f2fe; border-left: 4px solid #0284c7; font-size: 0.9rem;"><strong>ℹ️ Liten elevgrupp:</strong> <em>Mindre än 50 elever innebär att resultat kan variera mycket mellan år. Tolka trender över längre tid.</em></p>');
   }
 
-  return insights.length > 0 ? insights : ['Ingen automatisk analys kunde genereras baserat på tillgänglig data.'];
+  return insights.length > 0 ? insights : ['<p>Ingen automatisk analys kunde genereras baserat på tillgänglig data.</p>'];
 }
 
 /**
@@ -1536,14 +1672,29 @@ async function renderSections(ouId, municipalityCode = null) {
   // === GENERERA OCH VISA STYRANDE ANALYS ===
   const styrandeAnalysContainer = document.getElementById('styrandeAnalys');
   
-  // 1. Beräkna sektionsstatus (trafikljus)
-  const baselineStatus = beraknaSektionStatus(BASELINE_KPIS, kpiData, groupAvgs);
-  const outcomeStatus = beraknaSektionStatus(kpiDefsOutcome(), kpiData, groupAvgs);
-  const salsaStatus = beraknaSektionStatus(SALSA_KPIS, kpiData, groupAvgs);
-  const tryggStatus = beraknaSektionStatus(TRYG_KPIS, kpiData, groupAvgs);
+  console.log('DEBUG: Rendering styrande analys', {
+    containerFound: !!styrandeAnalysContainer,
+    kpiDataKeys: Object.keys(kpiData),
+    kpiDataCount: Object.keys(kpiData).length,
+    groupAvgsKeys: Object.keys(groupAvgs),
+    sampleKPI: kpiData['N15807']
+  });
   
-  const sektionStatusGrid = document.getElementById('sektionStatusGrid');
-  const baselineBaseNote = baselineResult.sectionHasMock
+  if (!styrandeAnalysContainer) {
+    console.warn('styrandeAnalys container not found in DOM - skipping styrande analys rendering');
+  } else {
+    // 1. Beräkna sektionsstatus (trafikljus)
+    const baselineStatus = beraknaSektionStatus(BASELINE_KPIS, kpiData, groupAvgs);
+    const outcomeStatus = beraknaSektionStatus(kpiDefsOutcome(), kpiData, groupAvgs);
+    const salsaStatus = beraknaSektionStatus(SALSA_KPIS, kpiData, groupAvgs);
+    const tryggStatus = beraknaSektionStatus(TRYG_KPIS, kpiData, groupAvgs);
+    
+    const sektionStatusGrid = document.getElementById('sektionStatusGrid');
+    
+    if (!sektionStatusGrid) {
+      console.warn('sektionStatusGrid element not found in DOM');
+    } else {
+      const baselineBaseNote = baselineResult.sectionHasMock
     ? 'Jämfört med: Liknande skolor (F-9) + ersättningsvärde för saknade'
     : 'Jämfört med: Liknande skolor (F-9)';
   const outcomeBaseNote = outcomeHasMock
@@ -1593,28 +1744,33 @@ async function renderSections(ouId, municipalityCode = null) {
       <div class="status-explanation">${tryggStatus.statusExplanation}</div>
       <div class="comparison-base">${tryggBaseNote}</div>
     </div>
-  `;
+      `;
+    }
 
-  // Visa datakvalitetsnotis över styrande analys vid mock-fallback
-  let dqNotice = document.getElementById('dataQualityNotice');
-  if (!dqNotice) {
-    dqNotice = document.createElement('div');
-    dqNotice.id = 'dataQualityNotice';
-    dqNotice.className = 'data-quality-notice';
+    // Visa datakvalitetsnotis över styrande analys vid mock-fallback
+    let dqNotice = document.getElementById('dataQualityNotice');
+    if (!dqNotice) {
+      dqNotice = document.createElement('div');
+      dqNotice.id = 'dataQualityNotice';
+      dqNotice.className = 'data-quality-notice';
     // Prepend så den syns överst
     styrandeAnalysContainer.prepend(dqNotice);
-  }
-  if (anyMockBaseline) {
-    dqNotice.textContent = 'Begränsad jämförelsedata: Vissa baslinjer kunde inte hämtas live. Ersättningsvärden används — tolka analys med försiktighet.';
-    dqNotice.style.display = 'block';
-  } else {
-    dqNotice.style.display = 'none';
-  }
-  
-  // 2. Generera insikter (Styrka/Risk/Hävstång)
-  const insikter = genereraInsikter(kpiData, groupAvgs);
-  const insiktGrid = document.getElementById('insiktGrid');
-  insiktGrid.innerHTML = `
+    }
+    if (anyMockBaseline) {
+      dqNotice.textContent = 'Begränsad jämförelsedata: Vissa baslinjer kunde inte hämtas live. Ersättningsvärden används — tolka analys med försiktighet.';
+      dqNotice.style.display = 'block';
+    } else {
+      dqNotice.style.display = 'none';
+    }
+    
+    // 2. Generera insikter (Styrka/Risk/Hävstång)
+    const insikter = genereraInsikter(kpiData, groupAvgs);
+    const insiktGrid = document.getElementById('insiktGrid');
+    
+    if (!insiktGrid) {
+      console.warn('insiktGrid element not found in DOM');
+    } else {
+      insiktGrid.innerHTML = `
     <div class="insikt-card styrka">
       <h4>💪 Styrka</h4>
       <div class="insikt-label">VAD:</div>
@@ -1642,32 +1798,53 @@ async function renderSections(ouId, municipalityCode = null) {
       <div class="insikt-label">REKOMMENDATION:</div>
       <p class="insikt-action">Starta arbete omgående. Följ upp efter 3 månader.</p>
     </div>
-  `;
-  
-  // 3. Generera narrativ text som punktlista
-  const narrativText = genereraNarrativText(kpiData, groupAvgs);
-  const narrativEl = document.getElementById('narrativText');
-  
-  // Konvertera till strukturerad punktlista
-  const meningar = narrativText.split('. ').filter(m => m.length > 10);
-  const struktureradSammanfattning = `
-    <h4>Sammanfattning – Vad du behöver veta</h4>
-    <ul class="narrative-bullets">
-      <li><strong>📊 Nuläge:</strong> ${meningar[0] || 'Data analyseras...'}.</li>
-      <li><strong>⚡ Konsekvens:</strong> ${meningar[1] || 'Följ utvecklingen noga'}.</li>
-      <li><strong>✅ Positivt:</strong> ${meningar.find(m => m.includes('god') || m.includes('starka') || m.includes('över')) || 'Fortsätt nuvarande arbetssätt'}.</li>
-      <li><strong>🎯 Fokus framåt:</strong> ${meningar[meningar.length - 1] || 'Prioritera enligt rekommendationerna ovan'}.</li>
-    </ul>
-  `;
-  narrativEl.innerHTML = struktureradSammanfattning;
-  
-  // Visa analysen
-  styrandeAnalysContainer.style.display = 'block';
+      `;
+    }
+    
+    // 3. Generera narrativ text som punktlista
+    const narrativText = genereraNarrativText(kpiData, groupAvgs);
+    const narrativEl = document.getElementById('narrativText');
+    
+    if (!narrativEl) {
+      console.warn('narrativText element not found in DOM');
+    } else {
+      // Konvertera till strukturerad punktlista
+      const meningar = narrativText.split('. ').filter(m => m.length > 10);
+      const struktureradSammanfattning = `
+        <h4>Sammanfattning – Vad du behöver veta</h4>
+        <ul class="narrative-bullets">
+          <li><strong>📊 Nuläge:</strong> ${meningar[0] || 'Data analyseras...'}.</li>
+          <li><strong>⚡ Konsekvens:</strong> ${meningar[1] || 'Följ utvecklingen noga'}.</li>
+          <li><strong>✅ Positivt:</strong> ${meningar.find(m => m.includes('god') || m.includes('starka') || m.includes('över')) || 'Fortsätt nuvarande arbetssätt'}.</li>
+          <li><strong>🎯 Fokus framåt:</strong> ${meningar[meningar.length - 1] || 'Prioritera enligt rekommendationerna ovan'}.</li>
+        </ul>
+      `;
+      narrativEl.innerHTML = struktureradSammanfattning;
+    }
+    
+    // Visa analysen
+    styrandeAnalysContainer.style.display = 'block';
+    
+    // Add source attribution if not already present
+    let sourceAttribution = document.getElementById('sourceAttribution');
+    if (!sourceAttribution) {
+      sourceAttribution = document.createElement('div');
+      sourceAttribution.id = 'sourceAttribution';
+      sourceAttribution.style.cssText = 'margin-top: 30px; padding: 20px; background: #f8fafc; border-left: 4px solid #3b82f6; font-size: 0.875rem; color: #475569;';
+      sourceAttribution.innerHTML = '<strong>Källa:</strong> Kolada | <strong>Analysmotor:</strong> Peter Wenström';
+      styrandeAnalysContainer.appendChild(sourceAttribution);
+    }
+  }
   
   // === GAMMAL AUTOMATISK ANALYS (behålls längst ner) ===
   const insights = genereraAutomatiskAnalys(kpiData);
   const analysisEl = document.getElementById('analysisText');
-  analysisEl.innerHTML = '<h4>Automatisk analys</h4>' + insights.map(i => `<p>${i}</p>`).join('');
+  
+  if (!analysisEl) {
+    console.warn('analysisText element not found in DOM - skipping automatisk analys rendering');
+  } else {
+    analysisEl.innerHTML = '<h4>Automatisk analys</h4>' + insights.map(i => `<p>${i}</p>`).join('');
+  }
 }
 
 function initKommuner(selectEl, defaultId = '0684') {
