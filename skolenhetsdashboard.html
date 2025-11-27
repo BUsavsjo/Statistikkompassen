@@ -5,6 +5,7 @@
   <title>Skolenhetsdashboard för rektorer</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="styles/betygkolada.css">
+  <link rel="stylesheet" href="styles/skolenhetsdashboard.css">
   <style>
     body {
       background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
@@ -236,10 +237,15 @@
       border-left-color: #ef4444;
       background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%);
     }
-    
+
     .insikt-card.havstang {
       border-left-color: #3b82f6;
       background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+    }
+
+    .insikt-card.uppmarksamma {
+      border-left-color: #f59e0b;
+      background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%);
     }
     
     .insikt-card h4 {
@@ -708,6 +714,17 @@
     <!-- Resultat Section -->
     <div class="dashboard-section">
       <h2>Resultat</h2>
+      <p class="panel-description">
+        <strong>Jämförelselogik:</strong> Alla KPI-kort jämförs primärt mot <em>kommungenomsnittet inom samma skolform</em> (F-6 jämförs med andra F-6, 7-9 med andra 7-9, F-9 med andra F-9). 
+        Färger och badges baseras endast på denna primära jämförelse. 
+        Riksgenomsnitt visas som grå referens för kontext men påverkar inte färgkodning. 
+        Om kommungruppen är för liten (&lt;3 enheter) visas neutral status.
+      </p>
+      <p class="panel-description">
+        <strong>NP-gap tolkningsguide:</strong> NP-gap (slutbetyg vs nationella prov) är en <em>kalibreringssignal</em>, inte ett mål i sig. 
+        Gapet visar hur bedömning förhåller sig till NP-resultat och hjälper identifiera behov av gemensam kalibrering, 
+        bedömningsunderlag eller likvärdighet. Ett balanserat gap (&lt;5 p.p) indikerar god kalibrering.
+      </p>
       <div class="kpi-grid" id="outcomeKPIs"></div>
     </div>
 
@@ -723,7 +740,6 @@
       <h2>Trygghet åk 5</h2>
       <div class="kpi-grid" id="trygghetsKPIs"></div>
     </div>
-  </div>
 
     <!-- Automatisk Analys längst ner -->
     <div class="dashboard-section">
@@ -733,7 +749,8 @@
         <p>Automatisk analys av nyckeltal visas här...</p>
       </div>
     </div>
+  </div>
 
-    <script type="module" src="scripts/skolenhetsdashboard/page.js"></script>
+  <script type="module" src="scripts/skolenhetsdashboard/page.js"></script>
 </body>
 </html>
