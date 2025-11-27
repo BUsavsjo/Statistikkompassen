@@ -3,6 +3,37 @@ import { SKOLENHET_SEARCH_API, SKOLENHET_DATA_BASE } from '../constants.js';
 import { hamtaKoladaData } from '../chartHelpers.js';
 import { createKPIComparison, formatComparisonText, getComparisonRule, clearCache, detectSchoolType } from './comparisons.js';
 
+// ===== CONFIGURATION & CONSTANTS =====
+
+// Thresholds for analysis and classification
+const THRESHOLDS = {
+  LEVEL: { GREEN: 2, RED: -2 },
+  TREND: { UP: 3, DOWN: -3 },
+  STUDENTS_PER_TEACHER: 15,
+  TEACHER_QUALIFICATION: 70,
+  SAFETY: 80,
+  SMALL_COHORT: 50,
+  NP_GAP: { CALIBRATED: 5, WATCH: 5, ATTENTION: 10, HIGH_RISK: 15, TREND: 3 }
+};
+
+// Mock averages for fallback when real data is unavailable
+const MOCK_AVERAGES = {
+  'N15807': 300, 'N15034': 13, 'N15813': 75, 'N15031': 90, 'N11805': 95,
+  'N15482': 85, 'N15485': 80, 'N15488': 82, 'N15509': 65, 'N15510': 90,
+  'N15539': 85, 'N15516': 80, 'N15523': 65,
+  'N15418': 88, 'N15419': 88, 'N15436': 85, 'N15503': 220, 'N15504': 85, 'N15505': 220,
+  'U15429': 10, 'U15430': 10, 'U15431': 10, 'U15432': 10,
+  'U15433': 10, 'U15434': 10, 'U15413': 0, 'U15414': 0, 'U15415': 0, 'U15416': 0,
+  'N15613': 82, 'N15603': 80, 'N15614': 85
+};
+
+// NP-gap subject configurations
+const NP_GAP_SUBJECTS = [
+  { hogre: 'U15429', lagre: 'U15430', amne: 'Matematik' },
+  { hogre: 'U15431', lagre: 'U15432', amne: 'Engelska' },
+  { hogre: 'U15433', lagre: 'U15434', amne: 'Svenska' }
+];
+
 const BASELINE_KPIS = [
   { id: 'N11805', label: 'Antal elever i förskoleklass', unit: 'st', scaleDependent: true },
   { id: 'N15807', label: 'Antal elever åk 1–9', unit: 'st', scaleDependent: true },
@@ -61,11 +92,11 @@ const skolenhetCache = new Map();
 const kpiCache = new Map();
 
 /**
- * Väljer rätt baseline för en KPI baserat på jämförelseregel
- * UPPDATERAD: Prioriterar kommungenomsnitt inom samma skolform
- * @param {object} def - KPI-definition
- * @param {object} comp - Comparison data från createKPIComparison
- * @returns {number|null} - Valt baseline-värde
+ * Selects the appropriate baseline for a KPI based on comparison rules
+ * UPDATED: Prioritizes municipality average within same school type
+ * @param {object} def - KPI definition
+ * @param {object} comp - Comparison data from createKPIComparison
+ * @returns {number|null} Selected baseline value
  */
 function pickBaseline(def, comp) {
   if (!comp || !comp.available) return null;
@@ -89,30 +120,29 @@ function pickBaseline(def, comp) {
 }
 
 /**
- * Formaterar differens enhetsmedvetet
- * @param {number} diff - Differensvärde
- * @param {string} unit - Enhet (%, st, poäng)
- * @returns {string} Formaterad diff med korrekt enhet
+ * Formats a difference value with appropriate unit
+ * @param {number} diff - Difference value
+ * @param {string} unit - Unit (%, st, poäng)
+ * @returns {string} Formatted difference with correct unit
  */
 function formatDiff(diff, unit) {
+  const UNIT_LABELS = {
+    '%': 'procentenheter',
+    'st': 'elever',
+    'poäng': 'poäng'
+  };
+  
   const sign = diff >= 0 ? '+' : '';
   const value = diff.toFixed(1);
+  const label = UNIT_LABELS[unit] || unit || '';
   
-  if (unit === '%') {
-    return `${sign}${value} procentenheter`;
-  } else if (unit === 'st') {
-    return `${sign}${value} elever`;
-  } else if (unit === 'poäng') {
-    return `${sign}${value} poäng`;
-  } else {
-    return `${sign}${value} ${unit || ''}`;
-  }
+  return `${sign}${value} ${label}`.trim();
 }
 
 /**
- * Skapar KPI-kort med strukturerade jämförelser enligt regelverket
- * @param {object} kpi - KPI-data med värde, trend och eventuell comparisonData
- * @returns {HTMLElement} - KPI-kortelement
+ * Creates a KPI card with structured comparisons according to rules
+ * @param {object} kpi - KPI data with value, trend, and optional comparisonData
+ * @returns {HTMLElement} KPI card element
  */
 function createKPICard(kpi) {
   const card = document.createElement('div');
@@ -282,11 +312,11 @@ function kpiDefsOutcome() {
 // ===== ANALYSMOTOR: Klassificering och beräkningar =====
 
 /**
- * Analyserar NP-gap (slutbetyg vs nationella prov)
- * @param {object} hogreData - KPI för högre slutbetyg än NP
- * @param {object} lagreData - KPI för lägre slutbetyg än NP
- * @param {string} amne - Ämnesnamn (matematik/engelska/svenska)
- * @returns {object} NP-gap analys med risknivå, riktning, badges
+ * Analyzes NP-gap (final grades vs national tests)
+ * @param {object} hogreData - KPI for higher final grades than NP
+ * @param {object} lagreData - KPI for lower final grades than NP
+ * @param {string} amne - Subject name (matematik/engelska/svenska)
+ * @returns {object} NP-gap analysis with risk level, direction, badges
  */
 function analyseraNPGap(hogreData, lagreData, amne) {
   // Kontrollera om data finns
@@ -313,25 +343,25 @@ function analyseraNPGap(hogreData, lagreData, amne) {
   const lagreTrend3y = lagreData.diff3 || 0;
   const nettoGapTrend3y = hogreTrend3y - lagreTrend3y;
   
-  // Basrisknivå baserat på absolut netto-gap
+  // Base risk level based on absolute net gap
   const absGap = Math.abs(nettoGap);
-  let riskNiva = 'kalibrerat'; // <5 p.p
-  if (absGap >= 15) {
+  let riskNiva = 'kalibrerat';
+  if (absGap >= THRESHOLDS.NP_GAP.HIGH_RISK) {
     riskNiva = 'hög risk';
-  } else if (absGap >= 10) {
+  } else if (absGap >= THRESHOLDS.NP_GAP.ATTENTION) {
     riskNiva = 'uppmärksamhet';
-  } else if (absGap >= 5) {
+  } else if (absGap >= THRESHOLDS.NP_GAP.WATCH) {
     riskNiva = 'bevaka';
   }
   
-  // Justera risknivå baserat på trend
-  if (Math.abs(nettoGapTrend3y) >= 3) {
+  // Adjust risk level based on trend
+  if (Math.abs(nettoGapTrend3y) >= THRESHOLDS.NP_GAP.TREND) {
     if (nettoGapTrend3y >= 3) {
       // Gap ökar - höj risk
       if (riskNiva === 'kalibrerat') riskNiva = 'bevaka';
       else if (riskNiva === 'bevaka') riskNiva = 'uppmärksamhet';
       else if (riskNiva === 'uppmärksamhet') riskNiva = 'hög risk';
-    } else if (nettoGapTrend3y <= -3) {
+    } else if (nettoGapTrend3y <= -THRESHOLDS.NP_GAP.TREND) {
       // Gap minskar - sänk risk
       if (riskNiva === 'hög risk') riskNiva = 'uppmärksamhet';
       else if (riskNiva === 'uppmärksamhet') riskNiva = 'bevaka';
@@ -339,22 +369,22 @@ function analyseraNPGap(hogreData, lagreData, amne) {
     }
   }
   
-  // Klassificera riktning
+  // Classify direction
   let riktning = 'Kalibrerat';
   let badge = 'neutral';
-  if (nettoGap > 5) {
+  if (nettoGap > THRESHOLDS.NP_GAP.CALIBRATED) {
     riktning = 'Lutar mot inflation';
     badge = 'inflation';
-  } else if (nettoGap < -5) {
+  } else if (nettoGap < -THRESHOLDS.NP_GAP.CALIBRATED) {
     riktning = 'Lutar mot deflation';
     badge = 'deflation';
   }
   
-  // Trendtext
+  // Trend text
   let trendText = 'Stabilt';
-  if (nettoGapTrend3y >= 3) {
+  if (nettoGapTrend3y >= THRESHOLDS.NP_GAP.TREND) {
     trendText = 'Gapet ökar';
-  } else if (nettoGapTrend3y <= -3) {
+  } else if (nettoGapTrend3y <= -THRESHOLDS.NP_GAP.TREND) {
     trendText = 'Gapet minskar';
   }
   
@@ -465,55 +495,42 @@ function createNPGapCard(hogreKPI, lagreKPI, amne) {
 }
 
 /**
- * Klassificerar en KPI baserat på nivå och trend
- * @param {object} kpi - KPI-data från hamtaKpiCardData
- * @param {number|null} groupAvg - Gruppgenomsnitt (från Kolada eller mockad)
+ * Classifies a KPI based on level and trend
+ * @param {object} kpi - KPI data from hamtaKpiCardData
+ * @param {number|null} groupAvg - Group average (from Kolada or mocked)
  * @returns {object} { nivaStatus, trendStatus, diff, trend3y }
  */
 function klassificeraKPI(kpi, groupAvg = null) {
   const current = kpi?.latest;
   const trend3y = kpi?.diff3;
   
-  // Hantera saknad data
   if (current == null) {
     return { nivaStatus: 'missing', trendStatus: 'missing', diff: 0, trend3y: 0 };
   }
   
-  // Beräkna diff mot gruppgenomsnitt
-  let diff = 0;
-  if (groupAvg != null) {
-    diff = current - groupAvg;
-  }
+  const diff = groupAvg != null ? current - groupAvg : 0;
   
-  // Klassificera nivåstatus (baserat på diff mot gruppsnitt)
-  // Grönt: diff >= +2, Gult: -2 till +2, Rött: <= -2
+  // Classify level status
   let nivaStatus = 'yellow';
-  if (diff >= 2) {
-    nivaStatus = 'green';
-  } else if (diff <= -2) {
-    nivaStatus = 'red';
-  }
+  if (diff >= THRESHOLDS.LEVEL.GREEN) nivaStatus = 'green';
+  else if (diff <= THRESHOLDS.LEVEL.RED) nivaStatus = 'red';
   
-  // Klassificera trendstatus (baserat på 3-årsförändring)
-  // Upp: >= +3, Stabil: -3 till +3, Ner: <= -3
+  // Classify trend status
   let trendStatus = 'stabil';
   if (trend3y != null) {
-    if (trend3y >= 3) {
-      trendStatus = 'upp';
-    } else if (trend3y <= -3) {
-      trendStatus = 'ner';
-    }
+    if (trend3y >= THRESHOLDS.TREND.UP) trendStatus = 'upp';
+    else if (trend3y <= THRESHOLDS.TREND.DOWN) trendStatus = 'ner';
   }
   
   return { nivaStatus, trendStatus, diff, trend3y: trend3y || 0 };
 }
 
 /**
- * Beräknar sektionsstatus (trafikljus) för en grupp av KPIer
- * @param {array} kpiList - Lista med KPI-definitioner
- * @param {object} kpiData - Objekt med KPI-data { kpiId: trendData }
- * @param {object} groupAvgs - Gruppgenomsnitt för varje KPI { kpiId: avgValue }
- * @returns {object} { status: 'red'|'yellow'|'green', summary: 'text' }
+ * Calculates section status (traffic light) for a group of KPIs
+ * @param {Array} kpiList - List of KPI definitions
+ * @param {object} kpiData - Object with KPI data { kpiId: trendData }
+ * @param {object} groupAvgs - Group averages for each KPI { kpiId: avgValue }
+ * @returns {object} { status: 'red'|'yellow'|'green', summary: 'text', ...details }
  */
 function beraknaSektionStatus(kpiList, kpiData, groupAvgs = {}) {
   let greenCount = 0, yellowCount = 0, redCount = 0;
@@ -1095,43 +1112,56 @@ function genereraNarrativText(kpiData, groupAvgs = {}) {
   return begransadeMeningar.join(' ');
 }
 
+/**
+ * Calculates trend text and direction from time series data
+ * @param {string} unit - Unit for display
+ * @param {Array<number>} values - Time series values
+ * @returns {object} Trend information
+ */
 function beraknaTrendtext(unit, values) {
   const serie = (values || []).filter(v => v != null);
-  if (serie.length === 0) return { dir: 'stable', arrow: '→', text: 'Ingen data', analysis: 'Data saknas.', latest: null, diff1: null, diff3: null };
+  
+  if (serie.length === 0) {
+    return { dir: 'stable', arrow: '→', text: 'Ingen data', analysis: 'Data saknas.', latest: null, diff1: null, diff3: null };
+  }
+  
   const latest = serie[serie.length - 1];
   const prev = serie[serie.length - 2] ?? null;
-  const idxMinus3 = serie.length - 4; const prev3 = idxMinus3 >= 0 ? serie[idxMinus3] : null;
-  const unitSuffix = unit === '%' ? 'procentenheter' : unit || '';
+  const prev3 = serie.length >= 4 ? serie[serie.length - 4] : null;
+  
   let dir = 'stable', arrow = '→', text = 'Stabil';
   let diff1 = null, diff3 = null;
   
-  // Bestäm riktning baserat på längsta tillgängliga trend
+  // Prioritize 3-year trend if available
   if (prev3 !== null) {
     diff3 = latest - prev3;
     if (diff3 > 0.5) { dir = 'improving'; arrow = '↗'; }
     else if (diff3 < -0.5) { dir = 'declining'; arrow = '↘'; }
-    const sign = diff3 > 0 ? '+' : '';
-    text = `${sign}${diff3.toFixed(1)} ${unitSuffix} på 3 år`;
+    text = `${formatDiff(diff3, unit)} på 3 år`;
   } else if (prev !== null) {
     diff1 = latest - prev;
     if (diff1 > 0.05) { dir = 'improving'; arrow = '↗'; }
     else if (diff1 < -0.05) { dir = 'declining'; arrow = '↘'; }
-    const sign = diff1 > 0 ? '+' : '';
-    text = `${sign}${diff1.toFixed(1)} ${unitSuffix} på 1 år`;
+    text = `${formatDiff(diff1, unit)} på 1 år`;
   } else {
     text = 'Ingen trenddata';
   }
   
-  const analysis = dir === 'improving' ? 'Förbättring över tid.' : dir === 'declining' ? 'Försämring över tid.' : 'Stabil nivå.';
-  return { dir, arrow, text, analysis, latest, diff1, diff3 };
+  const ANALYSIS_TEXT = {
+    improving: 'Förbättring över tid.',
+    declining: 'Försämring över tid.',
+    stable: 'Stabil nivå.'
+  };
+  
+  return { dir, arrow, text, analysis: ANALYSIS_TEXT[dir], latest, diff1, diff3 };
 }
 
 /**
- * Hämtar KPI-kortdata med strukturerade jämförelser från Kolada API v3
- * @param {string} ouId - Skolenhetens ID
- * @param {object} def - KPI-definition
- * @param {string} municipalityCode - Kommunkod för jämförelser (default '0684' Sävsjö)
- * @returns {Promise<Object>} - KPI-kortdata med comparisonData
+ * Fetches KPI card data with structured comparisons from Kolada API v3
+ * @param {string} ouId - School unit ID
+ * @param {object} def - KPI definition
+ * @param {string} municipalityCode - Municipality code for comparisons (default '0684' Sävsjö)
+ * @returns {Promise<Object>} KPI card data with comparisonData
  */
 async function hamtaKpiCardData(ouId, def, municipalityCode = '0684') {
   const cacheKey = `${ouId}:${def.id}`;
@@ -1242,16 +1272,16 @@ function genereraAutomatiskAnalys(kpiData) {
   if (yrkesprog?.latest && yrkesprog.latest < 80) {
     insights.push('🎯 <strong>Behörighet yrkesprogram:</strong> Andelen behöriga till yrkesprogram är under 80%. Säkerställ att eleverna får stöd i kärnämnena.');
   }
-  if (eleverPerLarare?.latest && eleverPerLarare.latest > 15) {
+  if (eleverPerLarare?.latest && eleverPerLarare.latest > THRESHOLDS.STUDENTS_PER_TEACHER) {
     insights.push('👩‍🏫 <strong>Resurstryck:</strong> Hög elevtäthet per lärare kan påverka undervisningskvaliteten. Överväg resursförstärkning eller omfördelning.');
   }
-  if (behorighetLarare?.latest && behorighetLarare.latest < 70) {
+  if (behorighetLarare?.latest && behorighetLarare.latest < THRESHOLDS.TEACHER_QUALIFICATION) {
     insights.push('📚 <strong>Lärarbehörighet:</strong> Andelen behöriga lärare är under 70%. Prioritera kompetensförsörjning och rekrytering.');
   }
-  if (trygghet?.latest && trygghet.latest < 80) {
+  if (trygghet?.latest && trygghet.latest < THRESHOLDS.SAFETY) {
     insights.push('🧭 <strong>Trygghet åk 5:</strong> Elevernas upplevda trygghet är låg. Öka trygghetsskapande åtgärder och elevinflytande.');
   }
-  if (studiero?.latest && studiero.latest < 80) {
+  if (studiero?.latest && studiero.latest < THRESHOLDS.SAFETY) {
     insights.push('🧠 <strong>Studiero åk 5:</strong> Låg studiero signalerar behov av tydligare struktur och ordningsregler.');
   }
   if (engelska?.dir === 'declining' || matematik?.dir === 'declining' || svenska?.dir === 'declining') {
@@ -1302,6 +1332,92 @@ function genereraAutomatiskAnalys(kpiData) {
   return insights.length > 0 ? insights : ['Ingen automatisk analys kunde genereras baserat på tillgänglig data.'];
 }
 
+/**
+ * Builds real averages from comparison data with mock fallbacks
+ * @param {Array} results - Card results with comparison data
+ * @param {Function} pickBaselineFn - Function to pick baseline value
+ * @returns {object} { realAvgs, sourceAvgs, hasMock }
+ */
+function buildRealAverages(results, pickBaselineFn) {
+  const realAvgs = {};
+  const sourceAvgs = {};
+  let hasMock = false;
+  
+  results.forEach(({ card, def }) => {
+    if (card.comparisonData && card.comparisonData.available) {
+      const baseline = pickBaselineFn(def, card.comparisonData);
+      if (baseline !== null) {
+        realAvgs[def.id] = baseline;
+        sourceAvgs[def.id] = card.comparisonData.rule_bucket;
+      } else {
+        realAvgs[def.id] = MOCK_AVERAGES[def.id] || null;
+        sourceAvgs[def.id] = 'mock';
+        hasMock = true;
+      }
+    } else {
+      realAvgs[def.id] = MOCK_AVERAGES[def.id] || null;
+      sourceAvgs[def.id] = 'mock';
+      hasMock = true;
+    }
+  });
+  
+  return { realAvgs, sourceAvgs, hasMock };
+}
+
+/**
+ * Renders regular and NP-gap cards into a document fragment
+ * @param {Array} regularCards - Regular KPI cards
+ * @param {Array} npGapPairs - NP-gap card pairs
+ * @param {object} kpiData - KPI data storage object
+ * @returns {DocumentFragment}
+ */
+function renderCards(regularCards, npGapPairs, kpiData) {
+  const frag = document.createDocumentFragment();
+  
+  // Render regular cards first
+  regularCards.forEach(({ card, def }) => {
+    frag.appendChild(createKPICard(card));
+    kpiData[def.id] = {
+      ...card.trendData,
+      rule_bucket: card.comparisonData?.rule_bucket || null,
+      unit: def.unit,
+      scaleDependent: def.scaleDependent || false
+    };
+  });
+  
+  // Render NP-gap cards as combined cards
+  npGapPairs.forEach(({ hogre, lagre, amne }) => {
+    frag.appendChild(createNPGapCard(hogre, lagre, amne));
+    kpiData[hogre.id] = { ...hogre.trendData, unit: '%' };
+    kpiData[lagre.id] = { ...lagre.trendData, unit: '%' };
+  });
+  
+  return frag;
+}
+
+/**
+ * Extracts NP-gap pairs from results
+ * @param {Array} results - All card results
+ * @returns {object} { npGapPairs, npGapIds }
+ */
+function extractNPGapPairs(results) {
+  const npGapPairs = [];
+  const npGapIds = new Set();
+  
+  NP_GAP_SUBJECTS.forEach(pair => {
+    const hogreCard = results.find(r => r.def.id === pair.hogre);
+    const lagreCard = results.find(r => r.def.id === pair.lagre);
+    
+    if (hogreCard && lagreCard) {
+      npGapPairs.push({ hogre: hogreCard.card, lagre: lagreCard.card, amne: pair.amne });
+      npGapIds.add(pair.hogre);
+      npGapIds.add(pair.lagre);
+    }
+  });
+  
+  return { npGapPairs, npGapIds };
+}
+
 async function renderSection(sectionId, defs, ouId, kpiData, municipalityCode = '0684') {
   setLoading(sectionId, true);
   const sectionEl = document.getElementById(sectionId);
@@ -1317,37 +1433,9 @@ async function renderSection(sectionId, defs, ouId, kpiData, municipalityCode = 
   
   const results = await Promise.all(cardPromises);
   
-  // Bygg realAvgs från comparisonData (fallback till mock om data saknas)
-  const realAvgs = {};
-  const sourceAvgs = {};
-  let sectionHasMock = false;
-  const mockAvgs = {
-    'N15807': 300, 'N15034': 13, 'N15813': 75, 'N15031': 90, 'N11805': 95,
-    'N15482': 85, 'N15485': 80, 'N15488': 82, 'N15509': 65, 'N15510': 90,
-    'N15539': 85, 'N15516': 80, 'N15523': 65,
-    'N15418': 88, 'N15419': 88, 'N15436': 85, 'N15503': 220, 'N15504': 85, 'N15505': 220,
-    'U15429': 10, 'U15430': 10, 'U15431': 10, 'U15432': 10,
-    'U15433': 10, 'U15434': 10, 'U15413': 0, 'U15414': 0, 'U15415': 0, 'U15416': 0,
-    'N15613': 82, 'N15603': 80, 'N15614': 85
-  };
-  
-  results.forEach(({ card, def }) => {
-    if (card.comparisonData && card.comparisonData.available) {
-      const baseline = pickBaseline(def, card.comparisonData);
-      if (baseline !== null) {
-        realAvgs[def.id] = baseline;
-        sourceAvgs[def.id] = card.comparisonData.rule_bucket;
-      } else {
-        realAvgs[def.id] = mockAvgs[def.id] || null;
-        sourceAvgs[def.id] = 'mock';
-        sectionHasMock = true;
-      }
-    } else {
-      realAvgs[def.id] = mockAvgs[def.id] || null;
-      sourceAvgs[def.id] = 'mock';
-      sectionHasMock = true;
-    }
-  });
+  // Build realAvgs from comparisonData (fallback to mock if data is missing)
+  const { realAvgs, sourceAvgs, hasMock } = buildRealAverages(results, pickBaseline);
+  const sectionHasMock = hasMock;
   
   // Sortera efter positiva värden först (högst diff mot realAvgs)
   results.sort((a, b) => {
@@ -1362,59 +1450,17 @@ async function renderSection(sectionId, defs, ouId, kpiData, municipalityCode = 
   });
   
   sectionEl.innerHTML = '';
-  const frag = document.createDocumentFragment();
   
-  // Gruppera NP-gap KPIer för speciell rendering
-  const npGapPairs = [];
-  const npGapIds = new Set();
-  const regularCards = [];
+  // Group NP-gap KPIs for special rendering
+  const { npGapPairs, npGapIds } = extractNPGapPairs(results);
   
-  // Identifiera NP-gap par
-  const npPairs = [
-    { hogre: 'U15429', lagre: 'U15430', amne: 'Matematik' },
-    { hogre: 'U15431', lagre: 'U15432', amne: 'Engelska' },
-    { hogre: 'U15433', lagre: 'U15434', amne: 'Svenska' }
-  ];
+  // Separate regular cards from NP-gap cards
+  const regularCards = results.filter(({ def }) => !npGapIds.has(def.id));
   
-  npPairs.forEach(pair => {
-    const hogreCard = results.find(r => r.def.id === pair.hogre);
-    const lagreCard = results.find(r => r.def.id === pair.lagre);
-    
-    if (hogreCard && lagreCard) {
-      npGapPairs.push({ hogre: hogreCard.card, lagre: lagreCard.card, amne: pair.amne });
-      npGapIds.add(pair.hogre);
-      npGapIds.add(pair.lagre);
-    }
-  });
-  
-  // Separera reguljära kort från NP-gap kort
-  results.forEach(({ card, def }) => {
-    if (!npGapIds.has(def.id)) {
-      regularCards.push({ card, def });
-    }
-  });
-  
-  // Rendera reguljära kort först
-  regularCards.forEach(({ card, def }) => {
-    frag.appendChild(createKPICard(card));
-    // Spara både trendData OCH regel/unit för styrande analys
-    kpiData[def.id] = {
-      ...card.trendData,
-      rule_bucket: card.comparisonData?.rule_bucket || null,
-      unit: def.unit,
-      scaleDependent: def.scaleDependent || false
-    };
-  });
-  
-  // Rendera NP-gap kort som kombinerade kort
-  npGapPairs.forEach(({ hogre, lagre, amne }) => {
-    frag.appendChild(createNPGapCard(hogre, lagre, amne));
-    // Spara data för båda KPIerna
-    kpiData[hogre.id] = { ...hogre.trendData, unit: '%' };
-    kpiData[lagre.id] = { ...lagre.trendData, unit: '%' };
-  });
-  
+  // Render all cards
+  const frag = renderCards(regularCards, npGapPairs, kpiData);
   sectionEl.appendChild(frag);
+  
   return { cards: results.map(r => r.card), realAvgs, sourceAvgs, sectionHasMock };
 }
 
@@ -1457,34 +1503,8 @@ async function renderSections(ouId, municipalityCode = null) {
     console.error('No outcome cards loaded!');
   }
   
-  // Bygg realAvgs för outcome KPIs
-  const mockAvgs = {
-    'N15807': 300, 'N15034': 13, 'N15813': 75, 'N15031': 90, 'N11805': 95,
-    'N15482': 85, 'N15485': 80, 'N15488': 82, 'N15509': 65, 'N15510': 90,
-    'N15539': 85, 'N15516': 80, 'N15523': 65,
-    'N15418': 88, 'N15419': 88, 'N15436': 85, 'N15503': 220, 'N15504': 85, 'N15505': 220,
-    'U15429': 10, 'U15430': 10, 'U15431': 10, 'U15432': 10,
-    'U15433': 10, 'U15434': 10, 'U15413': 0, 'U15414': 0, 'U15415': 0, 'U15416': 0,
-    'N15613': 82, 'N15603': 80, 'N15614': 85
-  };
-  
-  const outcomeRealAvgs = {};
-  let outcomeHasMock = false;
-  
-  outcomeCards.forEach(({ card, def }) => {
-    if (card.comparisonData && card.comparisonData.available) {
-      const baseline = pickBaseline(def, card.comparisonData);
-      if (baseline !== null) {
-        outcomeRealAvgs[def.id] = baseline;
-      } else {
-        outcomeRealAvgs[def.id] = mockAvgs[def.id] || null;
-        outcomeHasMock = true;
-      }
-    } else {
-      outcomeRealAvgs[def.id] = mockAvgs[def.id] || null;
-      outcomeHasMock = true;
-    }
-  });
+  // Build realAvgs for outcome KPIs using helper function
+  const { realAvgs: outcomeRealAvgs, hasMock: outcomeHasMock } = buildRealAverages(outcomeCards, pickBaseline);
   
   // Slå ihop alla realAvgs från sektionerna
   const groupAvgs = {
