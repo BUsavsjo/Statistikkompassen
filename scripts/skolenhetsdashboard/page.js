@@ -709,8 +709,38 @@ function genereraInsikter(kpiData, groupAvgs = {}) {
   else if (worstKPI.id?.startsWith('U154')) {
     havstang = 'Analysera undervisningsstruktur – <strong>SALSA visar outnyttjad potential</strong>.';
   }
-  
-  return { styrka, risk, havstang };
+
+  // Uppmärksamhet: indikatorer som är på väg åt fel håll men inte akut risk ännu
+  const attentionCandidates = allKPIs
+    .map(kpiDef => {
+      const data = kpiData[kpiDef.id];
+      if (!data || data.latest == null) return null;
+
+      const groupAvg = groupAvgs[kpiDef.id] || null;
+      const klassif = klassificeraKPI(data, groupAvg);
+
+      return {
+        id: kpiDef.id,
+        label: kpiDef.label,
+        unit: data.unit || kpiDef.unit,
+        klassif
+      };
+    })
+    .filter(Boolean)
+    .filter(item => item.klassif.nivaStatus === 'yellow' || item.klassif.trendStatus === 'ner')
+    .sort((a, b) => a.klassif.trend3y - b.klassif.trend3y || a.klassif.diff - b.klassif.diff);
+
+  let uppmarksamma = 'Följ utvecklingen – inga tydliga varningssignaler, men säkerställ fortsatt bevakning av nyckeltalen.';
+
+  if (attentionCandidates.length > 0) {
+    const candidate = attentionCandidates[0];
+    const riktning = candidate.klassif.trendStatus === 'ner' ? 'försämras' : 'ligger nära snitt';
+    const diffText = formatDiff(Math.abs(candidate.klassif.diff), candidate.unit);
+
+    uppmarksamma = `<strong>${candidate.label}</strong> ${riktning} (${diffText}). Följ utvecklingen och agera om trenden fortsätter.`;
+  }
+
+  return { styrka, risk, havstang, uppmarksamma };
 }
 
 /**
@@ -1108,9 +1138,9 @@ function genereraNarrativText(kpiData, groupAvgs = {}) {
     data: kpiData[def.id],
     klassif: klassificeraKPI(kpiData[def.id], groupAvgs[def.id])
   })).filter(item => item.data?.latest != null);
-  
+
   const salsaNegative = salsaKPIs.filter(item => item.klassif.diff < -2);
-  const salsaPositive = salsaKPIS.filter(item => item.klassif.diff > 2);
+  const salsaPositive = salsaKPIs.filter(item => item.klassif.diff > 2);
   
   if (salsaNegative.length >= 2) {
     meningar.push(`SALSA visar att skolan presterar under förväntan givet elevförutsättningarna, vilket indikerar outnyttjad potential i undervisningsstrukturen.`);
@@ -1602,6 +1632,8 @@ async function renderSection(sectionId, defs, ouId, kpiData, municipalityCode = 
 
 async function renderSections(ouId, municipalityCode = null) {
   const kpiData = {};
+
+  showAnalysLoadingState();
   
   // Hämta kommunkod från dropdown om inte angiven
   if (!municipalityCode) {
@@ -1772,7 +1804,7 @@ async function renderSections(ouId, municipalityCode = null) {
     } else {
       insiktGrid.innerHTML = `
     <div class="insikt-card styrka">
-      <h4>💪 Styrka</h4>
+      <h4>💪 Positivt</h4>
       <div class="insikt-label">VAD:</div>
       <p>${insikter.styrka}</p>
       <div class="insikt-label">KONSEKVENS:</div>
@@ -1790,13 +1822,22 @@ async function renderSections(ouId, municipalityCode = null) {
       <p class="insikt-action">Prioritera detta i nästa arbetsplansperiod. Avsätt tid och resurser.</p>
     </div>
     <div class="insikt-card havstang">
-      <h4>🎯 Åtgärd nu</h4>
+      <h4>🎯 Hävstång</h4>
       <div class="insikt-label">VAD:</div>
       <p>${insikter.havstang}</p>
       <div class="insikt-label">KONSEKVENS:</div>
       <p class="insikt-consequence">Detta är den mest effektiva vägen till förbättring baserat på data.</p>
       <div class="insikt-label">REKOMMENDATION:</div>
       <p class="insikt-action">Starta arbete omgående. Följ upp efter 3 månader.</p>
+    </div>
+    <div class="insikt-card uppmarksamma">
+      <h4>👀 Att uppmärksamma</h4>
+      <div class="insikt-label">VAD:</div>
+      <p>${insikter.uppmarksamma}</p>
+      <div class="insikt-label">KONSEKVENS:</div>
+      <p class="insikt-consequence">Tidiga signaler – följ upp innan det utvecklas till ett större problem.</p>
+      <div class="insikt-label">REKOMMENDATION:</div>
+      <p class="insikt-action">Planera riktade observationer/uppföljningar och justera arbetssätt vid behov.</p>
     </div>
       `;
     }
@@ -1847,6 +1888,70 @@ async function renderSections(ouId, municipalityCode = null) {
   }
 }
 
+function showAnalysLoadingState() {
+  const styrandeAnalysContainer = document.getElementById('styrandeAnalys');
+  if (!styrandeAnalysContainer) return;
+
+  styrandeAnalysContainer.style.display = 'block';
+
+  const sektionStatusGrid = document.getElementById('sektionStatusGrid');
+  if (sektionStatusGrid) {
+    sektionStatusGrid.innerHTML = `
+      <div class="sektion-status-card loading">
+        <div class="status-icon">⏳</div>
+        <h4>Förutsättningar</h4>
+        <div class="status-summary">Laddar analys...</div>
+      </div>
+      <div class="sektion-status-card loading">
+        <div class="status-icon">⏳</div>
+        <h4>Resultat</h4>
+        <div class="status-summary">Laddar analys...</div>
+      </div>
+      <div class="sektion-status-card loading">
+        <div class="status-icon">⏳</div>
+        <h4>Värdeskapande</h4>
+        <div class="status-summary">Laddar analys...</div>
+      </div>
+      <div class="sektion-status-card loading">
+        <div class="status-icon">⏳</div>
+        <h4>Trygghet & Studiero</h4>
+        <div class="status-summary">Laddar analys...</div>
+      </div>
+    `;
+  }
+
+  const insiktGrid = document.getElementById('insiktGrid');
+  if (insiktGrid) {
+    insiktGrid.innerHTML = `
+      <div class="insikt-card styrka"><h4>💪 Positivt</h4><p>Laddar...</p></div>
+      <div class="insikt-card risk"><h4>⚠️ Risk</h4><p>Laddar...</p></div>
+      <div class="insikt-card havstang"><h4>🎯 Hävstång</h4><p>Laddar...</p></div>
+      <div class="insikt-card uppmarksamma"><h4>👀 Att uppmärksamma</h4><p>Laddar...</p></div>
+    `;
+  }
+
+  const narrativEl = document.getElementById('narrativText');
+  if (narrativEl) {
+    narrativEl.innerHTML = `
+      <h4>Sammanfattning – Vad du behöver veta</h4>
+      <ul class="narrative-bullets">
+        <li><strong>📊 Nuläge:</strong> Analys genereras...</li>
+        <li><strong>⚡ Konsekvens:</strong> Uppdateras när data laddats.</li>
+        <li><strong>✅ Positivt:</strong> Identifieras efter dataladdning.</li>
+        <li><strong>🎯 Fokus framåt:</strong> Sätts när fullständigt underlag finns.</li>
+      </ul>
+    `;
+  }
+
+  const dqNotice = document.getElementById('dataQualityNotice');
+  if (dqNotice) dqNotice.style.display = 'none';
+
+  const analysisEl = document.getElementById('analysisText');
+  if (analysisEl) {
+    analysisEl.innerHTML = '<h4>Automatisk analys</h4><p>Analys genereras...</p>';
+  }
+}
+
 function initKommuner(selectEl, defaultId = '0684') {
   selectEl.innerHTML = '';
   ALLA_KOMMUNER.forEach(k => {
@@ -1873,6 +1978,12 @@ async function onKommunChange(kommunSelect, skolenhetSelect) {
   });
   skolenhetSelect.disabled = false;
   ['baselineKPIs','outcomeKPIs','salsaKPIs','trygghetsKPIs'].forEach(id => document.getElementById(id).innerHTML='');
+
+  // Välj och rendera automatiskt första skolenheten så styrande bild och analys syns direkt
+  if (enheter.length > 0) {
+    skolenhetSelect.value = enheter[0].id;
+    renderSections(enheter[0].id, kommunSelect.value);
+  }
 }
 
 function initFilterButtons(filterF6Btn, filter79Btn, skolenhetSelect) {
