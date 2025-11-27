@@ -13,11 +13,12 @@
     }
     
     #pageTitle {
-      color: white;
+      color: #1e3a8a;
       text-align: center;
       font-size: 2.5rem;
       margin-bottom: 2rem;
-      text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      text-shadow: 0 1px 2px rgba(255,255,255,0.5);
+      font-weight: 700;
     }
     
     .kpi-selector {
@@ -98,21 +99,245 @@
       border-color: #667eea;
     }
     
+    /* === STYRANDE ANALYS CSS === */
+    .styrande-analys-container {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      margin-bottom: 2rem;
+    }
+    
+    .styrande-analys-container h2 {
+      color: #1e3a8a;
+      margin-bottom: 1.5rem;
+      font-size: 1.8rem;
+    }
+    
+    /* Sektionsstatus grid (trafikljus) */
+    .sektion-status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    
+    .sektion-status-card {
+      padding: 1rem;
+      border-radius: 8px;
+      border-left: 5px solid;
+      background: #f8fafc;
+      transition: transform 0.2s;
+    }
+    
+    .sektion-status-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .sektion-status-card.green {
+      border-left-color: #10b981;
+      background: linear-gradient(135deg, #d1fae5 0%, #f0fdf4 100%);
+    }
+    
+    .sektion-status-card.yellow {
+      border-left-color: #f59e0b;
+      background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%);
+    }
+    
+    .sektion-status-card.red {
+      border-left-color: #ef4444;
+      background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%);
+    }
+    
+    .sektion-status-card h4 {
+      margin: 0 0 0.5rem 0;
+      font-size: 1rem;
+      color: #1e293b;
+    }
+    
+    .sektion-status-card .status-icon {
+      font-size: 2rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+      text-align: center;
+    }
+    
+    .sektion-status-card .status-word {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #1e293b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.5rem;
+      text-align: center;
+    }
+    
+    .sektion-status-card .status-summary {
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-bottom: 0.5rem;
+    }
+    
+    .sektion-status-card .status-trend {
+      font-size: 0.8rem;
+      color: #64748b;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+    
+    .sektion-status-card .status-explanation {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      font-style: italic;
+      margin-bottom: 0.5rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid rgba(0,0,0,0.05);
+    }
+    
+    .sektion-status-card .comparison-base {
+      font-size: 0.7rem;
+      color: #94a3b8;
+      margin-top: 0.5rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid rgba(0,0,0,0.05);
+    }
+    
+    /* Insiktsruta */
+    .insikts-ruta {
+      margin-bottom: 2rem;
+    }
+    
+    .insikts-ruta h3 {
+      color: #1e3a8a;
+      margin-bottom: 1rem;
+      font-size: 1.4rem;
+    }
+    
+    .insikt-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+    }
+    
+    .insikt-card {
+      padding: 1.5rem;
+      border-radius: 8px;
+      border-left: 5px solid;
+      background: #f8fafc;
+    }
+    
+    .insikt-card.styrka {
+      border-left-color: #10b981;
+      background: linear-gradient(135deg, #d1fae5 0%, #f0fdf4 100%);
+    }
+    
+    .insikt-card.risk {
+      border-left-color: #ef4444;
+      background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%);
+    }
+    
+    .insikt-card.havstang {
+      border-left-color: #3b82f6;
+      background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+    }
+    
+    .insikt-card h4 {
+      margin: 0 0 0.75rem 0;
+      font-size: 1.1rem;
+      color: #1e293b;
+      font-weight: 700;
+    }
+    
+    .insikt-card p {
+      margin: 0 0 0.75rem 0;
+      font-size: 0.95rem;
+      color: #475569;
+      line-height: 1.6;
+    }
+    
+    .insikt-card .insikt-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 0.75rem;
+      margin-bottom: 0.25rem;
+    }
+    
+    .insikt-card .insikt-consequence {
+      font-style: italic;
+      color: #64748b;
+      font-size: 0.9rem;
+    }
+    
+    .insikt-card .insikt-action {
+      font-weight: 600;
+      color: #1e293b;
+      background: rgba(255,255,255,0.5);
+      padding: 0.5rem;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+    
+    /* Narrativ text */
+    .narrativ-text {
+      padding: 1.5rem;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+      border-left: 5px solid #0284c7;
+      font-size: 1rem;
+      line-height: 1.8;
+      color: #1e293b;
+    }
+    
+    .narrativ-text h4 {
+      margin-top: 0;
+      margin-bottom: 1rem;
+      color: #0284c7;
+      font-size: 1.1rem;
+    }
+    
+    .narrative-bullets {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    
+    .narrative-bullets li {
+      padding: 0.75rem 0;
+      border-bottom: 1px solid rgba(2, 132, 199, 0.1);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+    
+    .narrative-bullets li:last-child {
+      border-bottom: none;
+    }
+    
+    .narrative-bullets li strong {
+      color: #0284c7;
+      font-weight: 700;
+    }
+    
     .back-link {
       display: inline-block;
-      color: white;
+      color: #1e3a8a;
       text-decoration: none;
       margin-bottom: 1.5rem;
       padding: 0.5rem 1rem;
-      background: rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.9);
       border-radius: 8px;
       transition: all 0.2s;
-      font-weight: 500;
+      font-weight: 600;
+      border: 2px solid rgba(30, 58, 138, 0.2);
     }
     
     .back-link:hover {
-      background: rgba(255,255,255,0.3);
+      background: white;
       transform: translateX(-2px);
+      border-color: #1e3a8a;
     }
     
     .dashboard-section {
@@ -167,6 +392,36 @@
       position: relative;
       overflow: hidden;
     }
+
+    .kpi-item.status-green {
+      border-color: #16a34a;
+      background: linear-gradient(135deg, #f0fdf4 0%, #bbf7d0 100%);
+    }
+
+    .kpi-item.status-green::before {
+      background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+      opacity: 1;
+    }
+
+    .kpi-item.status-red {
+      border-color: #dc2626;
+      background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
+    }
+
+    .kpi-item.status-red::before {
+      background: linear-gradient(135deg, #b91c1c 0%, #ef4444 100%);
+      opacity: 1;
+    }
+
+    .kpi-item.status-lightgreen {
+      border-color: #4ade80;
+      background: linear-gradient(135deg, #ecfccb 0%, #bbf7d0 100%);
+    }
+
+    .kpi-item.status-lightgreen::before {
+      background: linear-gradient(135deg, #22c55e 0%, #4ade80 100%);
+      opacity: 1;
+    }
     
     .kpi-item::before {
       content: '';
@@ -192,7 +447,7 @@
     
     .kpi-label {
       font-size: 0.9rem;
-      color: #64748b;
+      color: #475569;
       margin-bottom: 0.75rem;
       font-weight: 600;
       text-transform: uppercase;
@@ -258,9 +513,25 @@
       opacity: 0.6;
     }
     
+    .kpi-comparison {
+      font-size: 0.9rem;
+      color: #475569;
+      line-height: 1.6;
+      padding: 0.75rem;
+      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+      border-radius: 6px;
+      margin-bottom: 0.75rem;
+      border-left: 3px solid #667eea;
+    }
+    
+    .kpi-comparison::before {
+      content: '📊 ';
+      margin-right: 0.5rem;
+    }
+    
     .kpi-analysis {
       font-size: 0.85rem;
-      color: #64748b;
+      color: #475569;
       line-height: 1.5;
     }
     
@@ -287,7 +558,7 @@
     }
     
     .panel-interpretation p {
-      color: #475569;
+      color: #334155;
       line-height: 1.8;
       margin: 0.75rem 0;
       padding: 0.75rem;
@@ -299,9 +570,9 @@
     .loading-message {
       text-align: center;
       padding: 2rem 2rem 1rem;
-      color: #64748b;
+      color: #475569;
       font-size: 1.1rem;
-      font-weight: 500;
+      font-weight: 600;
     }
     
     .progress-container {
@@ -333,11 +604,13 @@
       position: absolute;
       width: 100%;
       text-align: center;
-      font-size: 0.75rem;
+      font-size: 0.8rem;
       font-weight: 700;
-      color: #1e293b;
+      color: white;
       line-height: 24px;
-      z-index: 1;
+      z-index: 2;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+      letter-spacing: 0.5px;
     }
     
     @keyframes progressShimmer {
@@ -408,6 +681,24 @@
   <!-- Dashboard content rendered below -->
 
   <div id="dashboardContent">
+
+    <!-- Styrande analys section (visas före KPI-kort) -->
+    <div id="styrandeAnalys" class="styrande-analys-container" style="display:none;">
+      <h2>Styrande skolbild</h2>
+      
+      <!-- Sektionsstatus med trafikljus -->
+      <div class="sektion-status-grid" id="sektionStatusGrid"></div>
+      
+      <!-- Insiktsruta med Styrka/Risk/Hävstång -->
+      <div class="insikts-ruta" id="insiktsRuta">
+        <h3>Nyckelinsikter</h3>
+        <div class="insikt-grid" id="insiktGrid"></div>
+      </div>
+      
+      <!-- Narrativ text (3-6 meningar) -->
+      <div class="narrativ-text" id="narrativText"></div>
+    </div>
+
     <!-- Förutsättningar Section -->
     <div class="dashboard-section">
       <h2>Förutsättningar</h2>
@@ -432,8 +723,9 @@
       <h2>Trygghet åk 5</h2>
       <div class="kpi-grid" id="trygghetsKPIs"></div>
     </div>
+  </div>
 
-    <!-- Automatisk Analys Section -->
+    <!-- Automatisk Analys längst ner -->
     <div class="dashboard-section">
       <h2>Automatisk analys</h2>
       <div class="panel-interpretation" id="analysisText">
@@ -441,7 +733,6 @@
         <p>Automatisk analys av nyckeltal visas här...</p>
       </div>
     </div>
-  </div>
 
     <script type="module" src="scripts/skolenhetsdashboard/page.js"></script>
 </body>
