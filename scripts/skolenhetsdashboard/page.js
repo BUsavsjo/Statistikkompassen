@@ -297,13 +297,24 @@ async function hamtaSkolenheterForKommun(kommunId) {
   const fetchPromise = (async () => {
     let url = `${SKOLENHET_SEARCH_API}?municipality=${kommunId}&per_page=500`;
     const enheter = [];
+    
+    // Filtrera baserat på OU-ID-prefix
+    // V11E = Förskola, V15E = Grundskola, V17E = Gymnasieskola
+    const allowedPrefixes = ['V11E', 'V15E', 'V17E'];
+    
     while (url) {
       const response = await fetch(url, { headers: { Accept: 'application/json' } });
       if (!response.ok) break;
       const data = await response.json();
       const resultat = data.results || data.values || [];
       resultat.forEach(enhet => {
-        enheter.push({ id: enhet.id, title: enhet.title, type: (enhet.type || enhet.type_name || '').toLowerCase() });
+        const enhetId = enhet.id || '';
+        const enhetType = (enhet.type || enhet.type_name || '').toLowerCase();
+        
+        // Filtrera: bara inkludera skolenheter baserat på ID-prefix
+        if (allowedPrefixes.some(prefix => enhetId.startsWith(prefix))) {
+          enheter.push({ id: enhet.id, title: enhet.title, type: enhetType });
+        }
       });
       url = data.next_page || data.next || null;
     }
@@ -615,6 +626,28 @@ function beraknaSektionStatus(kpiList, kpiData, groupAvgs = {}) {
 }
 
 /**
+ * KPI:er som ska uteslutas från risk/styrka-beräkning i nyckelinsikter
+ * Dessa är förklarare/kontextindikatorer snarare än åtgärdsbara resultat
+ */
+const excludedRiskIds = new Set([
+  // NP-gap (kalibreringssignal, inte resultatmått)
+  'U15429', 'U15430', 'U15431', 'U15432', 'U15433', 'U15434',
+  // SALSA-förväntansnivåer (modellberäknade värden)
+  'U15413', 'U15415',
+  // Elevantal/volym (strukturell faktor, inte resultat)
+  'N11805', 'N15807'
+]);
+
+/**
+ * Kontrollerar om ett KPI-ID ska uteslutas från risk/styrka-beräkning
+ * @param {string} id - KPI-ID
+ * @returns {boolean}
+ */
+function isExcludedFromRisk(id) {
+  return excludedRiskIds.has(id);
+}
+
+/**
  * Genererar insikter: Styrka, Risk, Hävstång
  * @param {object} kpiData - Objekt med all KPI-data
  * @param {object} groupAvgs - Gruppgenomsnitt
@@ -632,6 +665,9 @@ function genereraInsikter(kpiData, groupAvgs = {}) {
   allKPIs.forEach(kpiDef => {
     const data = kpiData[kpiDef.id];
     if (!data || data.latest == null) return;
+    
+    // Uteslut förklarare/kontextindikatorer från risk/styrka-beräkning
+    if (isExcludedFromRisk(kpiDef.id)) return;
     
     const groupAvg = groupAvgs[kpiDef.id] || null;
     const klassif = klassificeraKPI(data, groupAvg);
@@ -889,13 +925,13 @@ function renderGroupedOutcomeKPIs(sectionId, results, kpiData, realAvgs, schoolT
     },
     'svenska_79': {
       title: 'Svenska åk 9',
-      kpis: ['N15488', 'N15516'],
+      kpis: ['N15516'],
       npGap: { hogre: 'U15433', lagre: 'U15434', amne: 'Svenska' },
       stage: '79'
     },
     'matematik_79': {
       title: 'Matematik åk 9',
-      kpis: ['N15485', 'N15523'],
+      kpis: ['N15523'],
       npGap: { hogre: 'U15429', lagre: 'U15430', amne: 'Matematik' },
       stage: '79'
     },
