@@ -1684,39 +1684,62 @@ async function renderSections(ouId, municipalityCode = null) {
   // Hämta skoltyp för filtrering av resultatgrupper
   const schoolType = await detectSchoolType(ouId);
 
-  const sectionConfigs = [
+  const criticalSectionConfigs = [
     { id: 'baselineKPIs', defs: BASELINE_KPIS },
     { id: 'svenskaKPIs', defs: SVENSKA_KPIS },
     { id: 'matematikKPIs', defs: MATEMATIK_KPIS },
     { id: 'engelskaKPIs', defs: ENGELSKA_KPIS },
-    { id: 'outcomeKPIs', defs: kpiDefsOutcome() },
+    { id: 'outcomeKPIs', defs: kpiDefsOutcome() }
+  ];
+
+  const heavySectionConfigs = [
     { id: 'salsaKPIs', defs: SALSA_KPIS },
     { id: 'trygghetsKPIs', defs: TRYG_KPIS }
   ];
 
-  const orderedConfigs = [...sectionConfigs].sort((a, b) => a.defs.length - b.defs.length);
+  const loadSectionGroup = async (configs) => {
+    const orderedConfigs = [...configs].sort((a, b) => a.defs.length - b.defs.length);
+    const groupPromises = orderedConfigs.map(cfg => renderSection(cfg.id, cfg.defs, ouId, kpiData, municipalityCode));
+    const results = await Promise.all(groupPromises);
 
-  const sectionResults = [];
+    results.forEach(result => {
+      const sectionEl = document.getElementById(result.sectionId);
+      if (sectionEl) {
+        sectionEl.innerHTML = '';
+        sectionEl.appendChild(result.fragment);
+      }
+    });
 
-  for (const cfg of orderedConfigs) {
-    const result = await renderSection(cfg.id, cfg.defs, ouId, kpiData, municipalityCode);
-    sectionResults.push(result);
+    return results;
+  };
 
-    const sectionEl = document.getElementById(result.sectionId);
-    if (sectionEl) {
-      sectionEl.innerHTML = '';
-      sectionEl.appendChild(result.fragment);
-    }
-  }
+  // Ladda kritiska sektioner parallellt och rendera när alla är klara
+  const criticalResults = await loadSectionGroup(criticalSectionConfigs);
+
+  // Visa omedelbar laddningsindikator för tunga sektioner och ladda dem lite senare för att inte blockera första renderingen
+  heavySectionConfigs.forEach(cfg => setLoading(cfg.id, true));
+  const heavyResults = await new Promise((resolve) => {
+    setTimeout(async () => {
+      try {
+        const results = await loadSectionGroup(heavySectionConfigs);
+        resolve(results);
+      } catch (error) {
+        console.error('Fel vid laddning av tunga sektioner', error);
+        resolve([]);
+      }
+    }, 50);
+  });
+
+  const sectionResults = [...criticalResults, ...heavyResults];
 
   // Plocka ut resultat per sektion
-  const baselineResult = sectionResults.find(r => r.sectionId === 'baselineKPIs');
-  const svenskaResult = sectionResults.find(r => r.sectionId === 'svenskaKPIs');
-  const matematikResult = sectionResults.find(r => r.sectionId === 'matematikKPIs');
-  const engelskaResult = sectionResults.find(r => r.sectionId === 'engelskaKPIs');
-  const outcomeResult = sectionResults.find(r => r.sectionId === 'outcomeKPIs');
-  const salsaResult = sectionResults.find(r => r.sectionId === 'salsaKPIs');
-  const tryggResult = sectionResults.find(r => r.sectionId === 'trygghetsKPIs');
+  const baselineResult = sectionResults.find(r => r.sectionId === 'baselineKPIs') || {};
+  const svenskaResult = sectionResults.find(r => r.sectionId === 'svenskaKPIs') || {};
+  const matematikResult = sectionResults.find(r => r.sectionId === 'matematikKPIs') || {};
+  const engelskaResult = sectionResults.find(r => r.sectionId === 'engelskaKPIs') || {};
+  const outcomeResult = sectionResults.find(r => r.sectionId === 'outcomeKPIs') || {};
+  const salsaResult = sectionResults.find(r => r.sectionId === 'salsaKPIs') || {};
+  const tryggResult = sectionResults.find(r => r.sectionId === 'trygghetsKPIs') || {};
 
   // Slå ihop alla realAvgs från sektionerna
   const groupAvgs = {
