@@ -1,0 +1,493 @@
+/* Skolenhetsdashboard CSS */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  padding: 0;
+  color: #333;
+}
+
+nav {
+  background: rgba(44, 62, 80, 0.95);
+  padding: 1em 2em;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+
+nav a {
+  color: #ecf0f1;
+  margin-right: 1.5em;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+
+nav a:hover,
+nav a.active {
+  color: #3498db;
+}
+
+main {
+  max-width: 1200px;
+  margin: 2em auto;
+  padding: 2em;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+}
+
+h1 {
+  color: #2c3e50;
+  margin-bottom: 1.5em;
+  font-size: 2em;
+  text-align: center;
+}
+
+h2 {
+  color: #34495e;
+  margin: 1.5em 0 1em;
+  font-size: 1.5em;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 0.5em;
+}
+
+.selectors {
+  background: #f8f9fa;
+  padding: 1.5em;
+  border-radius: 8px;
+  margin-bottom: 2em;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5em;
+}
+
+.selectors label {
+  display: flex;
+  flex-direction: column;
+  font-weight: 600;
+  color: #555;
+}
+
+.selectors select {
+  margin-top: 0.5em;
+  padding: 0.75em;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  font-size: 1em;
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.3s ease;
+}
+
+.selectors select:hover {
+  border-color: #3498db;
+}
+
+.selectors select:focus {
+  outline: none;
+  border-color: #2980b9;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.kpi-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5em;
+  margin-top: 1em;
+}
+
+.kpi-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 10px;
+  padding: 1.5em;
+  min-width: 220px;
+  flex: 1 1 220px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  position: relative;
+  color: white;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.kpi-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+}
+
+.kpi-card h3 {
+  font-size: 0.95em;
+  margin-bottom: 0.75em;
+  opacity: 0.9;
+  font-weight: 600;
+  color: #fff;
+  border-bottom: none;
+}
+
+.kpi-card .value {
+  font-size: 2em;
+  font-weight: 700;
+  margin: 0.5em 0;
+}
+
+.kpi-card .comparison {
+  font-size: 0.85em;
+  opacity: 0.85;
+  margin-top: 0.5em;
+}
+
+.trend-arrow {
+  position: absolute;
+  top: 1.25em;
+  right: 1.25em;
+  font-size: 1.5em;
+  opacity: 0.8;
+}
+
+.trend-up {
+  color: #2ecc71;
+}
+
+.trend-down {
+  color: #e74c3c;
+}
+
+.trend-stable {
+  color: #f39c12;
+}
+
+.warning {
+  color: #f39c12;
+  font-size: 0.85em;
+  margin-top: 0.75em;
+  padding: 0.5em;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+#analysis {
+  background: #ecf0f1;
+  padding: 1.5em;
+  border-radius: 8px;
+  margin-top: 2em;
+}
+
+#analysisText {
+  line-height: 1.8;
+  color: #2c3e50;
+  font-size: 1.05em;
+}
+
+#analysisText p {
+  margin-bottom: 1em;
+}
+
+#analysisText .analysis-section {
+  margin-bottom: 1.5em;
+  padding: 1em;
+  background: white;
+  border-left: 4px solid #3498db;
+  border-radius: 4px;
+}
+
+#analysisText .analysis-section h4 {
+  color: #2980b9;
+  margin-bottom: 0.5em;
+  font-size: 1.1em;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  main {
+    padding: 1em;
+    margin: 1em;
+  }
+  
+  .selectors {
+    flex-direction: column;
+    gap: 1em;
+  }
+  
+  .kpi-cards {
+    flex-direction: column;
+  }
+  
+  nav {
+    padding: 1em;
+  }
+  
+  nav a {
+    display: block;
+    margin: 0.5em 0;
+  }
+  
+  h1 {
+    font-size: 1.5em;
+  }
+}
+
+@media (max-width: 480px) {
+  .kpi-card {
+    min-width: 100%;
+  }
+  
+  .kpi-card .value {
+    font-size: 1.75em;
+  }
+}
+
+/* Färgindikatorer för KPI-kort */
+.kpi-item.status-green {
+  border-left: 4px solid #4caf50;
+  background: linear-gradient(to right, rgba(76, 175, 80, 0.05), transparent);
+}
+
+.kpi-item.status-red {
+  border-left: 4px solid #f44336;
+  background: linear-gradient(to right, rgba(244, 67, 54, 0.05), transparent);
+}
+
+.kpi-item.status-lightgreen {
+  border-left: 4px solid #8bc34a;
+  background: linear-gradient(to right, rgba(139, 195, 74, 0.05), transparent);
+}
+
+/* Neutral KPI-kort (elevantal, SALSA-förutsättningar) */
+.kpi-item.neutral-kpi {
+  border-left: 4px solid #94a3b8;
+  background: linear-gradient(to right, rgba(148, 163, 184, 0.05), transparent);
+}
+
+/* NP-gap kort med neutral basfärg */
+.kpi-item.np-gap-card,
+.kpi-item.np-gap-individual {
+  border-left: 4px solid #94a3b8;
+  background: linear-gradient(to right, rgba(148, 163, 184, 0.05), transparent);
+}
+
+/* NP-kort som kräver uppmärksamhet (gul) */
+.kpi-item.np-attention {
+  border-left: 4px solid #f59e0b;
+  background: linear-gradient(to right, rgba(245, 158, 11, 0.08), transparent);
+}
+
+/* NP-gap värdevisning */
+.np-gap-value {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 1.1rem !important;
+}
+
+.np-components {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+  font-size: 1.3rem;
+}
+
+.np-hogre {
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+.np-lagre {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.np-netto {
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: #1e293b;
+  margin-top: 0.3rem;
+}
+
+/* NP badges container */
+.np-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Riktningsbadges */
+.np-badge {
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.badge-neutral {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.badge-inflation {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fbbf24;
+}
+
+.badge-deflation {
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #60a5fa;
+}
+
+/* Risknivå badges */
+.np-risk {
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.risk-kalibrerat {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #34d399;
+}
+
+.risk-bevaka {
+  background: #fef3c7;
+  color: #78350f;
+  border: 1px solid #fbbf24;
+}
+
+.risk-uppmärksamhet {
+  background: #fed7aa;
+  color: #7c2d12;
+  border: 1px solid #fb923c;
+}
+
+.risk-hög-risk {
+  background: #fecaca;
+  color: #7f1d1d;
+  border: 1px solid #f87171;
+}
+
+/* Trendtext badge */
+.np-trend {
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  background: #f1f5f9;
+  color: #475569;
+  font-style: italic;
+}
+
+/* Kohortvarning */
+.np-warning {
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  background: #fff7ed;
+  color: #9a3412;
+  border: 1px solid #fb923c;
+}
+
+/* === GRUPP-HEADERS FÖR KÄRNÄMNEN === */
+.subject-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  margin: 1.5rem 0 1rem 0;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-left: 4px solid #64748b;
+}
+
+.subject-group-header.summary {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  border-left-color: #3b82f6;
+}
+
+.subject-group-header.red {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  border-left-color: #dc2626;
+}
+
+.subject-group-header.yellow {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-left-color: #f59e0b;
+}
+
+.subject-group-header.green {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  border-left-color: #10b981;
+}
+
+.subject-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.subject-icon {
+  font-size: 1.5rem;
+}
+
+.subject-title h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.subject-badge {
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.subject-badge.red {
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.subject-badge.yellow {
+  color: #d97706;
+  border: 1px solid #fde68a;
+}
+
+.subject-badge.green {
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+
+.calibration-header {
+  margin-top: 1.5rem;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  border-radius: 6px;
+  border-left: 3px solid #64748b;
+}
+
+.calibration-header h4 {
+  margin: 0;
+  font-size: 1rem;
+  color: #475569;
+  font-weight: 500;
+}
+
+.subject-group-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
