@@ -104,6 +104,37 @@ const kpiCache = new Map();
 let totalKPIs = 0;
 let loadedKPIs = 0;
 
+// KPI-metadata: riktning för bättre/sämre
+const KPI_DIRECTION = {
+  // Lägre är bättre: Elever per lärare
+  'N15034': 'lower-better',
+  // SALSA-avvikelser: högre positiv avvikelse är bättre
+  'U15414': 'higher-better',
+  'U15416': 'higher-better'
+};
+
+function getDirectionForKPI(id) {
+  return KPI_DIRECTION[id] || 'higher-better';
+}
+
+// KPI-specifika diffetiketter
+const DIFF_LABEL_OVERRIDES = {
+  'N15034': 'elever/lärare'
+};
+
+function formatDiffById(diff, unit, kpiId) {
+  const UNIT_LABELS = {
+    '%': 'procentenheter',
+    'st': 'elever',
+    'poäng': 'poäng'
+  };
+  const labelOverride = DIFF_LABEL_OVERRIDES[kpiId];
+  const label = labelOverride || UNIT_LABELS[unit] || unit || '';
+  const sign = diff >= 0 ? '+' : '';
+  const value = diff.toFixed(1);
+  return `${sign}${value} ${label}`.trim();
+}
+
 /**
  * Uppdaterar global loading bar
  * @param {number} current - Nuvarande antal laddade KPIer
@@ -206,17 +237,18 @@ function createKPICard(kpi) {
   const isSALSADeviationOnly = kpi.id === 'U15414' || kpi.id === 'U15416';
   const isStimulans = kpi.id && kpi.id === 'N15602'; // Stimulans - förklarare/klimatindikator
   
-  // Bestäm färgindikator baserat på trend-status (förbättring, försämring, stabil)
+  // Kortfärg väger in nivå mot baseline + trend
   // SKIP för NP-gap, elevantal, SALSA och Stimulans
   let colorClass = '';
   if (!isNPGap && !isBaselineCount && !isSALSA && !isStimulans && kpi.trendData) {
-    const dir = kpi.trendData.dir;
-    if (dir === 'improving') {
-      colorClass = 'status-green'; // Förbättring
-    } else if (dir === 'declining') {
-      colorClass = 'status-red'; // Försämring
+    const baseline = kpi.comparisonData ? pickBaseline(null, kpi.comparisonData) : null;
+    const klassif = klassificeraKPI(kpi.trendData, baseline, kpi.id);
+    if (klassif.nivaStatus === 'red' || klassif.trendStatus === 'ner') {
+      colorClass = 'status-red';
+    } else if (klassif.nivaStatus === 'green' && (klassif.trendStatus === 'upp' || klassif.trendStatus === 'stabil')) {
+      colorClass = 'status-green';
     } else {
-      colorClass = 'status-lightgreen'; // Stabil eller okänt
+      colorClass = 'status-lightgreen';
     }
   }
   
@@ -269,13 +301,14 @@ function createKPICard(kpi) {
     if (kpi.trendData && kpi.trendData.diff3 !== null) {
       const trendInfo = document.createElement('div');
       trendInfo.style.cssText = 'margin-top: 6px; font-size: 0.85rem; color: #64748b;';
-      trendInfo.textContent = `${kpi.trendData.dir === 'improving' ? '↗' : kpi.trendData.dir === 'declining' ? '↘' : '→'} ${formatDiff(Math.abs(kpi.trendData.diff3 || 0), kpi.unit)} (3 år)`;
+      // Neutral trendtext för kontextindikator
+      trendInfo.textContent = `→ kontext (3 år)`;
       comparisonDiv.appendChild(trendInfo);
     }
   } else if (isSALSADeviationOnly) {
     // För SALSA U15414/U15416 – visa endast trendtext (ingen jämförelse)
     const trendText = kpi.trendText || (kpi.trendData?.diff3 != null
-      ? `${kpi.trendData.diff3 >= 0 ? '↗' : kpi.trendData.diff3 < 0 ? '↘' : '→'} ${formatDiff(Math.abs(kpi.trendData.diff3), kpi.unit)} (3 år)`
+      ? `${kpi.trendData.diff3 >= 0 ? '↗' : kpi.trendData.diff3 < 0 ? '↘' : '→'} ${formatDiffById(Math.abs(kpi.trendData.diff3), kpi.unit, kpi.id)} (3 år)`
       : '→ stabilt (3 år)');
     comparisonDiv.textContent = trendText;
   } else {
@@ -296,7 +329,7 @@ function createKPICard(kpi) {
       if (comp.deltas.main_vs_riket_reference !== undefined) {
         const riketVal = comp.values.riket_reference[comp.values.riket_reference.length - 1];
         const diff = comp.deltas.main_vs_riket_reference;
-        compLines.push(`Riket (referens) ${riketVal.toFixed(1)}${kpi.unit} (${formatDiff(diff, kpi.unit)})`);
+        compLines.push(`Riket (referens) ${riketVal.toFixed(1)}${kpi.unit} (${formatDiffById(diff, kpi.unit, kpi.id)})`);
       }
     } else {
       // PRIMÄR JÄMFÖRELSE: Kommungenomsnitt inom samma skolform
@@ -304,21 +337,21 @@ function createKPICard(kpi) {
         const kommunVal = comp.values.kommun_schooltype[0];
         const diff = comp.deltas.main_vs_kommun_schooltype;
         const schoolTypeLabel = comp.schoolType ? ` (${comp.schoolType})` : '';
-        compLines.push(`Kommun${schoolTypeLabel} ${kommunVal.toFixed(1)}${kpi.unit} (${formatDiff(diff, kpi.unit)})`);
+        compLines.push(`Kommun${schoolTypeLabel} ${kommunVal.toFixed(1)}${kpi.unit} (${formatDiffById(diff, kpi.unit, kpi.id)})`);
       }
       
       // SEKUNDÄR REFERENS: Riket (grå, endast visning)
       if (comp.deltas.main_vs_riket_reference !== undefined) {
         const riketVal = comp.values.riket_reference[comp.values.riket_reference.length - 1];
         const diff = comp.deltas.main_vs_riket_reference;
-        compLines.push(`<span style="color: #94a3b8;">Riket (ref) ${riketVal.toFixed(1)}${kpi.unit} (${formatDiff(diff, kpi.unit)})</span>`);
+        compLines.push(`<span style="color: #94a3b8;">Riket (ref) ${riketVal.toFixed(1)}${kpi.unit} (${formatDiffById(diff, kpi.unit, kpi.id)})</span>`);
       }
     }
     
     // Lägg till trend med enhetsmedveten formatering
     if (comp.trend && comp.trend.direction !== 'flat') {
       const trendIcon = comp.trend.direction === 'up' ? '↗' : '↘';
-      compLines.push(`${trendIcon} ${formatDiff(comp.trend.change, kpi.unit)} (3 år)`);
+      compLines.push(`${trendIcon} ${formatDiffById(comp.trend.change, kpi.unit, kpi.id)} (3 år)`);
     } else {
       compLines.push('→ stabilt (3 år)');
     }
@@ -389,9 +422,14 @@ async function hamtaSkolenheterForKommun(kommunId) {
   return fetchPromise;
 }
 
-function kpiDefsOutcome() {
+function kpiDefsOutcome(kpiDataOpt = null) {
   // Använd endast sammanfattnings-KPIer i Resultat-sektionen
-  return OUTCOME_SUMMARY_KPIS;
+  // Preferera N15419; om den har data, uteslut N15418. Annars tvärtom.
+  if (!kpiDataOpt) return OUTCOME_SUMMARY_KPIS;
+  const hasN15419 = !!(kpiDataOpt['N15419'] && kpiDataOpt['N15419'].latest != null);
+  const preferred = hasN15419 ? 'N15419' : 'N15418';
+  const excluded = hasN15419 ? 'N15418' : 'N15419';
+  return OUTCOME_SUMMARY_KPIS.filter(def => def.id !== excluded);
 }
 
 // ===== ANALYSMOTOR: Klassificering och beräkningar =====
@@ -594,7 +632,7 @@ function createNPGapCard(hogreKPI, lagreKPI, amne) {
  * @param {number|null} groupAvg - Group average (from Kolada or mocked)
  * @returns {object} { nivaStatus, trendStatus, diff, trend3y }
  */
-function klassificeraKPI(kpi, groupAvg = null) {
+function klassificeraKPI(kpi, groupAvg = null, kpiId = null) {
   const current = kpi?.latest;
   const trend3y = kpi?.diff3;
   
@@ -602,7 +640,9 @@ function klassificeraKPI(kpi, groupAvg = null) {
     return { nivaStatus: 'missing', trendStatus: 'missing', diff: 0, trend3y: 0 };
   }
   
-  const diff = groupAvg != null ? current - groupAvg : 0;
+  const rawDiff = groupAvg != null ? current - groupAvg : 0;
+  const direction = kpiId ? getDirectionForKPI(kpiId) : 'higher-better';
+  const diff = direction === 'lower-better' ? -rawDiff : rawDiff;
   
   // Classify level status
   let nivaStatus = 'yellow';
@@ -611,12 +651,14 @@ function klassificeraKPI(kpi, groupAvg = null) {
   
   // Classify trend status
   let trendStatus = 'stabil';
+  let effectiveTrend3y = trend3y || 0;
   if (trend3y != null) {
-    if (trend3y >= THRESHOLDS.TREND.UP) trendStatus = 'upp';
-    else if (trend3y <= THRESHOLDS.TREND.DOWN) trendStatus = 'ner';
+    effectiveTrend3y = direction === 'lower-better' ? -trend3y : trend3y;
+    if (effectiveTrend3y >= THRESHOLDS.TREND.UP) trendStatus = 'upp';
+    else if (effectiveTrend3y <= THRESHOLDS.TREND.DOWN) trendStatus = 'ner';
   }
   
-  return { nivaStatus, trendStatus, diff, trend3y: trend3y || 0 };
+  return { nivaStatus, trendStatus, diff, trend3y: effectiveTrend3y };
 }
 
 /**
@@ -638,7 +680,7 @@ function beraknaSektionStatus(kpiList, kpiData, groupAvgs = {}) {
     if (excludedFromTrafficLight.has(kpiDef.id)) return;
     
     const groupAvg = groupAvgs[kpiDef.id] || null;
-    const klassif = klassificeraKPI(data, groupAvg);
+    const klassif = klassificeraKPI(data, groupAvg, kpiDef.id);
     
     if (klassif.nivaStatus === 'green') greenCount++;
     else if (klassif.nivaStatus === 'yellow') yellowCount++;
@@ -747,7 +789,7 @@ function genereraInsikter(kpiData, groupAvgs = {}) {
     if (isExcludedFromRisk(kpiDef.id)) return;
     
     const groupAvg = groupAvgs[kpiDef.id] || null;
-    const klassif = klassificeraKPI(data, groupAvg);
+    const klassif = klassificeraKPI(data, groupAvg, kpiDef.id);
     
     if (klassif.diff > bestKPI.diff) {
       bestKPI = { id: kpiDef.id, diff: klassif.diff, label: kpiDef.label, unit: data.unit || kpiDef.unit };
@@ -766,17 +808,17 @@ function genereraInsikter(kpiData, groupAvgs = {}) {
   // Styrka: Den indikator med bäst diff eller trend (enhetsanpassad)
   let styrka = 'Ingen tydlig styrka identifierad.';
   if (bestKPI.diff > 2) {
-    styrka = `<strong>${bestKPI.label}</strong> ligger ${formatDiff(bestKPI.diff, bestKPI.unit)} över gruppsnitt.`;
+    styrka = `<strong>${bestKPI.label}</strong> ligger ${formatDiffById(bestKPI.diff, bestKPI.unit, bestKPI.id)} över gruppsnitt.`;
   } else if (bestTrendKPI.trend3y > 3) {
-    styrka = `<strong>${bestTrendKPI.label}</strong> har förbättrats med ${formatDiff(bestTrendKPI.trend3y, bestTrendKPI.unit)} på 3 år.`;
+    styrka = `<strong>${bestTrendKPI.label}</strong> har förbättrats med ${formatDiffById(bestTrendKPI.trend3y, bestTrendKPI.unit, bestTrendKPI.id)} på 3 år.`;
   }
   
   // Risk: Den indikator med sämst diff eller trend (enhetsanpassad)
   let risk = 'Ingen tydlig risk identifierad.';
   if (worstKPI.diff < -2) {
-    risk = `<strong>${worstKPI.label}</strong> ligger ${formatDiff(Math.abs(worstKPI.diff), worstKPI.unit)} under gruppsnitt.`;
+    risk = `<strong>${worstKPI.label}</strong> ligger ${formatDiffById(Math.abs(worstKPI.diff), worstKPI.unit, worstKPI.id)} under gruppsnitt.`;
   } else if (worstTrendKPI.trend3y < -3) {
-    risk = `<strong>${worstTrendKPI.label}</strong> har försämrats med ${formatDiff(Math.abs(worstTrendKPI.trend3y), worstTrendKPI.unit)} på 3 år.`;
+    risk = `<strong>${worstTrendKPI.label}</strong> har försämrats med ${formatDiffById(Math.abs(worstTrendKPI.trend3y), worstTrendKPI.unit, worstTrendKPI.id)} på 3 år.`;
   }
   
   // Hävstång: Smart rekommendation baserad på data
@@ -826,11 +868,13 @@ function genereraInsikter(kpiData, groupAvgs = {}) {
   // Uppmärksamhet: indikatorer som är på väg åt fel håll men inte akut risk ännu
   const attentionCandidates = allKPIs
     .map(kpiDef => {
+      // Exkludera kontext-/förklarande KPI:er från uppmärksamhetslistan
+      if (isExcludedFromRisk(kpiDef.id)) return null;
       const data = kpiData[kpiDef.id];
       if (!data || data.latest == null) return null;
 
       const groupAvg = groupAvgs[kpiDef.id] || null;
-      const klassif = klassificeraKPI(data, groupAvg);
+      const klassif = klassificeraKPI(data, groupAvg, kpiDef.id);
 
       return {
         id: kpiDef.id,
@@ -848,7 +892,7 @@ function genereraInsikter(kpiData, groupAvgs = {}) {
   if (attentionCandidates.length > 0) {
     const candidate = attentionCandidates[0];
     const riktning = candidate.klassif.trendStatus === 'ner' ? 'försämras' : 'ligger nära snitt';
-    const diffText = formatDiff(Math.abs(candidate.klassif.diff), candidate.unit);
+    const diffText = formatDiffById(Math.abs(candidate.klassif.diff), candidate.unit, candidate.id);
 
     uppmarksamma = `<strong>${candidate.label}</strong> ${riktning} (${diffText}). Följ utvecklingen och agera om trenden fortsätter.`;
   }
@@ -870,7 +914,7 @@ function beraknaGruppStatus(cards, realAvgs) {
   
   cards.forEach(({ card, def }) => {
     const groupAvg = realAvgs[def.id] || null;
-    const klassif = klassificeraKPI(card.trendData, groupAvg);
+    const klassif = klassificeraKPI(card.trendData, groupAvg, def.id);
     
     if (klassif.nivaStatus === 'red' || klassif.trendStatus === 'ner') {
       hasRed = true;
@@ -907,8 +951,8 @@ function beraknaGruppStatus(cards, realAvgs) {
  */
 function sorteraEfterUppmarksamhet(cards, realAvgs) {
   return cards.sort((a, b) => {
-    const klassifA = klassificeraKPI(a.card.trendData, realAvgs[a.def.id]);
-    const klassifB = klassificeraKPI(b.card.trendData, realAvgs[b.def.id]);
+    const klassifA = klassificeraKPI(a.card.trendData, realAvgs[a.def.id], a.def.id);
+    const klassifB = klassificeraKPI(b.card.trendData, realAvgs[b.def.id], b.def.id);
     
     // Prioritet: röd/ner > gul > grön/upp
     const scoreA = (klassifA.nivaStatus === 'red' || klassifA.trendStatus === 'ner') ? 3 
@@ -1019,6 +1063,12 @@ function renderGroupedOutcomeKPIs(sectionId, results, kpiData, realAvgs, schoolT
       stage: '79'
     }
   };
+
+  // Preferera N15419 i sammanfattningen om den finns i resultaten
+  const hasN15419 = results.some(r => r?.def?.id === 'N15419');
+  if (hasN15419) {
+    groups['summary_79'].kpis = ['N15419', 'N15503', 'N15504'];
+  }
   
   const frag = document.createDocumentFragment();
   
@@ -1117,7 +1167,7 @@ function analyseraF6Resultat(kpiData, groupAvgs) {
   const trygghet = kpiData['N15613'];
   
   if (allaAmnenF6?.latest != null) {
-    const allaF6Klassif = klassificeraKPI(allaAmnenF6, groupAvgs['N15539']);
+    const allaF6Klassif = klassificeraKPI(allaAmnenF6, groupAvgs['N15539'], 'N15539');
     
     // Huvudsignal baserad på N15539
     if (allaF6Klassif.nivaStatus === 'red' || allaF6Klassif.trendStatus === 'ner') {
@@ -1137,7 +1187,7 @@ function analyseraF6Resultat(kpiData, groupAvgs) {
         { kpi: svaF6, label: 'svenska som andraspråk', id: 'N15516' }
       ].map(item => ({
         ...item,
-        klassif: klassificeraKPI(item.kpi, groupAvgs[item.id])
+        klassif: klassificeraKPI(item.kpi, groupAvgs[item.id], item.id)
       })).filter(item => item.kpi?.latest != null);
       
       const amnesRed = amnesKlassif.filter(item => 
@@ -1152,14 +1202,14 @@ function analyseraF6Resultat(kpiData, groupAvgs) {
       
       // Koppla till trygghet/studiero
       if (studiero?.latest != null) {
-        const studKlassif = klassificeraKPI(studiero, groupAvgs['N15603']);
+        const studKlassif = klassificeraKPI(studiero, groupAvgs['N15603'], 'N15603');
         if (studKlassif.nivaStatus === 'red' || studKlassif.trendStatus === 'ner') {
           meningar.push(`Låg studiero (${studiero.latest.toFixed(0)}%) är en förklaring – förbättrad arbetsro och klassrumsledarskap är avgörande hävstångar.`);
         }
       }
       
       if (trygghet?.latest != null && (!studiero?.latest || studiero.latest >= 75)) {
-        const tryggKlassif = klassificeraKPI(trygghet, groupAvgs['N15613']);
+        const tryggKlassif = klassificeraKPI(trygghet, groupAvgs['N15613'], 'N15613');
         if (tryggKlassif.nivaStatus === 'red' || tryggKlassif.trendStatus === 'ner') {
           meningar.push(`Låg trygghet (${trygghet.latest.toFixed(0)}%) påverkar lärmiljön – klimat- och relationsarbete behöver prioriteras.`);
         }
@@ -1176,8 +1226,8 @@ function analyseraF6Resultat(kpiData, groupAvgs) {
     // Progressionssignal med betygspoäng
     if ((allaF6Klassif.trendStatus === 'stabil' || allaF6Klassif.trendStatus === 'upp') && 
         (matPoangF6?.latest != null || svePoangF6?.latest != null)) {
-      const matPoangKlassif = klassificeraKPI(matPoangF6, groupAvgs['N15509']);
-      const svePoangKlassif = klassificeraKPI(svePoangF6, groupAvgs['N15510']);
+      const matPoangKlassif = klassificeraKPI(matPoangF6, groupAvgs['N15509'], 'N15509');
+      const svePoangKlassif = klassificeraKPI(svePoangF6, groupAvgs['N15510'], 'N15510');
       
       if (matPoangKlassif.trendStatus === 'ner' || svePoangKlassif.trendStatus === 'ner') {
         meningar.push(`Fler elever klarar E-nivån, men färre når högre betyg – fokus behöver läggas på progression mot C och A.`);
@@ -1191,7 +1241,7 @@ function analyseraF6Resultat(kpiData, groupAvgs) {
       { kpi: engF6, label: 'engelska', id: 'N15482' }
     ].map(item => ({
       ...item,
-      klassif: klassificeraKPI(item.kpi, groupAvgs[item.id])
+      klassif: klassificeraKPI(item.kpi, groupAvgs[item.id], item.id)
     })).filter(item => item.kpi?.latest != null);
     
     const f6Red = f6Klassif.filter(item => item.klassif.nivaStatus === 'red');
@@ -1235,8 +1285,8 @@ function genereraNarrativText(kpiData, groupAvgs = {}) {
   const meritvarde = kpiData['N15505'];
   
   if (allaAmnen?.latest != null && meritvarde?.latest != null) {
-    const allaKlassif = klassificeraKPI(allaAmnen, groupAvgs['N15419']);
-    const meritKlassif = klassificeraKPI(meritvarde, groupAvgs['N15505']);
+    const allaKlassif = klassificeraKPI(allaAmnen, groupAvgs['N15419'], 'N15419');
+    const meritKlassif = klassificeraKPI(meritvarde, groupAvgs['N15505'], 'N15505');
     
     if (allaKlassif.trendStatus === 'ner' || meritKlassif.trendStatus === 'ner') {
       meningar.push(`Årskurs 9 visar en nedåtgående trend i slutbetyg, vilket signalerar behov av förstärkta insatser under högstadiet.`);
@@ -1251,7 +1301,7 @@ function genereraNarrativText(kpiData, groupAvgs = {}) {
   const salsaKPIs = SALSA_KPIS.map(def => ({
     id: def.id,
     data: kpiData[def.id],
-    klassif: klassificeraKPI(kpiData[def.id], groupAvgs[def.id])
+    klassif: klassificeraKPI(kpiData[def.id], groupAvgs[def.id], def.id)
   })).filter(item => item.data?.latest != null);
 
   const salsaNegative = salsaKPIs.filter(item => item.klassif.diff < -2);
@@ -1555,8 +1605,8 @@ async function renderSection(sectionId, defs, ouId, kpiData, municipalityCode = 
     const groupAvgA = realAvgs[a.def.id] || null;
     const groupAvgB = realAvgs[b.def.id] || null;
 
-    const klassifA = klassificeraKPI(a.card.trendData, groupAvgA);
-    const klassifB = klassificeraKPI(b.card.trendData, groupAvgB);
+    const klassifA = klassificeraKPI(a.card.trendData, groupAvgA, a.def.id);
+    const klassifB = klassificeraKPI(b.card.trendData, groupAvgB, b.def.id);
 
     // Sortera fallande efter diff (högst först)
     return klassifB.diff - klassifA.diff;
@@ -1601,7 +1651,7 @@ async function renderStyrandeAnalys(kpiData, groupAvgs, sectionResults) {
   const svenskaStatus = beraknaSektionStatus(SVENSKA_KPIS, kpiData, groupAvgs);
   const matematikStatus = beraknaSektionStatus(MATEMATIK_KPIS, kpiData, groupAvgs);
   const engelskaStatus = beraknaSektionStatus(ENGELSKA_KPIS, kpiData, groupAvgs);
-  const outcomeStatus = beraknaSektionStatus(kpiDefsOutcome(), kpiData, groupAvgs);
+  const outcomeStatus = beraknaSektionStatus(kpiDefsOutcome(kpiData), kpiData, groupAvgs);
   
   const sektionStatusGrid = document.getElementById('sektionStatusGrid');
   
