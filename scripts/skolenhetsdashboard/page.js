@@ -275,13 +275,7 @@ function setLoading(sectionId, loading = true) {
   const el = document.getElementById(sectionId);
   if (!el) return;
   if (loading) {
-    el.innerHTML = `
-      <div class="loading-message">Laddar data...</div>
-      <div class="progress-container">
-        <div class="progress-bar" style="width: 0%" data-section="${sectionId}"></div>
-        <div class="progress-text">0%</div>
-      </div>
-    `;
+    el.innerHTML = `<div class="loading-message">Laddar data...</div>`;
   } else {
     el.innerHTML = '';
   }
@@ -290,13 +284,7 @@ function setLoading(sectionId, loading = true) {
 function updateProgress(sectionId, current, total) {
   const el = document.getElementById(sectionId);
   if (!el) return;
-  const progressBar = el.querySelector(`[data-section="${sectionId}"]`);
-  const progressText = el.querySelector('.progress-text');
-  if (progressBar && progressText) {
-    const percent = Math.round((current / total) * 100);
-    progressBar.style.width = `${percent}%`;
-    progressText.textContent = `${percent}%`;
-  }
+  // Progressindikatorer visas inte längre; placeholdern behålls tills sektionen är klar.
 }
 
 async function hamtaSkolenheterForKommun(kommunId) {
@@ -1631,48 +1619,52 @@ function extractNPGapPairs(results) {
 
 async function renderSection(sectionId, defs, ouId, kpiData, municipalityCode = '0684') {
   setLoading(sectionId, true);
-  const sectionEl = document.getElementById(sectionId);
-  const total = defs.length;
-  let completed = 0;
-  
   const cardPromises = defs.map(async (def) => {
     const card = await hamtaKpiCardData(ouId, def, municipalityCode);
-    completed++;
-    updateProgress(sectionId, completed, total);
     return { card, def };
   });
-  
+
   const results = await Promise.all(cardPromises);
-  
+
+  const availableResults = results.filter(({ card }) => card?.trendData?.latest != null);
+
+  if (availableResults.length === 0) {
+    return {
+      sectionId,
+      fragment: document.createDocumentFragment(),
+      cards: [],
+      realAvgs: {},
+      sourceAvgs: {},
+      sectionHasMock: false
+    };
+  }
+
   // Build realAvgs from comparisonData (fallback to mock if data is missing)
-  const { realAvgs, sourceAvgs, hasMock } = buildRealAverages(results, pickBaseline);
+  const { realAvgs, sourceAvgs, hasMock } = buildRealAverages(availableResults, pickBaseline);
   const sectionHasMock = hasMock;
-  
+
   // Sortera efter positiva värden först (högst diff mot realAvgs)
-  results.sort((a, b) => {
+  availableResults.sort((a, b) => {
     const groupAvgA = realAvgs[a.def.id] || null;
     const groupAvgB = realAvgs[b.def.id] || null;
-    
+
     const klassifA = klassificeraKPI(a.card.trendData, groupAvgA);
     const klassifB = klassificeraKPI(b.card.trendData, groupAvgB);
-    
+
     // Sortera fallande efter diff (högst först)
     return klassifB.diff - klassifA.diff;
   });
-  
-  sectionEl.innerHTML = '';
-  
+
   // Group NP-gap KPIs for special rendering
-  const { npGapPairs, npGapIds } = extractNPGapPairs(results);
-  
+  const { npGapPairs, npGapIds } = extractNPGapPairs(availableResults);
+
   // Separate regular cards from NP-gap cards
-  const regularCards = results.filter(({ def }) => !npGapIds.has(def.id));
-  
-  // Render all cards
-  const frag = renderCards(regularCards, npGapPairs, kpiData);
-  sectionEl.appendChild(frag);
-  
-  return { cards: results.map(r => r.card), realAvgs, sourceAvgs, sectionHasMock };
+  const regularCards = availableResults.filter(({ def }) => !npGapIds.has(def.id));
+
+  // Render all cards and return fragment for deferred injection
+  const fragment = renderCards(regularCards, npGapPairs, kpiData);
+
+  return { sectionId, fragment, cards: availableResults.map(r => r.card), realAvgs, sourceAvgs, sectionHasMock };
 }
 
 async function renderSections(ouId, municipalityCode = null) {
@@ -1691,38 +1683,61 @@ async function renderSections(ouId, municipalityCode = null) {
   
   // Hämta skoltyp för filtrering av resultatgrupper
   const schoolType = await detectSchoolType(ouId);
-  
-  // Rendera sektioner: Baseline, ämnessektioner och Resultat-sammanfattning
-  const [baselineResult, svenskaResult, matematikResult, engelskaResult, outcomeResult, salsaResult, tryggResult] = await Promise.all([
-    renderSection('baselineKPIs', BASELINE_KPIS, ouId, kpiData, municipalityCode),
-    renderSection('svenskaKPIs', SVENSKA_KPIS, ouId, kpiData, municipalityCode),
-    renderSection('matematikKPIs', MATEMATIK_KPIS, ouId, kpiData, municipalityCode),
-    renderSection('engelskaKPIs', ENGELSKA_KPIS, ouId, kpiData, municipalityCode),
-    renderSection('outcomeKPIs', kpiDefsOutcome(), ouId, kpiData, municipalityCode),
-    renderSection('salsaKPIs', SALSA_KPIS, ouId, kpiData, municipalityCode),
-    renderSection('trygghetsKPIs', TRYG_KPIS, ouId, kpiData, municipalityCode)
-  ]);
-  
+
+  const sectionConfigs = [
+    { id: 'baselineKPIs', defs: BASELINE_KPIS },
+    { id: 'svenskaKPIs', defs: SVENSKA_KPIS },
+    { id: 'matematikKPIs', defs: MATEMATIK_KPIS },
+    { id: 'engelskaKPIs', defs: ENGELSKA_KPIS },
+    { id: 'outcomeKPIs', defs: kpiDefsOutcome() },
+    { id: 'salsaKPIs', defs: SALSA_KPIS },
+    { id: 'trygghetsKPIs', defs: TRYG_KPIS }
+  ];
+
+  const orderedConfigs = [...sectionConfigs].sort((a, b) => a.defs.length - b.defs.length);
+
+  const sectionResults = [];
+
+  for (const cfg of orderedConfigs) {
+    const result = await renderSection(cfg.id, cfg.defs, ouId, kpiData, municipalityCode);
+    sectionResults.push(result);
+
+    const sectionEl = document.getElementById(result.sectionId);
+    if (sectionEl) {
+      sectionEl.innerHTML = '';
+      sectionEl.appendChild(result.fragment);
+    }
+  }
+
+  // Plocka ut resultat per sektion
+  const baselineResult = sectionResults.find(r => r.sectionId === 'baselineKPIs');
+  const svenskaResult = sectionResults.find(r => r.sectionId === 'svenskaKPIs');
+  const matematikResult = sectionResults.find(r => r.sectionId === 'matematikKPIs');
+  const engelskaResult = sectionResults.find(r => r.sectionId === 'engelskaKPIs');
+  const outcomeResult = sectionResults.find(r => r.sectionId === 'outcomeKPIs');
+  const salsaResult = sectionResults.find(r => r.sectionId === 'salsaKPIs');
+  const tryggResult = sectionResults.find(r => r.sectionId === 'trygghetsKPIs');
+
   // Slå ihop alla realAvgs från sektionerna
   const groupAvgs = {
-    ...baselineResult.realAvgs,
-    ...svenskaResult.realAvgs,
-    ...matematikResult.realAvgs,
-    ...engelskaResult.realAvgs,
-    ...outcomeResult.realAvgs,
-    ...salsaResult.realAvgs,
-    ...tryggResult.realAvgs
+    ...(baselineResult?.realAvgs || {}),
+    ...(svenskaResult?.realAvgs || {}),
+    ...(matematikResult?.realAvgs || {}),
+    ...(engelskaResult?.realAvgs || {}),
+    ...(outcomeResult?.realAvgs || {}),
+    ...(salsaResult?.realAvgs || {}),
+    ...(tryggResult?.realAvgs || {})
   };
 
   // Data-kvalitet: markera om ersättningsvärden (mock) användes i någon sektion
   const anyMockBaseline = (
-    baselineResult.sectionHasMock ||
-    svenskaResult.sectionHasMock ||
-    matematikResult.sectionHasMock ||
-    engelskaResult.sectionHasMock ||
-    outcomeResult.sectionHasMock ||
-    salsaResult.sectionHasMock ||
-    tryggResult.sectionHasMock
+    baselineResult?.sectionHasMock ||
+    svenskaResult?.sectionHasMock ||
+    matematikResult?.sectionHasMock ||
+    engelskaResult?.sectionHasMock ||
+    outcomeResult?.sectionHasMock ||
+    salsaResult?.sectionHasMock ||
+    tryggResult?.sectionHasMock
   );
 
   // === GENERERA OCH VISA STYRANDE ANALYS ===
