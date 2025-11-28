@@ -7,6 +7,77 @@
   <link rel="stylesheet" href="styles/betygkolada.css">
   <link rel="stylesheet" href="styles/skolenhetsdashboard.css">
   <style>
+    /* Global Loading Screen */
+    .global-loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      transition: opacity 0.5s ease-out;
+    }
+    
+    .global-loading-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    
+    .loading-content {
+      text-align: center;
+      color: white;
+    }
+    
+    .coffee-icon {
+      font-size: 5rem;
+      margin-bottom: 1rem;
+      animation: steam 2s ease-in-out infinite;
+    }
+    
+    @keyframes steam {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    
+    .loading-content h2 {
+      font-size: 1.8rem;
+      margin-bottom: 1.5rem;
+      font-weight: 600;
+    }
+    
+    .progress-container {
+      width: 300px;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      overflow: hidden;
+      margin: 0 auto 1rem;
+    }
+    
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+      border-radius: 10px;
+      width: 0%;
+      transition: width 0.3s ease-out;
+    }
+    
+    .progress-text {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    
+    .loading-subtitle {
+      font-size: 0.9rem;
+      opacity: 0.8;
+      margin-top: 0.5rem;
+    }
+    
     body {
       background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
       min-height: 100vh;
@@ -646,6 +717,19 @@
     </div>
   </div>
 
+  <!-- Global Loading Screen -->
+  <div id="globalLoadingScreen" class="global-loading-overlay" style="display: none;">
+    <div class="loading-content">
+      <div class="coffee-icon">☕</div>
+      <h2>Laddar skoldata...</h2>
+      <div class="progress-container">
+        <div class="progress-bar" id="globalProgressBar"></div>
+      </div>
+      <div class="progress-text" id="globalProgressText">0%</div>
+      <p class="loading-subtitle">Hämtar nyckeltal från Kolada</p>
+    </div>
+  </div>
+
   <a href="index.html" class="back-link">← Till startsidan</a>
 
   <div id="stageDetection"></div>
@@ -723,15 +807,6 @@
     <div class="dashboard-section">
       <h2>Trygghet åk 5</h2>
       <div class="kpi-grid" id="trygghetsKPIs"></div>
-    </div>
-
-    <!-- Automatisk Analys längst ner -->
-    <div class="dashboard-section">
-      <h2>Automatisk analys</h2>
-      <div class="panel-interpretation" id="analysisText">
-        <h4>Analys</h4>
-        <p>Automatisk analys av nyckeltal visas här...</p>
-      </div>
     </div>
   </div>
 

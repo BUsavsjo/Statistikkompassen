@@ -100,6 +100,48 @@ const filterState = { hideF6: false, hide79: false };
 const skolenhetCache = new Map();
 const kpiCache = new Map();
 
+// Global loading state
+let totalKPIs = 0;
+let loadedKPIs = 0;
+
+/**
+ * Uppdaterar global loading bar
+ * @param {number} current - Nuvarande antal laddade KPIer
+ * @param {number} total - Totalt antal KPIer att ladda
+ */
+function updateGlobalProgress(current, total) {
+  const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+  const progressBar = document.getElementById('globalProgressBar');
+  const progressText = document.getElementById('globalProgressText');
+  
+  if (progressBar) progressBar.style.width = `${percent}%`;
+  if (progressText) progressText.textContent = `${percent}%`;
+}
+
+/**
+ * Visar global loading screen
+ */
+function showGlobalLoading() {
+  const loadingScreen = document.getElementById('globalLoadingScreen');
+  if (loadingScreen) {
+    loadingScreen.style.display = 'flex';
+    loadingScreen.classList.remove('hidden');
+  }
+}
+
+/**
+ * Döljer global loading screen
+ */
+function hideGlobalLoading() {
+  const loadingScreen = document.getElementById('globalLoadingScreen');
+  if (loadingScreen) {
+    loadingScreen.classList.add('hidden');
+    setTimeout(() => {
+      loadingScreen.style.display = 'none';
+    }, 500);
+  }
+}
+
 /**
  * Selects the appropriate baseline for a KPI based on comparison rules
  * UPDATED: Prioritizes municipality average within same school type
@@ -1267,7 +1309,11 @@ function beraknaTrendtext(unit, values) {
  */
 async function hamtaKpiCardData(ouId, def, municipalityCode = '0684') {
   const cacheKey = `${ouId}:${def.id}`;
-  if (kpiCache.has(cacheKey)) return kpiCache.get(cacheKey);
+  if (kpiCache.has(cacheKey)) {
+    loadedKPIs++;
+    updateGlobalProgress(loadedKPIs, totalKPIs);
+    return kpiCache.get(cacheKey);
+  }
 
   const fetchPromise = (async () => {
     try {
@@ -1276,6 +1322,8 @@ async function hamtaKpiCardData(ouId, def, municipalityCode = '0684') {
       const hasAny = (data?.totalt || []).some(v => v != null);
       
       if (!hasAny) {
+        loadedKPIs++;
+        updateGlobalProgress(loadedKPIs, totalKPIs);
         return { 
           id: def.id,
           label: def.label, 
@@ -1308,6 +1356,9 @@ async function hamtaKpiCardData(ouId, def, municipalityCode = '0684') {
         console.warn(`Could not fetch comparison data for ${def.id}:`, error);
       }
       
+      loadedKPIs++;
+      updateGlobalProgress(loadedKPIs, totalKPIs);
+      
       return { 
         id: def.id,
         label: def.label, 
@@ -1323,6 +1374,8 @@ async function hamtaKpiCardData(ouId, def, municipalityCode = '0684') {
       };
     } catch (error) {
       console.error('Kunde inte hämta KPI', def.id, error);
+      loadedKPIs++;
+      updateGlobalProgress(loadedKPIs, totalKPIs);
       return { 
         id: def.id,
         label: def.label, 
@@ -1343,193 +1396,7 @@ async function hamtaKpiCardData(ouId, def, municipalityCode = '0684') {
   return fetchPromise;
 }
 
-function genereraAutomatiskAnalys(kpiData) {
-  const insights = [];
-  
-  // Extrahera nyckeldata
-  const { elevantal, eleverPerLarare, behorighetLarare, allaAmnen, yrkesprog, meritvarde, trygghet, studiero, stimulans, allaAmnenF6, matHogreNP, matLagreNP, engHogreNP, engLagreNP, sveHogreNP, sveLagreNP, engelska, matematik, svenska } = {
-    elevantal: kpiData['N15807'],
-    eleverPerLarare: kpiData['N15034'],
-    behorighetLarare: kpiData['N15813'],
-    allaAmnen: kpiData['N15419'],
-    yrkesprog: kpiData['N15436'],
-    meritvarde: kpiData['N15505'],
-    trygghet: kpiData['N15613'],
-    studiero: kpiData['N15603'],
-    stimulans: kpiData['N15602'],
-    allaAmnenF6: kpiData['N15539'],
-    matHogreNP: kpiData['U15429'],
-    matLagreNP: kpiData['U15430'],
-    engHogreNP: kpiData['U15431'],
-    engLagreNP: kpiData['U15432'],
-    sveHogreNP: kpiData['U15433'],
-    sveLagreNP: kpiData['U15434'],
-    engelska: kpiData['N15482'],
-    matematik: kpiData['N15485'],
-    svenska: kpiData['N15488']
-  };
 
-  // === INSIKTER (Positiva signaler) ===
-  const insikterSection = [];
-  
-  if (allaAmnen?.dir === 'improving' && meritvarde?.dir === 'improving') {
-    insikterSection.push('📈 <strong>Stark positiv trend:</strong> Både andel godkända och meritvärde ökar över tid. Fortsätt med nuvarande framgångsrika arbetssätt.');
-  }
-  
-  if (trygghet?.latest && trygghet.latest >= 85 && studiero?.latest && studiero.latest >= 85) {
-    insikterSection.push('✅ <strong>Trygg lärmiljö:</strong> Hög trygghet och studiero skapar goda förutsättningar för lärande.');
-  }
-  
-  if (stimulans?.latest && stimulans.latest >= 85) {
-    insikterSection.push('🌟 <strong>Engagerande undervisning:</strong> Eleverna upplever att skolarbetet är intressant, vilket främjar motivation.');
-  }
-  
-  if (behorighetLarare?.latest && behorighetLarare.latest >= 80) {
-    insikterSection.push('👩‍🏫 <strong>Hög lärarkompetens:</strong> God andel behöriga lärare stärker undervisningskvaliteten.');
-  }
-  
-  if (allaAmnenF6?.latest && allaAmnenF6.latest >= 85) {
-    insikterSection.push('🎯 <strong>Stark grund i F-6:</strong> Hög måluppfyllelse i årskurs 6 ger goda förutsättningar för högstadiet.');
-  }
-  
-  // Lägg till insikter om det finns några
-  if (insikterSection.length > 0) {
-    insights.push('<h4 style="color: #059669; margin-top: 20px;">💡 Insikter - Vad fungerar bra</h4>');
-    insights.push(...insikterSection);
-  } else {
-    insights.push('<h4 style="color: #059669; margin-top: 20px;">💡 Insikter</h4>');
-    insights.push('<p><em>Inga tydliga styrkor kunde identifieras i tillgänglig data. Fokusera på att bygga stabilitet.</em></p>');
-  }
-
-  // === RISKFAKTORER ===
-  const riskSection = [];
-  
-  if (allaAmnen?.dir === 'declining' || meritvarde?.dir === 'declining') {
-    riskSection.push('⚠️ <strong>Fallande resultat:</strong> Nedåtgående trend i slutbetyg. Prioritera tidiga stödinsatser och uppföljning av undervisningskvalitet.');
-  }
-  
-  if (yrkesprog?.latest && yrkesprog.latest < 75) {
-    riskSection.push('🎯 <strong>Risk för icke-behörighet:</strong> Mindre än 75% blir behöriga till yrkesprogram. Fokusera på att säkra godkänt i kärnämnena.');
-  }
-  
-  if (eleverPerLarare?.latest && eleverPerLarare.latest > THRESHOLDS.STUDENTS_PER_TEACHER) {
-    riskSection.push(`👥 <strong>Högt resurstryck:</strong> ${eleverPerLarare.latest.toFixed(1)} elever per lärare kan begränsa möjligheten till individuellt stöd. Överväg resursomfördelning.`);
-  }
-  
-  if (behorighetLarare?.latest && behorighetLarare.latest < THRESHOLDS.TEACHER_QUALIFICATION) {
-    riskSection.push(`📚 <strong>Kompetensbrist:</strong> Endast ${behorighetLarare.latest.toFixed(0)}% behöriga lärare. Prioritera rekrytering och kompetensutveckling.`);
-  }
-  
-  if (trygghet?.latest && trygghet.latest < 75) {
-    riskSection.push(`🛡️ <strong>Låg trygghet:</strong> Trygghetsnivå på ${trygghet.latest.toFixed(0)}% kräver förstärkta trygghetsskapande åtgärder.`);
-  }
-  
-  if (studiero?.latest && studiero.latest < 75) {
-    riskSection.push(`🔇 <strong>Studierobrist:</strong> Studiero på ${studiero.latest.toFixed(0)}% påverkar lärmiljön negativt. Behov av tydligare strukturer och klassrumsledarskap.`);
-  }
-  
-  if (stimulans?.latest && stimulans.latest < 70) {
-    riskSection.push(`💤 <strong>Låg stimulans:</strong> Eleverna upplever inte undervisningen som engagerande (${stimulans.latest.toFixed(0)}%). Behov av mer varierade arbetssätt.`);
-  }
-  
-  // NP-gap riskfaktorer
-  if (matHogreNP && matLagreNP) {
-    const matGap = analyseraNPGap(matHogreNP, matLagreNP, 'Matematik');
-    if (matGap.riskNiva === 'hög risk' || matGap.riskNiva === 'uppmärksamhet') {
-      riskSection.push(`⚖️ <strong>Matematikbedömning:</strong> NP-gap visar ${matGap.riktning.toLowerCase()} - behov av kalibrering mellan lärare.`);
-    }
-  }
-  
-  if (engelska?.dir === 'declining' || matematik?.dir === 'declining' || svenska?.dir === 'declining') {
-    riskSection.push('📉 <strong>Kärnämnen försämras:</strong> Negativ trend i kärnämne(n). Stärk formativ bedömning och tidiga stödinsatser.');
-  }
-  
-  // Lägg till riskfaktorer
-  if (riskSection.length > 0) {
-    insights.push('<h4 style="color: #dc2626; margin-top: 20px;">⚠️ Riskfaktorer - Vad kräver uppmärksamhet</h4>');
-    insights.push(...riskSection);
-  } else {
-    insights.push('<h4 style="color: #dc2626; margin-top: 20px;">⚠️ Riskfaktorer</h4>');
-    insights.push('<p><em>Inga akuta riskfaktorer identifierade i tillgänglig data.</em></p>');
-  }
-
-  // === HÄVSTÅNGSEFFEKTER ===
-  const havstangSection = [];
-  
-  // R1: Stimulans + studiero båda låga (systemiskt problem)
-  if (stimulans?.latest && stimulans.latest < 75 && studiero?.latest && studiero.latest < 75) {
-    havstangSection.push('🎯 <strong>PRIORITET 1 - Klassrumsmiljö:</strong> Både stimulans och studiero är låga. Fokusera på <em>tydligare lektionsstruktur + mer elevaktiva arbetssätt</em>. Detta påverkar både arbetsro och motivation.');
-  }
-  // R2: Studiero låg men trygghet ok
-  else if (studiero?.latest && studiero.latest < 80 && (!trygghet?.latest || trygghet.latest >= 80)) {
-    havstangSection.push('📋 <strong>PRIORITET 1 - Studiero:</strong> Arbetsron behöver förbättras. Implementera <em>tydliga strukturer, rutiner och förutsägbarhet</em> i klassrummet.');
-  }
-  // R3: Trygghet låg
-  else if (trygghet?.latest && trygghet.latest < 75) {
-    havstangSection.push('🛡️ <strong>PRIORITET 1 - Trygghet:</strong> Grundläggande trygghet saknas. Starta med <em>trygghetsarbete, relationsbyggande och elevhälsoinsatser</em>.');
-  }
-  
-  // R4: F-6 resultat dåliga + stimulans låg
-  if (allaAmnenF6?.latest && allaAmnenF6.latest < 75 && stimulans?.latest && stimulans.latest < 75) {
-    havstangSection.push('🔄 <strong>HÄVSTÅNG - Motivation:</strong> Resultat och stimulans hänger ihop. Använd <em>formativ bedömning, tydlig återkoppling och meningsfullt lärande</em> för att öka både resultat och engagemang.');
-  }
-  
-  // R5: Behörighet + kärnämnen
-  if (yrkesprog?.latest && yrkesprog.latest < 80 && (engelska?.latest || matematik?.latest || svenska?.latest)) {
-    const lagtKarnamne = [];
-    if (matematik?.latest && matematik.latest < 75) lagtKarnamne.push('matematik');
-    if (svenska?.latest && svenska.latest < 75) lagtKarnamne.push('svenska');
-    if (engelska?.latest && engelska.latest < 75) lagtKarnamne.push('engelska');
-    
-    if (lagtKarnamne.length > 0) {
-      havstangSection.push(`📚 <strong>HÄVSTÅNG - Kärnämnen:</strong> Fokusera särskilt på <em>${lagtKarnamne.join(', ')}</em>. Använd <em>systematisk kartläggning, anpassad undervisning och extra stödgrupper</em>.`);
-    }
-  }
-  
-  // R6: Lärarkompetens som hävstång
-  if (behorighetLarare?.latest && behorighetLarare.latest < 75 && (allaAmnen?.latest && allaAmnen.latest < 80)) {
-    havstangSection.push('👨‍🏫 <strong>HÄVSTÅNG - Kompetensförsörjning:</strong> Öka andelen behöriga lärare genom <em>riktad rekrytering, kollegialt lärande och fortbildning</em>. Detta påverkar direkt undervisningskvaliteten.');
-  }
-  
-  // R7: NP-gap som hävstång
-  if (matHogreNP && matLagreNP && engHogreNP && engLagreNP && sveHogreNP && sveLagreNP) {
-    const npRisker = [
-      analyseraNPGap(matHogreNP, matLagreNP, 'Matematik'),
-      analyseraNPGap(engHogreNP, engLagreNP, 'Engelska'),
-      analyseraNPGap(sveHogreNP, sveLagreNP, 'Svenska')
-    ].filter(a => a.riskNiva === 'hög risk' || a.riskNiva === 'uppmärksamhet');
-    
-    if (npRisker.length >= 2) {
-      havstangSection.push('⚖️ <strong>HÄVSTÅNG - Likvärdighet:</strong> Flera ämnen visar NP-gap. Starta <em>strukturerade bedömningssamtal, gemensam kalibrering och provmatchning</em> mellan lärare.');
-    }
-  }
-  
-  // Allmän hävstång om inget specifikt
-  if (havstangSection.length === 0) {
-    if (studiero?.latest && studiero.latest >= 80 && trygghet?.latest && trygghet.latest >= 80) {
-      havstangSection.push('🚀 <strong>HÄVSTÅNG - Progression:</strong> God grundmiljö finns. Fokusera nu på <em>höjd ambitionsnivå, progression mot högre betyg och utmaningar för alla elever</em>.');
-    } else {
-      havstangSection.push('📊 <strong>HÄVSTÅNG - Systematik:</strong> Fortsätt med <em>datadrivet förbättringsarbete, regelbunden uppföljning och kontinuerlig utvärdering</em> av insatser.');
-    }
-  }
-  
-  // Lägg till hävstångseffekter
-  insights.push('<h4 style="color: #2563eb; margin-top: 20px;">🎯 Hävstångseffekter - Var ska ni börja?</h4>');
-  insights.push(...havstangSection);
-
-  // === DATAKVALITET ===
-  const harSaknad = Object.values(kpiData).some(k => k?.latest === null);
-  if (harSaknad) {
-    insights.push('<p style="margin-top: 20px; padding: 15px; background: #fef3c7; border-left: 4px solid #f59e0b; font-size: 0.9rem;"><strong>⚠️ Datakvalitet:</strong> <em>Vissa indikatorer saknar OU-data för denna enhet och ingår därför inte i bedömningen.</em></p>');
-  }
-
-  const elevantalValue = elevantal?.latest;
-  if (elevantalValue && elevantalValue < 50) {
-    insights.push('<p style="margin-top: 10px; padding: 15px; background: #e0f2fe; border-left: 4px solid #0284c7; font-size: 0.9rem;"><strong>ℹ️ Liten elevgrupp:</strong> <em>Mindre än 50 elever innebär att resultat kan variera mycket mellan år. Tolka trender över längre tid.</em></p>');
-  }
-
-  return insights.length > 0 ? insights : ['<p>Ingen automatisk analys kunde genereras baserat på tillgänglig data.</p>'];
-}
 
 /**
  * Builds real averages from comparison data with mock fallbacks
@@ -1667,9 +1534,341 @@ async function renderSection(sectionId, defs, ouId, kpiData, municipalityCode = 
   return { sectionId, fragment, cards: availableResults.map(r => r.card), realAvgs, sourceAvgs, sectionHasMock };
 }
 
+/**
+ * Renderar styrande skolbild baserat på kritisk data (Fas 2)
+ * @param {object} kpiData - KPI-data objekt
+ * @param {object} groupAvgs - Gruppgenomsnitt
+ * @param {Array} sectionResults - Resultat från kritiska sektioner
+ */
+async function renderStyrandeAnalys(kpiData, groupAvgs, sectionResults) {
+  const styrandeAnalysContainer = document.getElementById('styrandeAnalys');
+  
+  if (!styrandeAnalysContainer) {
+    console.warn('styrandeAnalys container not found in DOM - skipping styrande analys rendering');
+    return;
+  }
+  
+  console.log('DEBUG: Rendering styrande analys (kritisk data)', {
+    containerFound: !!styrandeAnalysContainer,
+    kpiDataKeys: Object.keys(kpiData),
+    kpiDataCount: Object.keys(kpiData).length,
+    groupAvgsKeys: Object.keys(groupAvgs),
+    sampleKPI: kpiData['N15807']
+  });
+  
+  // Beräkna sektionsstatus (trafikljus) baserat på kritisk data
+  const baselineStatus = beraknaSektionStatus(BASELINE_KPIS, kpiData, groupAvgs);
+  const svenskaStatus = beraknaSektionStatus(SVENSKA_KPIS, kpiData, groupAvgs);
+  const matematikStatus = beraknaSektionStatus(MATEMATIK_KPIS, kpiData, groupAvgs);
+  const engelskaStatus = beraknaSektionStatus(ENGELSKA_KPIS, kpiData, groupAvgs);
+  const outcomeStatus = beraknaSektionStatus(kpiDefsOutcome(), kpiData, groupAvgs);
+  
+  const sektionStatusGrid = document.getElementById('sektionStatusGrid');
+  
+  if (!sektionStatusGrid) {
+    console.warn('sektionStatusGrid element not found in DOM');
+  } else {
+    const baselineResult = sectionResults.find(r => r.sectionId === 'baselineKPIs') || {};
+    const svenskaResult = sectionResults.find(r => r.sectionId === 'svenskaKPIs') || {};
+    const matematikResult = sectionResults.find(r => r.sectionId === 'matematikKPIs') || {};
+    const engelskaResult = sectionResults.find(r => r.sectionId === 'engelskaKPIs') || {};
+    const outcomeResult = sectionResults.find(r => r.sectionId === 'outcomeKPIs') || {};
+    
+    const baselineBaseNote = baselineResult.sectionHasMock
+      ? 'Jämfört med: Liknande skolor (F-9) + ersättningsvärde för saknade'
+      : 'Jämfört med: Liknande skolor (F-9)';
+    const svenskaBaseNote = svenskaResult.sectionHasMock
+      ? 'Jämfört med: Liknande skolor (F-9) + ersättningsvärde för saknade'
+      : 'Jämfört med: Liknande skolor (F-9)';
+    const matematikBaseNote = matematikResult.sectionHasMock
+      ? 'Jämfört med: Liknande skolor (F-9) + ersättningsvärde för saknade'
+      : 'Jämfört med: Liknande skolor (F-9)';
+    const engelskaBaseNote = engelskaResult.sectionHasMock
+      ? 'Jämfört med: Liknande skolor (F-9) + ersättningsvärde för saknade'
+      : 'Jämfört med: Liknande skolor (F-9)';
+    const outcomeBaseNote = outcomeResult.sectionHasMock
+      ? 'Jämfört med: Liknande skolor (F-9) + ersättningsvärde för saknade'
+      : 'Jämfört med: Liknande skolor (F-9)';
+
+    sektionStatusGrid.innerHTML = `
+      <div class="sektion-status-card ${baselineStatus.status}">
+        <div class="status-icon">${baselineStatus.icon}</div>
+        <h4>Förutsättningar</h4>
+        <div class="status-word">${baselineStatus.statusWord}</div>
+        <div class="status-summary">${baselineStatus.summary}</div>
+        <div class="status-trend">${baselineStatus.trendIcon} ${baselineStatus.trendText} senaste året</div>
+        <div class="status-explanation">${baselineStatus.statusExplanation}</div>
+        <div class="comparison-base">${baselineBaseNote}</div>
+      </div>
+      <div class="sektion-status-card ${svenskaStatus.status}">
+        <div class="status-icon">${svenskaStatus.icon}</div>
+        <h4>Svenska</h4>
+        <div class="status-word">${svenskaStatus.statusWord}</div>
+        <div class="status-summary">${svenskaStatus.summary}</div>
+        <div class="status-trend">${svenskaStatus.trendIcon} ${svenskaStatus.trendText} senaste året</div>
+        <div class="status-explanation">${svenskaStatus.statusExplanation}</div>
+        <div class="comparison-base">${svenskaBaseNote}</div>
+      </div>
+      <div class="sektion-status-card ${matematikStatus.status}">
+        <div class="status-icon">${matematikStatus.icon}</div>
+        <h4>Matematik</h4>
+        <div class="status-word">${matematikStatus.statusWord}</div>
+        <div class="status-summary">${matematikStatus.summary}</div>
+        <div class="status-trend">${matematikStatus.trendIcon} ${matematikStatus.trendText} senaste året</div>
+        <div class="status-explanation">${matematikStatus.statusExplanation}</div>
+        <div class="comparison-base">${matematikBaseNote}</div>
+      </div>
+      <div class="sektion-status-card ${engelskaStatus.status}">
+        <div class="status-icon">${engelskaStatus.icon}</div>
+        <h4>Engelska</h4>
+        <div class="status-word">${engelskaStatus.statusWord}</div>
+        <div class="status-summary">${engelskaStatus.summary}</div>
+        <div class="status-trend">${engelskaStatus.trendIcon} ${engelskaStatus.trendText} senaste året</div>
+        <div class="status-explanation">${engelskaStatus.statusExplanation}</div>
+        <div class="comparison-base">${engelskaBaseNote}</div>
+      </div>
+      <div class="sektion-status-card ${outcomeStatus.status}">
+        <div class="status-icon">${outcomeStatus.icon}</div>
+        <h4>Resultat</h4>
+        <div class="status-word">${outcomeStatus.statusWord}</div>
+        <div class="status-summary">${outcomeStatus.summary}</div>
+        <div class="status-trend">${outcomeStatus.trendIcon} ${outcomeStatus.trendText} senaste året</div>
+        <div class="status-explanation">${outcomeStatus.statusExplanation}</div>
+        <div class="comparison-base">${outcomeBaseNote}</div>
+      </div>
+      <div class="sektion-status-card loading">
+        <div class="status-icon">⏳</div>
+        <h4>Värdeskapande</h4>
+        <div class="status-summary">Laddar...</div>
+      </div>
+      <div class="sektion-status-card loading">
+        <div class="status-icon">⏳</div>
+        <h4>Trygghet & Studiero</h4>
+        <div class="status-summary">Laddar...</div>
+      </div>
+    `;
+  }
+  
+  // Generera insikter baserat på kritisk data (begränsad)
+  const insikter = genereraInsikter(kpiData, groupAvgs);
+  const insiktGrid = document.getElementById('insiktGrid');
+  
+  if (!insiktGrid) {
+    console.warn('insiktGrid element not found in DOM');
+  } else {
+    insiktGrid.innerHTML = `
+      <div class="insikt-card styrka">
+        <h4>💪 Positivt</h4>
+        <div class="insikt-label">VAD:</div>
+        <p>${insikter.styrka}</p>
+        <div class="insikt-label">KONSEKVENS:</div>
+        <p class="insikt-consequence">Detta ger stabilitet och goda förutsättningar för fortsatt utveckling.</p>
+        <div class="insikt-label">REKOMMENDATION:</div>
+        <p class="insikt-action">Dokumentera och sprid framgångsfaktorer till andra delar av verksamheten.</p>
+      </div>
+      <div class="insikt-card risk">
+        <h4>⚠️ Risk</h4>
+        <div class="insikt-label">VAD:</div>
+        <p>${insikter.risk}</p>
+        <div class="insikt-label">KONSEKVENS:</div>
+        <p class="insikt-consequence">Risk för försämrade resultat om inget görs. Eleverna påverkas direkt.</p>
+        <div class="insikt-label">REKOMMENDATION:</div>
+        <p class="insikt-action">Prioritera detta i nästa arbetsplansperiod. Avsätt tid och resurser.</p>
+      </div>
+      <div class="insikt-card havstang">
+        <h4>🎯 Hävstång</h4>
+        <div class="insikt-label">VAD:</div>
+        <p>${insikter.havstang}</p>
+        <div class="insikt-label">KONSEKVENS:</div>
+        <p class="insikt-consequence">Detta är den mest effektiva vägen till förbättring baserat på data.</p>
+        <div class="insikt-label">REKOMMENDATION:</div>
+        <p class="insikt-action">Starta arbete omgående. Följ upp efter 3 månader.</p>
+      </div>
+      <div class="insikt-card uppmarksamma">
+        <h4>👀 Att uppmärksamma</h4>
+        <div class="insikt-label">VAD:</div>
+        <p>${insikter.uppmarksamma}</p>
+        <div class="insikt-label">KONSEKVENS:</div>
+        <p class="insikt-consequence">Tidiga signaler – följ upp innan det utvecklas till ett större problem.</p>
+        <div class="insikt-label">REKOMMENDATION:</div>
+        <p class="insikt-action">Planera riktade observationer/uppföljningar och justera arbetssätt vid behov.</p>
+      </div>
+    `;
+  }
+  
+  // Generera narrativ text baserat på kritisk data
+  const narrativText = genereraNarrativText(kpiData, groupAvgs);
+  const narrativEl = document.getElementById('narrativText');
+  
+  if (!narrativEl) {
+    console.warn('narrativText element not found in DOM');
+  } else {
+    // Konvertera till strukturerad punktlista
+    const meningar = narrativText.split('. ').filter(m => m.length > 10);
+    const struktureradSammanfattning = `
+      <h4>Sammanfattning – Vad du behöver veta</h4>
+      <ul class="narrative-bullets">
+        <li><strong>📊 Nuläge:</strong> ${meningar[0] || 'Data analyseras...'}.</li>
+        <li><strong>⚡ Konsekvens:</strong> ${meningar[1] || 'Följ utvecklingen noga'}.</li>
+        <li><strong>✅ Positivt:</strong> ${meningar.find(m => m.includes('god') || m.includes('starka') || m.includes('över')) || 'Fortsätt nuvarande arbetssätt'}.</li>
+        <li><strong>🎯 Fokus framåt:</strong> ${meningar[meningar.length - 1] || 'Prioritera enligt rekommendationerna ovan'}.</li>
+      </ul>
+      <p style="margin-top: 15px; padding: 10px; background: #fef3c7; border-left: 3px solid #f59e0b; font-size: 0.85rem;">
+        <strong>📋 Fullständig analys genereras...</strong> Trygghet och värdeskapande läggs till när alla data laddats.
+      </p>
+    `;
+    narrativEl.innerHTML = struktureradSammanfattning;
+  }
+  
+  // Visa analysen
+  styrandeAnalysContainer.style.display = 'block';
+  
+  // Add source attribution if not already present
+  let sourceAttribution = document.getElementById('sourceAttribution');
+  if (!sourceAttribution) {
+    sourceAttribution = document.createElement('div');
+    sourceAttribution.id = 'sourceAttribution';
+    sourceAttribution.style.cssText = 'margin-top: 30px; padding: 20px; background: #f8fafc; border-left: 4px solid #3b82f6; font-size: 0.875rem; color: #475569;';
+    sourceAttribution.innerHTML = '<strong>Källa:</strong> Kolada | <strong>Analysmotor:</strong> Peter Wenström';
+    styrandeAnalysContainer.appendChild(sourceAttribution);
+  }
+}
+
+/**
+ * Uppdaterar styrande analys med fullständig data inkl. SALSA och trygghet (Fas 3)
+ * @param {object} kpiData - Fullständig KPI-data
+ * @param {object} groupAvgs - Fullständiga gruppgenomsnitt
+ * @param {Array} allResults - Alla sektionsresultat (kritiska + tunga)
+ */
+async function enrichStyrandeAnalys(kpiData, groupAvgs, allResults) {
+  const styrandeAnalysContainer = document.getElementById('styrandeAnalys');
+  
+  if (!styrandeAnalysContainer) {
+    console.warn('styrandeAnalys container not found - skipping enrichment');
+    return;
+  }
+  
+  console.log('DEBUG: Enriching styrande analys with full data', {
+    kpiDataCount: Object.keys(kpiData).length,
+    groupAvgsCount: Object.keys(groupAvgs).length
+  });
+  
+  // Uppdatera sektionsstatus med SALSA och trygghet
+  const salsaStatus = beraknaSektionStatus(SALSA_KPIS, kpiData, groupAvgs);
+  const tryggStatus = beraknaSektionStatus(TRYG_KPIS, kpiData, groupAvgs);
+  
+  const salsaResult = allResults.find(r => r.sectionId === 'salsaKPIs') || {};
+  const tryggResult = allResults.find(r => r.sectionId === 'trygghetsKPIs') || {};
+  
+  const salsaBaseNote = salsaResult.sectionHasMock
+    ? 'Resultat i relation till förutsättningar + ersättningsvärde för saknade'
+    : 'Resultat i relation till förutsättningar';
+  const tryggBaseNote = tryggResult.sectionHasMock
+    ? 'Jämfört med: Liknande skolor (F-9) + ersättningsvärde för saknade'
+    : 'Jämfört med: Liknande skolor (F-9)';
+  
+  // Hitta och uppdatera värdeskapande- och trygghetskort
+  const sektionStatusGrid = document.getElementById('sektionStatusGrid');
+  if (sektionStatusGrid) {
+    const cards = sektionStatusGrid.querySelectorAll('.sektion-status-card');
+    cards.forEach((card, index) => {
+      const heading = card.querySelector('h4');
+      if (heading) {
+        if (heading.textContent.includes('Värdeskapande')) {
+          card.className = `sektion-status-card ${salsaStatus.status}`;
+          card.innerHTML = `
+            <div class="status-icon">${salsaStatus.icon}</div>
+            <h4>Värdeskapande</h4>
+            <div class="status-word">${salsaStatus.statusWord}</div>
+            <div class="status-summary">${salsaStatus.summary}</div>
+            <div class="status-trend">${salsaStatus.trendIcon} ${salsaStatus.trendText} senaste året</div>
+            <div class="status-explanation">${salsaStatus.statusExplanation}</div>
+            <div class="comparison-base">${salsaBaseNote}</div>
+          `;
+        } else if (heading.textContent.includes('Trygghet')) {
+          card.className = `sektion-status-card ${tryggStatus.status}`;
+          card.innerHTML = `
+            <div class="status-icon">${tryggStatus.icon}</div>
+            <h4>Trygghet & Studiero</h4>
+            <div class="status-word">${tryggStatus.statusWord}</div>
+            <div class="status-summary">${tryggStatus.summary}</div>
+            <div class="status-trend">${tryggStatus.trendIcon} ${tryggStatus.trendText} senaste året</div>
+            <div class="status-explanation">${tryggStatus.statusExplanation}</div>
+            <div class="comparison-base">${tryggBaseNote}</div>
+          `;
+        }
+      }
+    });
+  }
+  
+  // Uppdatera insikter med fullständig data
+  const insikter = genereraInsikter(kpiData, groupAvgs);
+  const insiktGrid = document.getElementById('insiktGrid');
+  
+  if (insiktGrid) {
+    insiktGrid.innerHTML = `
+      <div class="insikt-card styrka">
+        <h4>💪 Positivt</h4>
+        <div class="insikt-label">VAD:</div>
+        <p>${insikter.styrka}</p>
+        <div class="insikt-label">KONSEKVENS:</div>
+        <p class="insikt-consequence">Detta ger stabilitet och goda förutsättningar för fortsatt utveckling.</p>
+        <div class="insikt-label">REKOMMENDATION:</div>
+        <p class="insikt-action">Dokumentera och sprid framgångsfaktorer till andra delar av verksamheten.</p>
+      </div>
+      <div class="insikt-card risk">
+        <h4>⚠️ Risk</h4>
+        <div class="insikt-label">VAD:</div>
+        <p>${insikter.risk}</p>
+        <div class="insikt-label">KONSEKVENS:</div>
+        <p class="insikt-consequence">Risk för försämrade resultat om inget görs. Eleverna påverkas direkt.</p>
+        <div class="insikt-label">REKOMMENDATION:</div>
+        <p class="insikt-action">Prioritera detta i nästa arbetsplansperiod. Avsätt tid och resurser.</p>
+      </div>
+      <div class="insikt-card havstang">
+        <h4>🎯 Hävstång</h4>
+        <div class="insikt-label">VAD:</div>
+        <p>${insikter.havstang}</p>
+        <div class="insikt-label">KONSEKVENS:</div>
+        <p class="insikt-consequence">Detta är den mest effektiva vägen till förbättring baserat på data.</p>
+        <div class="insikt-label">REKOMMENDATION:</div>
+        <p class="insikt-action">Starta arbete omgående. Följ upp efter 3 månader.</p>
+      </div>
+      <div class="insikt-card uppmarksamma">
+        <h4>👀 Att uppmärksamma</h4>
+        <div class="insikt-label">VAD:</div>
+        <p>${insikter.uppmarksamma}</p>
+        <div class="insikt-label">KONSEKVENS:</div>
+        <p class="insikt-consequence">Tidiga signaler – följ upp innan det utvecklas till ett större problem.</p>
+        <div class="insikt-label">REKOMMENDATION:</div>
+        <p class="insikt-action">Planera riktade observationer/uppföljningar och justera arbetssätt vid behov.</p>
+      </div>
+    `;
+  }
+  
+  // Uppdatera narrativ med fullständig analys
+  const narrativText = genereraNarrativText(kpiData, groupAvgs);
+  const narrativEl = document.getElementById('narrativText');
+  
+  if (narrativEl) {
+    const meningar = narrativText.split('. ').filter(m => m.length > 10);
+    const struktureradSammanfattning = `
+      <h4>Sammanfattning – Vad du behöver veta</h4>
+      <ul class="narrative-bullets">
+        <li><strong>📊 Nuläge:</strong> ${meningar[0] || 'Data analyseras...'}.</li>
+        <li><strong>⚡ Konsekvens:</strong> ${meningar[1] || 'Följ utvecklingen noga'}.</li>
+        <li><strong>✅ Positivt:</strong> ${meningar.find(m => m.includes('god') || m.includes('starka') || m.includes('över')) || 'Fortsätt nuvarande arbetssätt'}.</li>
+        <li><strong>🎯 Fokus framåt:</strong> ${meningar[meningar.length - 1] || 'Prioritera enligt rekommendationerna ovan'}.</li>
+      </ul>
+    `;
+    narrativEl.innerHTML = struktureradSammanfattning;
+  }
+}
+
 async function renderSections(ouId, municipalityCode = null) {
   const kpiData = {};
 
+  showGlobalLoading();
   showAnalysLoadingState();
   
   // Hämta kommunkod från dropdown om inte angiven
@@ -1697,6 +1896,12 @@ async function renderSections(ouId, municipalityCode = null) {
     { id: 'trygghetsKPIs', defs: TRYG_KPIS }
   ];
 
+  // Räkna totalt antal KPIer att ladda
+  totalKPIs = [...criticalSectionConfigs, ...heavySectionConfigs]
+    .reduce((sum, config) => sum + config.defs.length, 0);
+  loadedKPIs = 0;
+  updateGlobalProgress(0, totalKPIs);
+
   const loadSectionGroup = async (configs) => {
     const orderedConfigs = [...configs].sort((a, b) => a.defs.length - b.defs.length);
     const groupPromises = orderedConfigs.map(cfg => renderSection(cfg.id, cfg.defs, ouId, kpiData, municipalityCode));
@@ -1713,10 +1918,24 @@ async function renderSections(ouId, municipalityCode = null) {
     return results;
   };
 
-  // Ladda kritiska sektioner parallellt och rendera när alla är klara
+  // === FAS 1: Ladda kritiska sektioner och rendera i DOM ===
   const criticalResults = await loadSectionGroup(criticalSectionConfigs);
 
-  // Visa omedelbar laddningsindikator för tunga sektioner och ladda dem lite senare för att inte blockera första renderingen
+  // === FAS 2: När DOM är uppdaterad, generera och rendera styrande analys ===
+  // Vänta på nästa animation frame för att säkerställa att DOM är fullt renderad
+  await new Promise(resolve => requestAnimationFrame(resolve));
+  
+  // Samla ihop alla realAvgs från kritiska sektioner för styrande analys
+  const criticalGroupAvgs = {};
+  criticalResults.forEach(result => {
+    Object.assign(criticalGroupAvgs, result.realAvgs || {});
+  });
+  
+  // Generera och visa styrande analys baserat på kritisk data
+  await renderStyrandeAnalys(kpiData, criticalGroupAvgs, criticalResults);
+
+  // === FAS 3: Lazy-load tunga sektioner och enricha analys ===
+  // Visa laddningsindikator för tunga sektioner
   heavySectionConfigs.forEach(cfg => setLoading(cfg.id, true));
   const heavyResults = await new Promise((resolve) => {
     setTimeout(async () => {
@@ -1741,7 +1960,7 @@ async function renderSections(ouId, municipalityCode = null) {
   const salsaResult = sectionResults.find(r => r.sectionId === 'salsaKPIs') || {};
   const tryggResult = sectionResults.find(r => r.sectionId === 'trygghetsKPIs') || {};
 
-  // Slå ihop alla realAvgs från sektionerna
+  // Slå ihop alla realAvgs från sektionerna (inkl. tunga sektioner för full analys)
   const groupAvgs = {
     ...(baselineResult?.realAvgs || {}),
     ...(svenskaResult?.realAvgs || {}),
@@ -1751,6 +1970,9 @@ async function renderSections(ouId, municipalityCode = null) {
     ...(salsaResult?.realAvgs || {}),
     ...(tryggResult?.realAvgs || {})
   };
+
+  // Uppdatera styrande analys med fullständig data (inkl. SALSA och trygghet)
+  await enrichStyrandeAnalys(kpiData, groupAvgs, sectionResults);
 
   // Data-kvalitet: markera om ersättningsvärden (mock) användes i någon sektion
   const anyMockBaseline = (
@@ -1763,230 +1985,28 @@ async function renderSections(ouId, municipalityCode = null) {
     tryggResult?.sectionHasMock
   );
 
-  // === GENERERA OCH VISA STYRANDE ANALYS ===
-  const styrandeAnalysContainer = document.getElementById('styrandeAnalys');
-  
-  console.log('DEBUG: Rendering styrande analys', {
-    containerFound: !!styrandeAnalysContainer,
-    kpiDataKeys: Object.keys(kpiData),
-    kpiDataCount: Object.keys(kpiData).length,
-    groupAvgsKeys: Object.keys(groupAvgs),
-    sampleKPI: kpiData['N15807']
-  });
-  
-  if (!styrandeAnalysContainer) {
-    console.warn('styrandeAnalys container not found in DOM - skipping styrande analys rendering');
-  } else {
-    // 1. Beräkna sektionsstatus (trafikljus)
-    const baselineStatus = beraknaSektionStatus(BASELINE_KPIS, kpiData, groupAvgs);
-    const svenskaStatus = beraknaSektionStatus(SVENSKA_KPIS, kpiData, groupAvgs);
-    const matematikStatus = beraknaSektionStatus(MATEMATIK_KPIS, kpiData, groupAvgs);
-    const engelskaStatus = beraknaSektionStatus(ENGELSKA_KPIS, kpiData, groupAvgs);
-    const outcomeStatus = beraknaSektionStatus(kpiDefsOutcome(), kpiData, groupAvgs);
-    const salsaStatus = beraknaSektionStatus(SALSA_KPIS, kpiData, groupAvgs);
-    const tryggStatus = beraknaSektionStatus(TRYG_KPIS, kpiData, groupAvgs);
-    
-    const sektionStatusGrid = document.getElementById('sektionStatusGrid');
-    
-    if (!sektionStatusGrid) {
-      console.warn('sektionStatusGrid element not found in DOM');
-    } else {
-      const baselineBaseNote = baselineResult.sectionHasMock
-    ? 'Jämfört med: Liknande skolor (F-9) + ersättningsvärde för saknade'
-    : 'Jämfört med: Liknande skolor (F-9)';
-  const svenskaBaseNote = svenskaResult.sectionHasMock
-    ? 'Jämfört med: Liknande skolor (F-9) + ersättningsvärde för saknade'
-    : 'Jämfört med: Liknande skolor (F-9)';
-  const matematikBaseNote = matematikResult.sectionHasMock
-    ? 'Jämfört med: Liknande skolor (F-9) + ersättningsvärde för saknade'
-    : 'Jämfört med: Liknande skolor (F-9)';
-  const engelskaBaseNote = engelskaResult.sectionHasMock
-    ? 'Jämfört med: Liknande skolor (F-9) + ersättningsvärde för saknade'
-    : 'Jämfört med: Liknande skolor (F-9)';
-  const outcomeBaseNote = outcomeResult.sectionHasMock
-    ? 'Jämfört med: Liknande skolor (F-9) + ersättningsvärde för saknade'
-    : 'Jämfört med: Liknande skolor (F-9)';
-  const salsaBaseNote = salsaResult.sectionHasMock
-    ? 'Resultat i relation till förutsättningar + ersättningsvärde för saknade'
-    : 'Resultat i relation till förutsättningar';
-  const tryggBaseNote = tryggResult.sectionHasMock
-    ? 'Jämfört med: Liknande skolor (F-9) + ersättningsvärde för saknade'
-    : 'Jämfört med: Liknande skolor (F-9)';
-
-  sektionStatusGrid.innerHTML = `
-    <div class="sektion-status-card ${baselineStatus.status}">
-      <div class="status-icon">${baselineStatus.icon}</div>
-      <h4>Förutsättningar</h4>
-      <div class="status-word">${baselineStatus.statusWord}</div>
-      <div class="status-summary">${baselineStatus.summary}</div>
-      <div class="status-trend">${baselineStatus.trendIcon} ${baselineStatus.trendText} senaste året</div>
-      <div class="status-explanation">${baselineStatus.statusExplanation}</div>
-      <div class="comparison-base">${baselineBaseNote}</div>
-    </div>
-    <div class="sektion-status-card ${svenskaStatus.status}">
-      <div class="status-icon">${svenskaStatus.icon}</div>
-      <h4>Svenska</h4>
-      <div class="status-word">${svenskaStatus.statusWord}</div>
-      <div class="status-summary">${svenskaStatus.summary}</div>
-      <div class="status-trend">${svenskaStatus.trendIcon} ${svenskaStatus.trendText} senaste året</div>
-      <div class="status-explanation">${svenskaStatus.statusExplanation}</div>
-      <div class="comparison-base">${svenskaBaseNote}</div>
-    </div>
-    <div class="sektion-status-card ${matematikStatus.status}">
-      <div class="status-icon">${matematikStatus.icon}</div>
-      <h4>Matematik</h4>
-      <div class="status-word">${matematikStatus.statusWord}</div>
-      <div class="status-summary">${matematikStatus.summary}</div>
-      <div class="status-trend">${matematikStatus.trendIcon} ${matematikStatus.trendText} senaste året</div>
-      <div class="status-explanation">${matematikStatus.statusExplanation}</div>
-      <div class="comparison-base">${matematikBaseNote}</div>
-    </div>
-    <div class="sektion-status-card ${engelskaStatus.status}">
-      <div class="status-icon">${engelskaStatus.icon}</div>
-      <h4>Engelska</h4>
-      <div class="status-word">${engelskaStatus.statusWord}</div>
-      <div class="status-summary">${engelskaStatus.summary}</div>
-      <div class="status-trend">${engelskaStatus.trendIcon} ${engelskaStatus.trendText} senaste året</div>
-      <div class="status-explanation">${engelskaStatus.statusExplanation}</div>
-      <div class="comparison-base">${engelskaBaseNote}</div>
-    </div>
-    <div class="sektion-status-card ${outcomeStatus.status}">
-      <div class="status-icon">${outcomeStatus.icon}</div>
-      <h4>Resultat</h4>
-      <div class="status-word">${outcomeStatus.statusWord}</div>
-      <div class="status-summary">${outcomeStatus.summary}</div>
-      <div class="status-trend">${outcomeStatus.trendIcon} ${outcomeStatus.trendText} senaste året</div>
-      <div class="status-explanation">${outcomeStatus.statusExplanation}</div>
-      <div class="comparison-base">${outcomeBaseNote}</div>
-    </div>
-    <div class="sektion-status-card ${salsaStatus.status}">
-      <div class="status-icon">${salsaStatus.icon}</div>
-      <h4>Värdeskapande</h4>
-      <div class="status-word">${salsaStatus.statusWord}</div>
-      <div class="status-summary">${salsaStatus.summary}</div>
-      <div class="status-trend">${salsaStatus.trendIcon} ${salsaStatus.trendText} senaste året</div>
-      <div class="status-explanation">${salsaStatus.statusExplanation}</div>
-      <div class="comparison-base">${salsaBaseNote}</div>
-    </div>
-    <div class="sektion-status-card ${tryggStatus.status}">
-      <div class="status-icon">${tryggStatus.icon}</div>
-      <h4>Trygghet & Studiero</h4>
-      <div class="status-word">${tryggStatus.statusWord}</div>
-      <div class="status-summary">${tryggStatus.summary}</div>
-      <div class="status-trend">${tryggStatus.trendIcon} ${tryggStatus.trendText} senaste året</div>
-      <div class="status-explanation">${tryggStatus.statusExplanation}</div>
-      <div class="comparison-base">${tryggBaseNote}</div>
-    </div>
-      `;
-    }
-
-    // Visa datakvalitetsnotis över styrande analys vid mock-fallback
-    let dqNotice = document.getElementById('dataQualityNotice');
-    if (!dqNotice) {
+  // Visa datakvalitetsnotis vid mock-fallback
+  let dqNotice = document.getElementById('dataQualityNotice');
+  if (!dqNotice) {
+    const styrandeAnalysContainer = document.getElementById('styrandeAnalys');
+    if (styrandeAnalysContainer) {
       dqNotice = document.createElement('div');
       dqNotice.id = 'dataQualityNotice';
       dqNotice.className = 'data-quality-notice';
-    // Prepend så den syns överst
-    styrandeAnalysContainer.prepend(dqNotice);
+      styrandeAnalysContainer.prepend(dqNotice);
     }
+  }
+  if (dqNotice) {
     if (anyMockBaseline) {
       dqNotice.textContent = 'Begränsad jämförelsedata: Vissa baslinjer kunde inte hämtas live. Ersättningsvärden används — tolka analys med försiktighet.';
       dqNotice.style.display = 'block';
     } else {
       dqNotice.style.display = 'none';
     }
-    
-    // 2. Generera insikter (Styrka/Risk/Hävstång)
-    const insikter = genereraInsikter(kpiData, groupAvgs);
-    const insiktGrid = document.getElementById('insiktGrid');
-    
-    if (!insiktGrid) {
-      console.warn('insiktGrid element not found in DOM');
-    } else {
-      insiktGrid.innerHTML = `
-    <div class="insikt-card styrka">
-      <h4>💪 Positivt</h4>
-      <div class="insikt-label">VAD:</div>
-      <p>${insikter.styrka}</p>
-      <div class="insikt-label">KONSEKVENS:</div>
-      <p class="insikt-consequence">Detta ger stabilitet och goda förutsättningar för fortsatt utveckling.</p>
-      <div class="insikt-label">REKOMMENDATION:</div>
-      <p class="insikt-action">Dokumentera och sprid framgångsfaktorer till andra delar av verksamheten.</p>
-    </div>
-    <div class="insikt-card risk">
-      <h4>⚠️ Risk</h4>
-      <div class="insikt-label">VAD:</div>
-      <p>${insikter.risk}</p>
-      <div class="insikt-label">KONSEKVENS:</div>
-      <p class="insikt-consequence">Risk för försämrade resultat om inget görs. Eleverna påverkas direkt.</p>
-      <div class="insikt-label">REKOMMENDATION:</div>
-      <p class="insikt-action">Prioritera detta i nästa arbetsplansperiod. Avsätt tid och resurser.</p>
-    </div>
-    <div class="insikt-card havstang">
-      <h4>🎯 Hävstång</h4>
-      <div class="insikt-label">VAD:</div>
-      <p>${insikter.havstang}</p>
-      <div class="insikt-label">KONSEKVENS:</div>
-      <p class="insikt-consequence">Detta är den mest effektiva vägen till förbättring baserat på data.</p>
-      <div class="insikt-label">REKOMMENDATION:</div>
-      <p class="insikt-action">Starta arbete omgående. Följ upp efter 3 månader.</p>
-    </div>
-    <div class="insikt-card uppmarksamma">
-      <h4>👀 Att uppmärksamma</h4>
-      <div class="insikt-label">VAD:</div>
-      <p>${insikter.uppmarksamma}</p>
-      <div class="insikt-label">KONSEKVENS:</div>
-      <p class="insikt-consequence">Tidiga signaler – följ upp innan det utvecklas till ett större problem.</p>
-      <div class="insikt-label">REKOMMENDATION:</div>
-      <p class="insikt-action">Planera riktade observationer/uppföljningar och justera arbetssätt vid behov.</p>
-    </div>
-      `;
-    }
-    
-    // 3. Generera narrativ text som punktlista
-    const narrativText = genereraNarrativText(kpiData, groupAvgs);
-    const narrativEl = document.getElementById('narrativText');
-    
-    if (!narrativEl) {
-      console.warn('narrativText element not found in DOM');
-    } else {
-      // Konvertera till strukturerad punktlista
-      const meningar = narrativText.split('. ').filter(m => m.length > 10);
-      const struktureradSammanfattning = `
-        <h4>Sammanfattning – Vad du behöver veta</h4>
-        <ul class="narrative-bullets">
-          <li><strong>📊 Nuläge:</strong> ${meningar[0] || 'Data analyseras...'}.</li>
-          <li><strong>⚡ Konsekvens:</strong> ${meningar[1] || 'Följ utvecklingen noga'}.</li>
-          <li><strong>✅ Positivt:</strong> ${meningar.find(m => m.includes('god') || m.includes('starka') || m.includes('över')) || 'Fortsätt nuvarande arbetssätt'}.</li>
-          <li><strong>🎯 Fokus framåt:</strong> ${meningar[meningar.length - 1] || 'Prioritera enligt rekommendationerna ovan'}.</li>
-        </ul>
-      `;
-      narrativEl.innerHTML = struktureradSammanfattning;
-    }
-    
-    // Visa analysen
-    styrandeAnalysContainer.style.display = 'block';
-    
-    // Add source attribution if not already present
-    let sourceAttribution = document.getElementById('sourceAttribution');
-    if (!sourceAttribution) {
-      sourceAttribution = document.createElement('div');
-      sourceAttribution.id = 'sourceAttribution';
-      sourceAttribution.style.cssText = 'margin-top: 30px; padding: 20px; background: #f8fafc; border-left: 4px solid #3b82f6; font-size: 0.875rem; color: #475569;';
-      sourceAttribution.innerHTML = '<strong>Källa:</strong> Kolada | <strong>Analysmotor:</strong> Peter Wenström';
-      styrandeAnalysContainer.appendChild(sourceAttribution);
-    }
   }
   
-  // === GAMMAL AUTOMATISK ANALYS (behålls längst ner) ===
-  const insights = genereraAutomatiskAnalys(kpiData);
-  const analysisEl = document.getElementById('analysisText');
-  
-  if (!analysisEl) {
-    console.warn('analysisText element not found in DOM - skipping automatisk analys rendering');
-  } else {
-    analysisEl.innerHTML = '<h4>Automatisk analys</h4>' + insights.map(i => `<p>${i}</p>`).join('');
-  }
+  // === DÖLJ GLOBAL LOADING SCREEN ===
+  hideGlobalLoading();
 }
 
 function showAnalysLoadingState() {
@@ -2046,11 +2066,6 @@ function showAnalysLoadingState() {
 
   const dqNotice = document.getElementById('dataQualityNotice');
   if (dqNotice) dqNotice.style.display = 'none';
-
-  const analysisEl = document.getElementById('analysisText');
-  if (analysisEl) {
-    analysisEl.innerHTML = '<h4>Automatisk analys</h4><p>Analys genereras...</p>';
-  }
 }
 
 function initKommuner(selectEl, defaultId = '0684') {
@@ -2082,12 +2097,6 @@ async function onKommunChange(kommunSelect, skolenhetSelect) {
     const el = document.getElementById(id);
     if (el) el.innerHTML='';
   });
-
-  // Välj och rendera automatiskt första skolenheten så styrande bild och analys syns direkt
-  if (enheter.length > 0) {
-    skolenhetSelect.value = enheter[0].id;
-    renderSections(enheter[0].id, kommunSelect.value);
-  }
 }
 
 function initDashboard() {
