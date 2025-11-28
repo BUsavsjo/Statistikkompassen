@@ -203,6 +203,7 @@ function createKPICard(kpi) {
   const isNPGap = kpi.id && (kpi.id.startsWith('U1542') || kpi.id.startsWith('U1543'));
   const isBaselineCount = kpi.id && (kpi.id === 'N11805' || kpi.id === 'N15807'); // Elevantal
   const isSALSA = kpi.id && kpi.id.startsWith('U154') && ['U15413', 'U15414', 'U15415', 'U15416'].includes(kpi.id);
+  const isSALSADeviationOnly = kpi.id === 'U15414' || kpi.id === 'U15416';
   const isStimulans = kpi.id && kpi.id === 'N15602'; // Stimulans - förklarare/klimatindikator
   
   // Bestäm färgindikator baserat på trend-status (förbättring, försämring, stabil)
@@ -256,6 +257,29 @@ function createKPICard(kpi) {
   const comparisonDiv = document.createElement('div');
   comparisonDiv.className = 'kpi-comparison';
   
+  // För elevantal: visa bara kontext-badge, ingen jämförelse
+  if (isBaselineCount) {
+    const contextBadge = document.createElement('div');
+    contextBadge.className = 'context-badge';
+    contextBadge.innerHTML = '📌 Kontext/volym (ingen värdering)';
+    contextBadge.style.cssText = 'display: inline-block; margin-top: 8px; padding: 4px 10px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 12px; font-size: 0.75rem; color: #64748b; font-weight: 500;';
+    comparisonDiv.appendChild(contextBadge);
+    
+    // Visa endast trend om den finns
+    if (kpi.trendData && kpi.trendData.diff3 !== null) {
+      const trendInfo = document.createElement('div');
+      trendInfo.style.cssText = 'margin-top: 6px; font-size: 0.85rem; color: #64748b;';
+      trendInfo.textContent = `${kpi.trendData.dir === 'improving' ? '↗' : kpi.trendData.dir === 'declining' ? '↘' : '→'} ${formatDiff(Math.abs(kpi.trendData.diff3 || 0), kpi.unit)} (3 år)`;
+      comparisonDiv.appendChild(trendInfo);
+    }
+  } else if (isSALSADeviationOnly) {
+    // För SALSA U15414/U15416 – visa endast trendtext (ingen jämförelse)
+    const trendText = kpi.trendText || (kpi.trendData?.diff3 != null
+      ? `${kpi.trendData.diff3 >= 0 ? '↗' : kpi.trendData.diff3 < 0 ? '↘' : '→'} ${formatDiff(Math.abs(kpi.trendData.diff3), kpi.unit)} (3 år)`
+      : '→ stabilt (3 år)');
+    comparisonDiv.textContent = trendText;
+  } else {
+  
   if (kpi.comparisonData && kpi.comparisonData.available) {
     const comp = kpi.comparisonData;
     const rule = comp.rule_bucket;
@@ -303,6 +327,7 @@ function createKPICard(kpi) {
   } else {
     // Fallback till gammal trendtext om ingen comparisonData
     comparisonDiv.textContent = kpi.trendText || 'Ingen jämförelsedata';
+  }
   }
 
   const analysis = document.createElement('div');
@@ -609,6 +634,9 @@ function beraknaSektionStatus(kpiList, kpiData, groupAvgs = {}) {
     const data = kpiData[kpiDef.id];
     if (!data || data.latest == null) return; // Skippa saknad data
     
+    // Exkludera kontextindikatorer från trafikljus
+    if (excludedFromTrafficLight.has(kpiDef.id)) return;
+    
     const groupAvg = groupAvgs[kpiDef.id] || null;
     const klassif = klassificeraKPI(data, groupAvg);
     
@@ -678,6 +706,16 @@ const excludedRiskIds = new Set([
 ]);
 
 /**
+ * KPI:er som ska uteslutas från trafikljusberäkning i sektionsstatus
+ * Samma som excludedRiskIds - används i beraknaSektionStatus
+ */
+const excludedFromTrafficLight = new Set([
+  'U15429', 'U15430', 'U15431', 'U15432', 'U15433', 'U15434',
+  'U15413', 'U15415',
+  'N11805', 'N15807'
+]);
+
+/**
  * Kontrollerar om ett KPI-ID ska uteslutas från risk/styrka-beräkning
  * @param {string} id - KPI-ID
  * @returns {boolean}
@@ -705,7 +743,7 @@ function genereraInsikter(kpiData, groupAvgs = {}) {
     const data = kpiData[kpiDef.id];
     if (!data || data.latest == null) return;
     
-    // Uteslut förklarare/kontextindikatorer från risk/styrka-beräkning
+    // Uteslut förklarare/kontextindikatorer från risk/styrka-beräkning (inkl elevantal)
     if (isExcludedFromRisk(kpiDef.id)) return;
     
     const groupAvg = groupAvgs[kpiDef.id] || null;
@@ -1174,11 +1212,13 @@ function analyseraF6Resultat(kpiData, groupAvgs) {
 function genereraNarrativText(kpiData, groupAvgs = {}) {
   const meningar = [];
   
-  // 1. Förutsättningar (elevantal, elever per lärare, behörighet)
+  // 1. Förutsättningar (elevantal som KONTEXT, elever per lärare, behörighet)
+  // OBS: Elevantal används endast som kontextinformation, aldrig som risk/styrka
   const elevantal = kpiData['N15807'];
   const eleverPerLarare = kpiData['N15034'];
   const behorighetLarare = kpiData['N15813'];
   
+  // Elevantal endast som kontextförklaring för datakvalitet
   if (elevantal?.latest && elevantal.latest < 50) {
     meningar.push(`Skolan har en liten elevkull (${Math.round(elevantal.latest)} elever), vilket kan ge varierande resultat mellan år.`);
   } else if (eleverPerLarare?.latest && eleverPerLarare.latest > 15) {
