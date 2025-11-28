@@ -74,6 +74,14 @@ const OUTCOME_KPIS = [
   { id: 'U15434', label: 'Åk 9: Lägre slutbetyg än NP i svenska', unit: '%', stage: '79' }
 ];
 
+// Ämnessektioner: filtrera ut KPIer per ämne för separata sektioner
+const SVENSKA_KPIS = OUTCOME_KPIS.filter(def => ['N15488','N15510','N15516','U15433','U15434'].includes(def.id));
+const MATEMATIK_KPIS = OUTCOME_KPIS.filter(def => ['N15485','N15509','N15523','U15429','U15430'].includes(def.id));
+const ENGELSKA_KPIS = OUTCOME_KPIS.filter(def => ['N15482','U15431','U15432'].includes(def.id));
+
+// Resultatsammanfattning: KPIer som ska ligga kvar under "Resultat"
+const OUTCOME_SUMMARY_KPIS = OUTCOME_KPIS.filter(def => ['N15539','N15418','N15419','N15436','N15505'].includes(def.id));
+
 const SALSA_KPIS = [
   { id: 'U15413', label: 'Åk 9: SALSA-modell förväntat (alla ämnen)', unit: '%' },
   { id: 'U15414', label: 'Åk 9: Avvikelse faktisk vs SALSA-modell (%)', unit: 'procentenheter' },
@@ -327,7 +335,8 @@ async function hamtaSkolenheterForKommun(kommunId) {
 }
 
 function kpiDefsOutcome() {
-  return OUTCOME_KPIS;
+  // Använd endast sammanfattnings-KPIer i Resultat-sektionen
+  return OUTCOME_SUMMARY_KPIS;
 }
 
 // ===== ANALYSMOTOR: Klassificering och beräkningar =====
@@ -1683,58 +1692,37 @@ async function renderSections(ouId, municipalityCode = null) {
   // Hämta skoltyp för filtrering av resultatgrupper
   const schoolType = await detectSchoolType(ouId);
   
-  // Hämta baseline, SALSA och trygghet med vanlig rendering
-  const [baselineResult, salsaResult, tryggResult] = await Promise.all([
+  // Rendera sektioner: Baseline, ämnessektioner och Resultat-sammanfattning
+  const [baselineResult, svenskaResult, matematikResult, engelskaResult, outcomeResult, salsaResult, tryggResult] = await Promise.all([
     renderSection('baselineKPIs', BASELINE_KPIS, ouId, kpiData, municipalityCode),
+    renderSection('svenskaKPIs', SVENSKA_KPIS, ouId, kpiData, municipalityCode),
+    renderSection('matematikKPIs', MATEMATIK_KPIS, ouId, kpiData, municipalityCode),
+    renderSection('engelskaKPIs', ENGELSKA_KPIS, ouId, kpiData, municipalityCode),
+    renderSection('outcomeKPIs', kpiDefsOutcome(), ouId, kpiData, municipalityCode),
     renderSection('salsaKPIs', SALSA_KPIS, ouId, kpiData, municipalityCode),
     renderSection('trygghetsKPIs', TRYG_KPIS, ouId, kpiData, municipalityCode)
   ]);
   
-  // Hämta outcome-kort manuellt för grupperad rendering
-  setLoading('outcomeKPIs', true);
-  const outcomeDefs = kpiDefsOutcome();
-  console.log('DEBUG kpiDefsOutcome returned:', outcomeDefs.length, 'definitions');
-  console.log('DEBUG KPI IDs:', outcomeDefs.map(d => d.id));
-  
-  const outcomeCardPromises = outcomeDefs.map(async (def) => {
-    const card = await hamtaKpiCardData(ouId, def, municipalityCode);
-    return { card, def };
-  });
-  const outcomeCards = await Promise.all(outcomeCardPromises);
-  
-  console.log('DEBUG outcomeCards loaded:', outcomeCards.length, 'cards');
-  if (outcomeCards.length === 0) {
-    console.error('No outcome cards loaded!');
-  }
-  
-  // Build realAvgs for outcome KPIs using helper function
-  const { realAvgs: outcomeRealAvgs, hasMock: outcomeHasMock } = buildRealAverages(outcomeCards, pickBaseline);
-  
   // Slå ihop alla realAvgs från sektionerna
   const groupAvgs = {
     ...baselineResult.realAvgs,
+    ...svenskaResult.realAvgs,
+    ...matematikResult.realAvgs,
+    ...engelskaResult.realAvgs,
+    ...outcomeResult.realAvgs,
     ...salsaResult.realAvgs,
-    ...tryggResult.realAvgs,
-    ...outcomeRealAvgs
+    ...tryggResult.realAvgs
   };
-  
-  console.log('DEBUG before renderGroupedOutcomeKPIs:', {
-    outcomeCardsCount: outcomeCards.length,
-    outcomeCardIds: outcomeCards.map(c => c.def.id),
-    schoolType,
-    groupAvgsKeys: Object.keys(groupAvgs)
-  });
-  
-  // Rendera grupperade resultat-KPIer
-  renderGroupedOutcomeKPIs('outcomeKPIs', outcomeCards, kpiData, groupAvgs, schoolType);
-  // setLoading redan hanterad i renderGroupedOutcomeKPIs genom sectionEl.innerHTML = ''
 
   // Data-kvalitet: markera om ersättningsvärden (mock) användes i någon sektion
   const anyMockBaseline = (
     baselineResult.sectionHasMock ||
+    svenskaResult.sectionHasMock ||
+    matematikResult.sectionHasMock ||
+    engelskaResult.sectionHasMock ||
+    outcomeResult.sectionHasMock ||
     salsaResult.sectionHasMock ||
-    tryggResult.sectionHasMock ||
-    outcomeHasMock
+    tryggResult.sectionHasMock
   );
 
   // === GENERERA OCH VISA STYRANDE ANALYS ===
@@ -1753,6 +1741,9 @@ async function renderSections(ouId, municipalityCode = null) {
   } else {
     // 1. Beräkna sektionsstatus (trafikljus)
     const baselineStatus = beraknaSektionStatus(BASELINE_KPIS, kpiData, groupAvgs);
+    const svenskaStatus = beraknaSektionStatus(SVENSKA_KPIS, kpiData, groupAvgs);
+    const matematikStatus = beraknaSektionStatus(MATEMATIK_KPIS, kpiData, groupAvgs);
+    const engelskaStatus = beraknaSektionStatus(ENGELSKA_KPIS, kpiData, groupAvgs);
     const outcomeStatus = beraknaSektionStatus(kpiDefsOutcome(), kpiData, groupAvgs);
     const salsaStatus = beraknaSektionStatus(SALSA_KPIS, kpiData, groupAvgs);
     const tryggStatus = beraknaSektionStatus(TRYG_KPIS, kpiData, groupAvgs);
@@ -1765,7 +1756,16 @@ async function renderSections(ouId, municipalityCode = null) {
       const baselineBaseNote = baselineResult.sectionHasMock
     ? 'Jämfört med: Liknande skolor (F-9) + ersättningsvärde för saknade'
     : 'Jämfört med: Liknande skolor (F-9)';
-  const outcomeBaseNote = outcomeHasMock
+  const svenskaBaseNote = svenskaResult.sectionHasMock
+    ? 'Jämfört med: Liknande skolor (F-9) + ersättningsvärde för saknade'
+    : 'Jämfört med: Liknande skolor (F-9)';
+  const matematikBaseNote = matematikResult.sectionHasMock
+    ? 'Jämfört med: Liknande skolor (F-9) + ersättningsvärde för saknade'
+    : 'Jämfört med: Liknande skolor (F-9)';
+  const engelskaBaseNote = engelskaResult.sectionHasMock
+    ? 'Jämfört med: Liknande skolor (F-9) + ersättningsvärde för saknade'
+    : 'Jämfört med: Liknande skolor (F-9)';
+  const outcomeBaseNote = outcomeResult.sectionHasMock
     ? 'Jämfört med: Liknande skolor (F-9) + ersättningsvärde för saknade'
     : 'Jämfört med: Liknande skolor (F-9)';
   const salsaBaseNote = salsaResult.sectionHasMock
@@ -1784,6 +1784,33 @@ async function renderSections(ouId, municipalityCode = null) {
       <div class="status-trend">${baselineStatus.trendIcon} ${baselineStatus.trendText} senaste året</div>
       <div class="status-explanation">${baselineStatus.statusExplanation}</div>
       <div class="comparison-base">${baselineBaseNote}</div>
+    </div>
+    <div class="sektion-status-card ${svenskaStatus.status}">
+      <div class="status-icon">${svenskaStatus.icon}</div>
+      <h4>Svenska</h4>
+      <div class="status-word">${svenskaStatus.statusWord}</div>
+      <div class="status-summary">${svenskaStatus.summary}</div>
+      <div class="status-trend">${svenskaStatus.trendIcon} ${svenskaStatus.trendText} senaste året</div>
+      <div class="status-explanation">${svenskaStatus.statusExplanation}</div>
+      <div class="comparison-base">${svenskaBaseNote}</div>
+    </div>
+    <div class="sektion-status-card ${matematikStatus.status}">
+      <div class="status-icon">${matematikStatus.icon}</div>
+      <h4>Matematik</h4>
+      <div class="status-word">${matematikStatus.statusWord}</div>
+      <div class="status-summary">${matematikStatus.summary}</div>
+      <div class="status-trend">${matematikStatus.trendIcon} ${matematikStatus.trendText} senaste året</div>
+      <div class="status-explanation">${matematikStatus.statusExplanation}</div>
+      <div class="comparison-base">${matematikBaseNote}</div>
+    </div>
+    <div class="sektion-status-card ${engelskaStatus.status}">
+      <div class="status-icon">${engelskaStatus.icon}</div>
+      <h4>Engelska</h4>
+      <div class="status-word">${engelskaStatus.statusWord}</div>
+      <div class="status-summary">${engelskaStatus.summary}</div>
+      <div class="status-trend">${engelskaStatus.trendIcon} ${engelskaStatus.trendText} senaste året</div>
+      <div class="status-explanation">${engelskaStatus.statusExplanation}</div>
+      <div class="comparison-base">${engelskaBaseNote}</div>
     </div>
     <div class="sektion-status-card ${outcomeStatus.status}">
       <div class="status-icon">${outcomeStatus.icon}</div>
@@ -2013,7 +2040,10 @@ async function onKommunChange(kommunSelect, skolenhetSelect) {
     o.value=e.id; o.textContent=e.title; skolenhetSelect.appendChild(o);
   });
   skolenhetSelect.disabled = false;
-  ['baselineKPIs','outcomeKPIs','salsaKPIs','trygghetsKPIs'].forEach(id => document.getElementById(id).innerHTML='');
+  ['baselineKPIs','outcomeKPIs','svenskaKPIs','matematikKPIs','engelskaKPIs','salsaKPIs','trygghetsKPIs'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML='';
+  });
 
   // Välj och rendera automatiskt första skolenheten så styrande bild och analys syns direkt
   if (enheter.length > 0) {
@@ -2022,30 +2052,11 @@ async function onKommunChange(kommunSelect, skolenhetSelect) {
   }
 }
 
-function initFilterButtons(filterF6Btn, filter79Btn, skolenhetSelect) {
-  filterF6Btn.addEventListener('click', () => {
-    filterState.hideF6 = !filterState.hideF6;
-    filterF6Btn.classList.toggle('active', filterState.hideF6);
-    const ouId = skolenhetSelect.value;
-    if (ouId) renderSections(ouId);
-  });
-
-  filter79Btn.addEventListener('click', () => {
-    filterState.hide79 = !filterState.hide79;
-    filter79Btn.classList.toggle('active', filterState.hide79);
-    const ouId = skolenhetSelect.value;
-    if (ouId) renderSections(ouId);
-  });
-}
-
 function initDashboard() {
   const kommunSelect = document.getElementById('kommunSelect');
   const skolenhetSelect = document.getElementById('skolenhetSelect');
-  const filterF6Btn = document.getElementById('filterF6');
-  const filter79Btn = document.getElementById('filter79');
 
   initKommuner(kommunSelect);
-  initFilterButtons(filterF6Btn, filter79Btn, skolenhetSelect);
 
   kommunSelect.addEventListener('change', () => onKommunChange(kommunSelect, skolenhetSelect));
   skolenhetSelect.addEventListener('change', () => {
