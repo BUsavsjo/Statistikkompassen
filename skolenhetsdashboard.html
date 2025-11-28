@@ -70,36 +70,6 @@
       cursor: not-allowed;
     }
     
-    .filter-buttons {
-      display: flex;
-      gap: 0.75rem;
-      margin-top: 1rem;
-      flex-wrap: wrap;
-    }
-    
-    .filter-btn {
-      padding: 0.5rem 1rem;
-      border: 2px solid #e2e8f0;
-      background: white;
-      border-radius: 8px;
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: #64748b;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    
-    .filter-btn:hover {
-      border-color: #667eea;
-      color: #667eea;
-    }
-    
-    .filter-btn.active {
-      background: #667eea;
-      color: white;
-      border-color: #667eea;
-    }
-    
     /* === STYRANDE ANALYS CSS === */
     .styrande-analys-container {
       background: white;
@@ -674,10 +644,6 @@
         </select>
       </div>
     </div>
-    <div class="filter-buttons">
-      <button class="filter-btn" id="filterF6" data-filter="f6">Dölj F-6</button>
-      <button class="filter-btn" id="filter79" data-filter="79">Dölj åk 7-9</button>
-    </div>
   </div>
 
   <a href="index.html" class="back-link">← Till startsidan</a>
@@ -726,6 +692,24 @@
         bedömningsunderlag eller likvärdighet. Ett balanserat gap (&lt;5 p.p) indikerar god kalibrering.
       </p>
       <div class="kpi-grid" id="outcomeKPIs"></div>
+    </div>
+
+    <!-- Svenska Section -->
+    <div class="dashboard-section">
+      <h2>📚 Svenska</h2>
+      <div class="kpi-grid" id="svenskaKPIs"></div>
+    </div>
+
+    <!-- Matematik Section -->
+    <div class="dashboard-section">
+      <h2>🔢 Matematik</h2>
+      <div class="kpi-grid" id="matematikKPIs"></div>
+    </div>
+
+    <!-- Engelska Section -->
+    <div class="dashboard-section">
+      <h2>🌍 Engelska</h2>
+      <div class="kpi-grid" id="engelskaKPIs"></div>
     </div>
 
     <!-- SALSA Section -->
