@@ -581,6 +581,20 @@ function createNPGapCard(hogreKPI, lagreKPI, amne) {
   } else {
     value.textContent = '— Saknar data';
   }
+
+  // Tydliggörande rad(er) under pilarna
+  const info = document.createElement('div');
+  info.className = 'np-info';
+  info.style.cssText = 'margin-top: 6px; font-size: 0.85rem; color: #64748b; line-height: 1.25;';
+  if (npAnalys.hogreAndel != null && npAnalys.lagreAndel != null) {
+    info.innerHTML = `
+      Högre än NP (senaste år): ${npAnalys.hogreAndel.toFixed(1)}%<br/>
+      Lägre än NP (senaste år): ${npAnalys.lagreAndel.toFixed(1)}%<br/>
+      Trend netto-gap (3 år): ${npAnalys.trendText}
+    `;
+  } else {
+    info.textContent = 'Nuläge senaste år. Trend avser förändring 3 år.';
+  }
   
   // Badges och riskindikatorer
   const badgesDiv = document.createElement('div');
@@ -620,6 +634,7 @@ function createNPGapCard(hogreKPI, lagreKPI, amne) {
   card.appendChild(label);
   card.appendChild(kpiId);
   card.appendChild(value);
+  card.appendChild(info);
   card.appendChild(badgesDiv);
   card.appendChild(analysis);
   
