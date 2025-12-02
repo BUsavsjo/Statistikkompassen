@@ -60,10 +60,9 @@ const OUTCOME_KPIS = [
   { id: 'N15419', label: 'Åk 9: Alla ämnen godkända', unit: '%', stage: '79' },
   { id: 'N15436', label: 'Åk 9: Behöriga till yrkesprogram (kommun)', unit: '%', stage: '79' },
   { id: 'N15505', label: 'Åk 9: Meritvärde (17 ämnen)', unit: 'poäng', stage: '79' },
-  { id: 'N15482', label: 'Åk 9: Engelska minst E', unit: '%', stage: '79' },
-  { id: 'N15485', label: 'Åk 9: Matematik minst E', unit: '%', stage: '79' },
-  { id: 'N15488', label: 'Åk 9: Svenska minst E', unit: '%', stage: '79' },
-  { id: 'N15516', label: 'Åk 9: Svenska som andraspråk minst E', unit: '%', stage: '79' },
+  { id: 'N15494', label: 'Åk 9: Engelska minst E', unit: '%', stage: '79' },
+  { id: 'N15497', label: 'Åk 9: Matematik minst E', unit: '%', stage: '79' },
+  { id: 'N15498', label: 'Åk 9: Svenska minst E', unit: '%', stage: '79' },
   { id: 'N15523', label: 'Åk 9: Betygspoäng i matematik', unit: 'poäng', stage: '79' },
   // NP-gap
   { id: 'U15429', label: 'Åk 9: Högre slutbetyg än NP i matematik', unit: '%', stage: '79' },
@@ -75,9 +74,9 @@ const OUTCOME_KPIS = [
 ];
 
 // Ämnessektioner: filtrera ut KPIer per ämne för separata sektioner
-const SVENSKA_KPIS = OUTCOME_KPIS.filter(def => ['N15488','N15510','N15516','U15433','U15434'].includes(def.id));
-const MATEMATIK_KPIS = OUTCOME_KPIS.filter(def => ['N15485','N15509','N15523','U15429','U15430'].includes(def.id));
-const ENGELSKA_KPIS = OUTCOME_KPIS.filter(def => ['N15482','U15431','U15432'].includes(def.id));
+const SVENSKA_KPIS = OUTCOME_KPIS.filter(def => ['N15488','N15498','N15510','N15516','U15433','U15434'].includes(def.id));
+const MATEMATIK_KPIS = OUTCOME_KPIS.filter(def => ['N15485','N15497','N15509','N15523','U15429','U15430'].includes(def.id));
+const ENGELSKA_KPIS = OUTCOME_KPIS.filter(def => ['N15482','N15494','U15431','U15432'].includes(def.id));
 
 // Resultatsammanfattning: KPIer som ska ligga kvar under "Resultat"
 const OUTCOME_SUMMARY_KPIS = OUTCOME_KPIS.filter(def => ['N15539','N15418','N15419','N15436','N15505'].includes(def.id));
