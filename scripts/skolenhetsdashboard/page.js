@@ -285,6 +285,46 @@ function createKPICard(kpi) {
   const mainValue = `${kpi.value ?? '—'} ${kpi.unit || ''}`.trim();
   value.textContent = mainValue;
 
+  // Mini-staplar: visa årets och föregående års värde för meritvärde åk 9
+  // Förutsätter att trendData har latestYear/prevYear + latest/previous
+  const isMeritAk9 = kpi.id === 'N15503' || kpi.id === 'N15505' || (typeof kpi.label === 'string' && /meritvärde/i.test(kpi.label));
+  if (isMeritAk9 && kpi.trendData) {
+    const latest = kpi.trendData.latest;
+    const previous = kpi.trendData.previous;
+    const latestYear = kpi.trendData.latestYear;
+    const previousYear = kpi.trendData.previousYear;
+
+    if (latest != null && previous != null) {
+      const maxVal = Math.max(Number(latest), Number(previous));
+      const minVal = 0;
+      const denom = Math.max(1, maxVal - minVal);
+      const wLatest = Math.max(5, Math.round(((Number(latest) - minVal) / denom) * 100));
+      const wPrev = Math.max(5, Math.round(((Number(previous) - minVal) / denom) * 100));
+
+      const bars = document.createElement('div');
+      bars.className = 'kpi-mini-bars';
+
+      const rowPrev = document.createElement('div');
+      rowPrev.className = 'kpi-mini-bar-row';
+      rowPrev.innerHTML = `
+        <div class="kpi-mini-bar-year">${previousYear ?? 'Föreg.'}</div>
+        <div class="kpi-mini-bar-track"><div class="kpi-mini-bar kpi-mini-bar-prev" style="width:${wPrev}%"></div></div>
+        <div class="kpi-mini-bar-value">${Number(previous).toFixed(1)}</div>
+      `;
+
+      const rowLatest = document.createElement('div');
+      rowLatest.className = 'kpi-mini-bar-row';
+      rowLatest.innerHTML = `
+        <div class="kpi-mini-bar-year">${latestYear ?? 'I år'}</div>
+        <div class="kpi-mini-bar-track"><div class="kpi-mini-bar kpi-mini-bar-latest" style="width:${wLatest}%"></div></div>
+        <div class="kpi-mini-bar-value">${Number(latest).toFixed(1)}</div>
+      `;
+
+      bars.append(rowPrev, rowLatest);
+      card.appendChild(bars);
+    }
+  }
+
   // Jämförelsesektion (om comparisonData finns)
   const comparisonDiv = document.createElement('div');
   comparisonDiv.className = 'kpi-comparison';
@@ -1368,27 +1408,50 @@ function genereraNarrativText(kpiData, groupAvgs = {}) {
  * @returns {object} Trend information
  */
 function beraknaTrendtext(unit, values) {
-  const serie = (values || []).filter(v => v != null);
+  // values kan vara en ren sifferserie (t.ex. [1,2,3]) eller en serie av objekt
+  // (t.ex. [{period: 2023, value: 210.4}, ...]) beroende på datakälla.
+  const raw = Array.isArray(values) ? values : [];
+  const asPoints = raw
+    .map(v => {
+      if (v == null) return null;
+      if (typeof v === 'number') return { value: v, year: null };
+      if (typeof v === 'object') {
+        const year = v.period ?? v.year ?? v.ar ?? null;
+        const value = v.value ?? v.varde ?? null;
+        if (value == null) return null;
+        return { value: Number(value), year: year != null ? Number(year) : null };
+      }
+      return null;
+    })
+    .filter(p => p && p.value != null && !Number.isNaN(p.value));
+
+  const serie = asPoints;
   
   if (serie.length === 0) {
-    return { dir: 'stable', arrow: '→', text: 'Ingen data', analysis: 'Data saknas.', latest: null, diff1: null, diff3: null };
+    return { dir: 'stable', arrow: '→', text: 'Ingen data', analysis: 'Data saknas.', latest: null, previous: null, latestYear: null, previousYear: null, diff1: null, diff3: null };
   }
   
-  const latest = serie[serie.length - 1];
-  const prev = serie[serie.length - 2] ?? null;
-  const prev3 = serie.length >= 4 ? serie[serie.length - 4] : null;
+  const latestPoint = serie[serie.length - 1];
+  const prevPoint = serie[serie.length - 2] ?? null;
+  const prev3Point = serie.length >= 4 ? serie[serie.length - 4] : null;
+
+  const latest = latestPoint?.value ?? null;
+  const previous = prevPoint?.value ?? null;
+  const latestYear = latestPoint?.year ?? null;
+  const previousYear = prevPoint?.year ?? null;
+  const prev3 = prev3Point?.value ?? null;
   
   let dir = 'stable', arrow = '→', text = 'Stabil';
   let diff1 = null, diff3 = null;
   
   // Prioritize 3-year trend if available
-  if (prev3 !== null) {
+  if (prev3 !== null && latest !== null) {
     diff3 = latest - prev3;
     if (diff3 > 0.5) { dir = 'improving'; arrow = '↗'; }
     else if (diff3 < -0.5) { dir = 'declining'; arrow = '↘'; }
     text = `${formatDiff(diff3, unit)} på 3 år`;
-  } else if (prev !== null) {
-    diff1 = latest - prev;
+  } else if (previous !== null && latest !== null) {
+    diff1 = latest - previous;
     if (diff1 > 0.05) { dir = 'improving'; arrow = '↗'; }
     else if (diff1 < -0.05) { dir = 'declining'; arrow = '↘'; }
     text = `${formatDiff(diff1, unit)} på 1 år`;
@@ -1402,7 +1465,7 @@ function beraknaTrendtext(unit, values) {
     stable: 'Stabil nivå.'
   };
   
-  return { dir, arrow, text, analysis: ANALYSIS_TEXT[dir], latest, diff1, diff3 };
+  return { dir, arrow, text, analysis: ANALYSIS_TEXT[dir], latest, previous, latestYear, previousYear, diff1, diff3 };
 }
 
 /**
@@ -1439,7 +1502,7 @@ async function hamtaKpiCardData(ouId, def, municipalityCode = '0684') {
           trendArrow: '→', 
           trendText: 'Ingen data', 
           analysis: 'Data saknas för denna indikator.', 
-          trendData: { dir: null, latest: null, diff1: null, diff3: null },
+          trendData: { dir: null, latest: null, previous: null, latestYear: null, previousYear: null, diff1: null, diff3: null },
           comparisonData: null
         };
       }
@@ -1474,7 +1537,7 @@ async function hamtaKpiCardData(ouId, def, municipalityCode = '0684') {
         trendArrow: trend.arrow, 
         trendText: trend.text, 
         analysis: trend.analysis, 
-        trendData: { dir: trend.dir, latest: trend.latest, diff1: trend.diff1, diff3: trend.diff3 },
+        trendData: { dir: trend.dir, latest: trend.latest, previous: trend.previous, latestYear: trend.latestYear, previousYear: trend.previousYear, diff1: trend.diff1, diff3: trend.diff3 },
         comparisonData: comparisonData
       };
     } catch (error) {
@@ -1491,7 +1554,7 @@ async function hamtaKpiCardData(ouId, def, municipalityCode = '0684') {
         trendArrow: '→', 
         trendText: 'Fel vid hämtning', 
         analysis: 'Kunde inte ladda data just nu.', 
-        trendData: { dir: null, latest: null, diff1: null, diff3: null },
+        trendData: { dir: null, latest: null, previous: null, latestYear: null, previousYear: null, diff1: null, diff3: null },
         comparisonData: null
       };
     }

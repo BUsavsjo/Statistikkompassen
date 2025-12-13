@@ -2,7 +2,7 @@
 <html lang="sv">
 <head>
   <meta charset="UTF-8">
-  <title>Skolenhetsdashboard för rektorer</title>
+  <title>Kommunbild – verksamhetens kvalitet</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="styles/betygkolada.css">
   <link rel="stylesheet" href="styles/skolenhetsdashboard.css">
@@ -700,7 +700,7 @@
   </style>
 </head>
 <body data-skoltyp="grundskola">
-  <h1 id="pageTitle">Skolenhetsdashboard för rektorer</h1>
+  <h1 id="pageTitle">Kommunbild – verksamhetens kvalitet</h1>
 
   <div class="kpi-selector">
     <div class="selector-row">
@@ -709,9 +709,9 @@
         <select id="kommunSelect"></select>
       </div>
       <div class="selector-group">
-        <label for="skolenhetSelect">Välj skolenhet:</label>
-        <select id="skolenhetSelect" disabled>
-          <option value="">Hämtar skolenheter...</option>
+        <label for="qualityYearSelect">År (senaste med data):</label>
+        <select id="qualityYearSelect" disabled>
+          <option value="">Välj kommun först...</option>
         </select>
       </div>
     </div>
@@ -732,11 +732,32 @@
 
   <a href="index.html" class="back-link">← Till startsidan</a>
 
-  <div id="stageDetection"></div>
+  <div id="stageDetection" style="display:none;"></div>
 
-  <!-- Dashboard content rendered below -->
+  <!-- Kommunbild content rendered below -->
 
   <div id="dashboardContent">
+
+    <div class="dashboard-section" id="kommunbildIntro">
+      <h2>Översikt</h2>
+      <p class="panel-description">
+        Kommunbilden sammanfattar verksamhetens kvalitet med nyckeltal från Kolada.
+        Varje kort visar kommunens värde, förändring mot föregående år (om möjligt) och rank jämfört med alla kommuner.
+        Diagram (där det finns) visar kommunvärde jämfört med "alla kommuner" (median/medel beroende på KPI).
+      </p>
+      <div id="kommunbildStatus" class="narrativ-text" style="display:none;"></div>
+    </div>
+
+    <div class="dashboard-section" id="kommunbildQuality">
+      <h2>Kommunbild av verksamhetens kvalitet</h2>
+      <div id="qualityBlocks"></div>
+    </div>
+
+    <div class="dashboard-section" id="kommunbildOrg">
+      <h2>Organisation &amp; struktur</h2>
+      <p class="panel-description">Nyckeltal om resurser, struktur och organisation. Visas som tabell (utan diagram).</p>
+      <div id="orgTableContainer"></div>
+    </div>
 
     <!-- Styrande analys section (visas före KPI-kort) -->
     <div id="styrandeAnalys" class="styrande-analys-container" style="display:none;">
@@ -755,13 +776,13 @@
       <div class="narrativ-text" id="narrativText"></div>
     </div>
 
-    <!-- Förutsättningar Section -->
+    <!-- Förutsättningar Section (skolenhetsdashboard) -->
     <div class="dashboard-section">
       <h2>Förutsättningar</h2>
       <div class="kpi-grid" id="baselineKPIs"></div>
     </div>
 
-    <!-- Resultat Section -->
+    <!-- Resultat Section (skolenhetsdashboard) -->
     <div class="dashboard-section">
       <h2>Resultat</h2>
       <p class="panel-description">
@@ -778,38 +799,38 @@
       <div class="kpi-grid" id="outcomeKPIs"></div>
     </div>
 
-    <!-- Svenska Section -->
+    <!-- Svenska Section (skolenhetsdashboard) -->
     <div class="dashboard-section">
       <h2>📚 Svenska</h2>
       <div class="kpi-grid" id="svenskaKPIs"></div>
     </div>
 
-    <!-- Matematik Section -->
+    <!-- Matematik Section (skolenhetsdashboard) -->
     <div class="dashboard-section">
       <h2>🔢 Matematik</h2>
       <div class="kpi-grid" id="matematikKPIs"></div>
     </div>
 
-    <!-- Engelska Section -->
+    <!-- Engelska Section (skolenhetsdashboard) -->
     <div class="dashboard-section">
       <h2>🌍 Engelska</h2>
       <div class="kpi-grid" id="engelskaKPIs"></div>
     </div>
 
-    <!-- SALSA Section -->
+    <!-- SALSA Section (skolenhetsdashboard) -->
     <div class="dashboard-section">
       <h2>SALSA/Resultat givet förutsättningar</h2>
       <p class="panel-description">SALSA visar skolans resultat i relation till elevförutsättningar – en positiv avvikelse betyder att skolan presterar över förväntan, en negativ att resultaten ligger under förväntan.</p>
       <div class="kpi-grid" id="salsaKPIs"></div>
     </div>
 
-    <!-- Trygghet Section -->
+    <!-- Trygghet Section (skolenhetsdashboard) -->
     <div class="dashboard-section">
       <h2>Trygghet åk 5</h2>
       <div class="kpi-grid" id="trygghetsKPIs"></div>
     </div>
   </div>
 
-  <script type="module" src="scripts/skolenhetsdashboard/page.js"></script>
+  <script type="module" src="scripts/kommunbild/page.js"></script>
 </body>
 </html>
