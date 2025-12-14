@@ -26,6 +26,8 @@ const KPI_BLOCKS = [
       { id: "U15456", label: "Åk 9: Alla ämnen godkända (modellberäknat)", unit: "%", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
       { id: "U15402", label: "Elevenkätsindex åk 8", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
       { id: "U15200", label: "Medarbetarengagemang grundskola och förskoleklass", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
+      { id: "U15900", label: "Effektivitetsindex kommunal grundskola F-9", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
+      { id: "U15010", label: "Resursindex kommunal grundskola F-9", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
     ],
   },
   {
@@ -40,17 +42,15 @@ const KPI_BLOCKS = [
   {
     title: "Nationella prov – genomförande",
     kpis: [
-      { id: "N15473", label: "Andel elever som deltagit i NP Svenska åk 3", unit: "%", higherIsBetter: true, kpi_type: "N", rankable: true },
-      { id: "N15472", label: "Andel elever som deltagit i NP Matematik åk 3", unit: "%", higherIsBetter: true, kpi_type: "N", rankable: true },
+      { id: "N15473", label: "Elever i åk 3 som klarat alla delar av nationella proven för ämnesprovet i matematik, hemkommun, andel (%)", unit: "%", higherIsBetter: true, kpi_type: "N", rankable: true },
+      { id: "N15472", label: "Elever i åk 3 som klarat alla delar av nationella proven för ämnesprovet i svenska och svenska som andraspråk, hemkommun, andel (%)", unit: "%", higherIsBetter: true, kpi_type: "N", rankable: true },
     ],
   },
   {
     title: "Trygghet – elever",
     kpis: [
-      { id: "N15301", label: "Trygghet i skolan åk 5", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
-      { id: "N15302", label: "Trygghet utanför skolan åk 5", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
-      { id: "N15309", label: "Trygghet i skolan åk 8", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
-      { id: "N15310", label: "Trygghet utanför skolan åk 8", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
+      { id: "N15613", label: "Trygghet i skolan åk 5", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
+      { id: "N15643", label: "Trygghet i skolan åk 8", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
     ],
   },
   {
@@ -58,7 +58,6 @@ const KPI_BLOCKS = [
     kpis: [
       { id: "N15313", label: "Pedagogisk personal: studiero på lektioner", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
       { id: "N15331", label: "Uppföljning av elevers upplevelse av studiero", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
-      { id: "N15309", label: "Stöd för lärare att skapa studiero", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
     ],
   },
 ];
@@ -94,12 +93,11 @@ const MOCK_REFERENCE_DATA = {
 };
 
 const ORG_KPIS = [
-  // OBS: flera tidigare N15xxx-kostnadsposter gav inga kommun-datapunkter för 2024/2023 i 0684.
-  // Byt till KPI:er som vi kan verifiera har kommundata i vald årsperiod.
-  { id: "U15011", label: "Nettokostnad per elev F–9", unit: "kr", higherIsBetter: false },
-  // Lärartäthet: antal elever per lärare (kommun) – använd N15034
-  { id: "N15034", label: "Lärartäthet (elever per lärare)", unit: "antal", higherIsBetter: false },
-  { id: "N15814", label: "Lärare (heltidstjänster) med lärarlegitimation och behörighet i grundskola åk 1-9, kommunala skolor", unit: "%", higherIsBetter: true },
+  { id: "U15011", label: "Nettokostnad per elev grundskolan", unit: "kr", higherIsBetter: false },
+  { id: "N15006", label: "Kostnad grundskola åk 1-9 hemkommun, kr/elev", unit: "kr", higherIsBetter: false },
+  { id: "N15031", label: "Lärare med pedagogisk högskoleexamen", unit: "%", higherIsBetter: true },
+  { id: "N15814", label: "Lärare med legitimation och behörighet", unit: "%", higherIsBetter: true },
+  { id: "N15034", label: "Elever/lärare grundskola", unit: "antal", higherIsBetter: false },
 ];
 
 function $(id) {
