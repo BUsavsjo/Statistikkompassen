@@ -72,6 +72,10 @@ h2 {
 
 .selectors label {
   display: flex;
+  flex-direction: column;
+  font-weight: 600;
+  color: #374151;
+}
 
 .kpi-mini-bars-vertical {
   display: flex;
@@ -86,10 +90,6 @@ h2 {
   flex-direction: column;
   align-items: center;
   gap: 6px;
-}
-  flex-direction: column;
-  font-weight: 600;
-  color: #374151;
 }
 
 .selectors select {
@@ -315,6 +315,8 @@ h2 {
   padding-top: 10px;
   border-top: 1px solid #e2e8f0;
   display: grid;
+  gap: 6px;
+}
 
 .kpi-mini-bar.vertical {
   width: 100%;
@@ -329,8 +331,6 @@ h2 {
   bottom: 0;
   height: 2px;
   background: #cbd5e1;
-}
-  gap: 6px;
 }
 
 .kpi-mini-bar-row {
@@ -437,6 +437,46 @@ h2 {
   bottom: 12px;
   height: 2px;
   background: #cbd5e1;
+}
+
+/* 5-year trend line chart */
+.kpi-trend-chart {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.kpi-trend-chart-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+.kpi-trend-chart-legend {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  font-size: 0.85rem;
+  color: #475569;
+  margin-bottom: 0.35rem;
+}
+
+.kpi-trend-chart-legend .legend-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 4px;
+  border-radius: 999px;
+  background: #667eea;
+}
+
+.kpi-trend-chart svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
 }
 
 /* Neutral KPI-kort (elevantal, SALSA-förutsättningar) */

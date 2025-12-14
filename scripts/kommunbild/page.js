@@ -20,74 +20,78 @@ const DEFAULTS = {
  */
 const KPI_BLOCKS = [
   {
-    title: "Resultat och index",
+    title: "Övergripande kvalitet och index",
     kpis: [
-      { id: "N15505", label: "Meritvärde åk 9 (kommunala)", unit: "p", higherIsBetter: true, kpi_type: "N", rankable: true },
-      { id: "U15401", label: "Kvalitetsindex grundskola", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: false },
-      { id: "U15402", label: "Elevenkätsindex åk 8", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: false },
-        { id: "U15200", label: "Medarbetareengagemang grundskola och förskoleklass", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: false },
+      { id: "U15401", label: "Kvalitetsindex grundskola", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
+      { id: "U15456", label: "Åk 9: Alla ämnen godkända (modellberäknat)", unit: "%", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
+      { id: "U15402", label: "Elevenkätsindex åk 8", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
+      { id: "U15200", label: "Medarbetarengagemang grundskola och förskoleklass", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
     ],
   },
   {
-    title: "Kostnad per elev",
+    title: "Kunskapsresultat – betyg och måluppfyllelse",
     kpis: [
-      { id: "U15011", label: "Nettokostnad per elev F–9", unit: "kr", higherIsBetter: false, kpi_type: "U", rankable: false },
+      { id: "N15505", label: "Meritvärde åk 9 (kommunala skolor)", unit: "p", higherIsBetter: true, kpi_type: "N", rankable: true },
+      { id: "N15419", label: "Åk 9: Alla ämnen godkända (kommunala skolor)", unit: "%", higherIsBetter: true, kpi_type: "N", rankable: true },
+      { id: "N15436", label: "Åk 9: Behöriga till yrkesprogram (kommunala skolor)", unit: "%", higherIsBetter: true, kpi_type: "N", rankable: true },
+      { id: "N15540", label: "Andel elever i åk 6 som uppnått kunskapskraven i alla ämnen", unit: "%", higherIsBetter: true, kpi_type: "N", rankable: true },
     ],
   },
   {
-    title: "Åk 3 – nationella prov",
+    title: "Nationella prov – genomförande",
     kpis: [
-      { id: "N15473", label: "NP matematik åk 3, godkänt (hemkommun)", unit: "%", higherIsBetter: true, kpi_type: "N", rankable: true },
-      { id: "N15472", label: "NP svenska/sva åk 3, godkänt (hemkommun)", unit: "%", higherIsBetter: true, kpi_type: "N", rankable: true },
+      { id: "N15473", label: "Andel elever som deltagit i NP Svenska åk 3", unit: "%", higherIsBetter: true, kpi_type: "N", rankable: true },
+      { id: "N15472", label: "Andel elever som deltagit i NP Matematik åk 3", unit: "%", higherIsBetter: true, kpi_type: "N", rankable: true },
     ],
   },
   {
-    title: "Åk 6 – betyg",
+    title: "Trygghet – elever",
     kpis: [
-      // OBS: N15042 kommer som andel (0–1) i Kolada för kommun. Visas därför som andel, inte procent.
-      { id: "N15042", label: "Minst E i engelska", unit: "andel", higherIsBetter: true, kpi_type: "N", rankable: true },
+      { id: "N15301", label: "Trygghet i skolan åk 5", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
+      { id: "N15302", label: "Trygghet utanför skolan åk 5", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
+      { id: "N15309", label: "Trygghet i skolan åk 8", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
+      { id: "N15310", label: "Trygghet utanför skolan åk 8", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
     ],
   },
   {
-    title: "Åk 9 – kompletterande",
+    title: "Trygghet och studiero – personal",
     kpis: [
-      // U15428 saknar datapunkter för 2024/2023 i kommun-datat (ranking (-2022) i katalogen).
-      // Behåll gärna blocket när vi har en ersättare med kommundata för valda år.
-    ],
-  },
-  {
-    title: "Modellavvikelse",
-    kpis: [
-      { id: "U15416", label: "Avvikelse meritvärde (SALSA)", unit: "p", higherIsBetter: true, kpi_type: "U", rankable: false },
-      { id: "U15414", label: "Avvikelse betygskriterier (SALSA)", unit: "p.p", higherIsBetter: true, kpi_type: "U", rankable: false },
-    ],
-  },
-  {
-    title: "Nationella prov – betyg vs prov",
-    kpis: [
-      { id: "U15429", label: "Åk 9: Matematik – betyg > prov", unit: "%", higherIsBetter: false, kpi_type: "U", rankable: false },
-      { id: "U15430", label: "Åk 9: Matematik – betyg < prov", unit: "%", higherIsBetter: false, kpi_type: "U", rankable: false },
-    ],
-  },
-  {
-    title: "Elevenkäten – delindex",
-    kpis: [
-      { id: "N15301", label: "Trygg i skolan åk 5", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
-      { id: "N15302", label: "Trygg i skolan åk 8", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
-      { id: "N15305", label: "Lärarna förklarar åk 5", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
-      { id: "N15306", label: "Lärarna förklarar åk 8", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
-      { id: "N15309", label: "Arbetsro åk 5", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
-      { id: "N15310", label: "Arbetsro åk 8", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
-    ],
-  },
-  {
-    title: "NPF",
-    kpis: [
-      { id: "N15860", label: "Andel elever med NPF", unit: "%", higherIsBetter: false, kpi_type: "N", rankable: true },
-      { id: "N15861", label: "NPF-elever behöriga till yrkesgymnasium", unit: "%", higherIsBetter: true, kpi_type: "N", rankable: true },
+      { id: "N15313", label: "Pedagogisk personal: studiero på lektioner", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
+      { id: "N15331", label: "Uppföljning av elevers upplevelse av studiero", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
+      { id: "N15309", label: "Stöd för lärare att skapa studiero", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
     ],
   },
 ];
+
+// KPIs that should show a 5-year trend line
+// KPIs that should show a 5-year trend with comparison to all municipalities
+const TREND_KPI_IDS = new Set(["U15401", "U15456", "N15505", "N15419", "N15436", "N15540"]);
+
+// KPIs that should show mini-trend (2-3 years) - enkätkort
+const MINI_TREND_KPI_IDS = new Set(["U15402", "U15200"]);
+
+// Optional: per-KPI referenskälla för svart linje.
+// Om värdet är olika från KPI själv → hämtar per-kommun-värde från det KPI:t (som N15505→U15458).
+// Om värdet är samma som KPI → hämtar median över alla kommuner för det KPI:t.
+const REFERENCE_MEDIAN_OVERRIDE = {
+  // N15505 har egen specialhantering i koden (U15458 per kommun), behöver ej här
+  // Men för andra: sätt till samma KPI = använd median; sätt till annat KPI = per-muni från det KPI:t
+  U15456: null,  // null = standard median över alla för U15456
+  N15419: null,
+  N15436: null,
+  N15540: null,
+  U15401: null,
+};
+
+// Mock-data för svart linje (Alla kommuner median) som fallback när riktiga anrop misslyckas
+const MOCK_REFERENCE_DATA = {
+  U15456: { 2020: 71.4, 2021: 71.95, 2022: 69.57, 2023: 68.85, 2024: 67.49 },
+  N15419: { 2020: 70.2, 2021: 70.8, 2022: 69.1, 2023: 68.5, 2024: 67.15 },
+  N15436: { 2020: 81.5, 2021: 81.8, 2022: 80.9, 2023: 81.2, 2024: 80.8 },
+  N15540: { 2020: 68.3, 2021: 68.9, 2022: 67.8, 2023: 67.4, 2024: 66.9 },
+  U15401: { 2020: 52.3, 2021: 51.8, 2022: 50.9, 2023: 50.5, 2024: 50.17 },
+  N15505: { 2020: 217.8, 2021: 216.5, 2022: 215.2, 2023: 214.8, 2024: 213.95 },
+};
 
 const ORG_KPIS = [
   // OBS: flera tidigare N15xxx-kostnadsposter gav inga kommun-datapunkter för 2024/2023 i 0684.
@@ -174,13 +178,106 @@ function rankOfValue(values, value, higherIsBetter) {
   return { rank: better + 1, total: arr.length };
 }
 
-async function analyzeKpiAcrossMunicipalities(kpiId, year) {
-  // Prefer MCP-backed analysis endpoint when available in this project.
-  // Fallback is handled by caller if it throws.
+// Set this to your proxy endpoint if you want HTTP analyze fallback (used when hook saknas)
+// Example: '/api/analyze' or full URL to your Kolada analyze proxy
+const ANALYZE_HTTP_ENDPOINT = "/api/analyze";
+
+let analyzeWarningShown = false;
+
+function showAnalyzeWarning(message) {
+  if (analyzeWarningShown) return;
+  const status = document.getElementById("kommunbildStatus");
+  if (!status) return;
+  const box = document.createElement("div");
+  box.id = "kommunbild-analyze-warning";
+  box.style.cssText = "margin-top:6px; padding:6px 10px; background:#fff7ed; border:1px solid #fdba74; color:#9a3412; border-radius:6px; font-size:0.85rem;";
+  box.textContent = message;
+  status.prepend(box);
+  analyzeWarningShown = true;
+}
+
+async function analyzeKpiAcrossMunicipalities(kpiId, year, { gender = 'T', municipality_type = 'K' } = {}) {
+  // 1) Prefer MCP-backed analyze hook
   if (typeof window !== "undefined" && window.__KOMMUNBILD_ANALYZE_KPI__) {
-    return window.__KOMMUNBILD_ANALYZE_KPI__(kpiId, year);
+    return window.__KOMMUNBILD_ANALYZE_KPI__(kpiId, year, { gender, municipality_type });
   }
-  throw new Error("analyze_kpi_across_municipalities not wired");
+
+  // 2) Optional HTTP proxy to Kolada analyze (set ANALYZE_HTTP_ENDPOINT or window.__KOMMUNBILD_ANALYZE_HTTP__)
+  const httpEndpoint = (typeof window !== "undefined" && window.__KOMMUNBILD_ANALYZE_HTTP__) || ANALYZE_HTTP_ENDPOINT;
+  if (httpEndpoint) {
+    const url = `${httpEndpoint}?kpi_id=${encodeURIComponent(kpiId)}&year=${encodeURIComponent(year)}&gender=${encodeURIComponent(gender)}&municipality_type=${encodeURIComponent(municipality_type)}`;
+    try {
+      const res = await fetch(url, { headers: { Accept: 'application/json' } });
+      if (res.ok) {
+        const json = await res.json();
+        return json;
+      }
+      console.warn('[kommunbild] analyze HTTP endpoint returned non-OK', res.status);
+    } catch (e) {
+      console.warn('[kommunbild] analyze HTTP endpoint failed', url, e);
+    }
+  }
+
+  // 3) Fallback: compute median locally from all municipalities for the year
+  showAnalyzeWarning("Analys-endpoint saknas, använder klientberäknad median (Alla kommuner)");
+  return computeMedianAcrossMunicipalities(kpiId, year, municipality_type);
+}
+
+// Explicit helper: fetch median via analyze endpoint/hook, returns { year, median, count }
+async function fetchAllMunicipalitiesMedianForYear(kpiId, year) {
+  try {
+    const analysis = await analyzeKpiAcrossMunicipalities(kpiId, year, { gender: 'T', municipality_type: 'K' });
+    if (!analysis) {
+      console.warn('[kommunbild] analyzeKpiAcrossMunicipalities returned null for', kpiId, year);
+      return { year, median: null, count: null };
+    }
+    const medianVal = numberOrNull(analysis?.statistics?.median ?? analysis?.median ?? null);
+    const countVal = Number(analysis?.statistics?.count ?? analysis?.count ?? 0) || null;
+    console.log(`[kommunbild] fetchAllMunicipalitiesMedianForYear ${kpiId} ${year}: median=${medianVal}, count=${countVal}`);
+    if (medianVal !== null) {
+      return { year, median: medianVal, count: countVal, method: 'analyze' };
+    }
+    // Fallback: compute median locally if analyze returned null
+    const fallback = await computeMedianAcrossMunicipalities(kpiId, year, 'K');
+    if (!fallback) {
+      console.warn('[kommunbild] fallback median also failed for', kpiId, year);
+      return { year, median: null, count: null, method: 'error' };
+    }
+    const fbMedian = numberOrNull(fallback?.statistics?.median ?? fallback?.median ?? null);
+    const fbCount = Number(fallback?.statistics?.count ?? fallback?.count ?? 0) || null;
+    console.warn('[kommunbild] analyze median missing, used fallback median', kpiId, year, fbMedian, fbCount);
+    return { year, median: fbMedian, count: fbCount, method: 'fallback_median' };
+  } catch (e) {
+    console.warn('[kommunbild] fetchAllMunicipalitiesMedianForYear failed', kpiId, year, e);
+    return { year, median: null, count: null, method: 'error' };
+  }
+}
+
+// Fallback: compute median locally from all municipalities for the year
+async function computeMedianAcrossMunicipalities(kpiId, year, municipality_type = 'K') {
+  try {
+    const all = await fetchAllMunicipalitiesForYear(kpiId, year);
+    // Extract non-null values (assume fetched data is already filtered to appropriate type server-side)
+    const vals = all
+      .map(row => numberOrNull(row.value))
+      .filter(v => v !== null);
+    
+    if (vals.length === 0) {
+      console.warn('[kommunbild] no valid values for median', kpiId, year);
+      return null;
+    }
+    
+    const med = median(vals);
+    console.log(`[kommunbild] computed median for ${kpiId} year ${year}: ${med} (from ${vals.length} values)`);
+    return {
+      median: med,
+      count: vals.length,
+      statistics: { median: med, count: vals.length }
+    };
+  } catch (e) {
+    console.warn('[kommunbild] computeMedianAcrossMunicipalities fallback error', kpiId, year, e);
+    return null;
+  }
 }
 
 async function fetchJson(url) {
@@ -246,23 +343,43 @@ async function fetchMunicipalityValueWithFallback(kpiId, municipalityId, year) {
 }
 
 async function fetchAllMunicipalitiesForYear(kpiId, year) {
-  // Match older strategy: fetch all municipalities via /v3/data/kpi/<kpi>/municipality then filter client-side.
-  const url = `${KOLADA_DATA_BASE}/${encodeURIComponent(kpiId)}/municipality?per_page=500`;
-  console.log(`[kommunbild] fetching all municipalities (series): ${url}`);
-  const json = await fetchJson(url);
+  // 1) Try v2 first (more reliable for all KPI types)
+  try {
+    const urlV2 = `https://api.kolada.se/v2/data/kpi/${encodeURIComponent(kpiId)}/municipality/${encodeURIComponent(year)}`;
+    console.log(`[kommunbild] fetching all municipalities (v2): ${urlV2}`);
+    const json = await fetchJson(urlV2);
+    console.log(`[kommunbild] v2 response for ${kpiId}:`, json);
+    
+    // V2 /municipality/{year} returns already filtered by year:
+    // { values: [ { kpi:"...", values: [ { municipality:"0684", period:YEAR, values:[{gender,value}] }, ... ] } ] }
+    const root = Array.isArray(json?.values) ? json.values : [];
+    let rows = root;
+    if (root.length && Array.isArray(root[0]?.values) && root[0]?.municipality == null) {
+      rows = root[0].values || [];
+    }
+    
+    const out = [];
+    for (const row of rows) {
+      const municipality = row?.municipality ?? row?.municipality_id ?? null;
+      if (!municipality) continue;
+      
+      // Data is already filtered by year in this endpoint, so row.values is the gender array directly
+      const vals = Array.isArray(row?.values) ? row.values : [];
+      const total = vals.find((v) => v?.gender === "T") ?? vals[0];
+      const val = numberOrNull(total?.value);
+      if (val !== null) {
+        out.push({ municipality, value: val });
+      }
+    }
 
-  // Expected: { values: [ { kpi:"...", values:[ {municipality:"0684", values:[{period,values:[{gender,value}]}]} ] } ] }
-  const node = Array.isArray(json?.values) ? json.values[0]?.values : [];
-  const out = [];
-  for (const row of node || []) {
-    const municipality = row?.municipality ?? row?.municipality_id ?? null;
-    const periods = Array.isArray(row?.values) ? row.values : [];
-    const point = periods.find((p) => Number(p?.period) === Number(year)) ?? null;
-    const vals = Array.isArray(point?.values) ? point.values : [];
-    const total = vals.find((v) => v?.gender === "T") ?? vals[0];
-    out.push({ municipality, value: numberOrNull(total?.value) });
+    console.log(`[kommunbild] v2 parsed ${out.length} municipalities for ${kpiId} year ${year}`);
+    if (out.length > 0) return out;
+    console.warn('[kommunbild] v2 data/kpi returned 0 valid rows');
+  } catch (err) {
+    console.warn('[kommunbild] v2 data/kpi fetch failed', err);
   }
-  return out;
+
+  return [];
 }
 
 // NOTE: Kommunbild ska alltid köras för ett explicit valt år (ingen "senaste år"-logik).
@@ -370,11 +487,15 @@ function renderKpiCard({
   deltaClass,
   rankText,
   comparisonText,
+  gapText,
   showComparison,
   statusClass,
   kpiId,
   debugUrl,
   referenceValue,
+  trendData5Years,
+  trendReference5Years,
+  usedMockData,
 }) {
   const safeLabel = escapeHtml(label);
   const safeComp = escapeHtml(comparisonText ?? "");
@@ -392,6 +513,7 @@ function renderKpiCard({
     "HME-index består av nio frågor som tillsammans bildar ett totalindex för Hållbart medarbetarengagemang och tre delindex; Motivation, Ledarskap och Styrning. " +
     "Frågorna besvaras på en skala 1-5 där 1 är stämmer mycket dåligt och 5 är stämmer mycket bra. Resultaten på varje fråga omvandlas sedan till ett index med skala 0-100. " +
     "Totalindex formas som ett medelvärde av de nio frågorna. Ett högt värde indikerar en hög nivå på hållbart medarbetarengagemang. Avser egen regi. Källa: Egen undersökning i kommunen. ID: U15200.";
+  const unitIcon = unit === "index" ? "📊" : unit === "%" ? "📈" : "";
   const infoBadge = (() => {
     if (kpiId === "U15401") return `<span class="kpi-info" title="${escapeHtml(infoTextU15401)}">ℹ️</span>`;
     if (kpiId === "U15200") return `<span class="kpi-info" title="${escapeHtml(infoTextU15200)}">ℹ️</span>`;
@@ -401,7 +523,132 @@ function renderKpiCard({
     ["N15505", "N15504", "U15011", "U15401", "U15402"].includes(kpiId) ||
     /meritvärde|yrkesprogram|kostnad per elev|kvalitetsindex|elevenkätsindex/i.test(label || "");
   let miniBarsHtml = "";
+  if (!isMiniBarTarget && MINI_TREND_KPI_IDS.has(kpiId) && previousValue !== null && value !== null) {
+    const prevVal = numberOrNull(previousValue);
+    const curVal = numberOrNull(value);
+    if (prevVal !== null && curVal !== null) {
+      const maxVal = Math.max(prevVal, curVal);
+      const denom = Math.max(1, maxVal);
+      const hPrev = Math.max(5, Math.round((prevVal / denom) * 100));
+      const hCur = Math.max(5, Math.round((curVal / denom) * 100));
+      miniBarsHtml = `
+        <div style="display:flex;gap:1rem;margin-top:0.5rem;font-size:0.85rem;opacity:0.85;justify-content:center;">
+          <div style="text-align:center;">
+            <div style="font-weight:bold;font-size:0.95rem;">${prevVal.toFixed(1)}</div>
+            <div style="font-size:0.7rem;opacity:0.75;margin-top:2px;">${previousYear ?? ""}</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-weight:bold;font-size:0.95rem;color:#667eea;">${curVal.toFixed(1)}</div>
+            <div style="font-size:0.7rem;opacity:0.75;margin-top:2px;">${year ?? ""}</div>
+          </div>
+        </div>`;
+    }
+  }
   let barChartHtml = "";
+  let trendLineHtml = "";
+
+  // 5-year trend line for configured KPIs (optionally with reference series)
+  // Show trend with >= 1 datapoint (municipal data might be sparse)
+  if (Array.isArray(trendData5Years) && trendData5Years.length >= 1) {
+    const own = trendData5Years;
+    const ref = Array.isArray(trendReference5Years) && trendReference5Years.length >= 1 ? trendReference5Years : null;
+    const allValues = [...own, ...(ref ?? [])].map((d) => d.value);
+    const minVal = Math.min(...allValues);
+    const maxVal = Math.max(...allValues);
+    const range = maxVal - minVal || 1;
+    const padding = { top: 20, bottom: 30, left: 10, right: 10 };
+    const w = 300;
+    const h = 120;
+    const chartWidth = w - padding.left - padding.right;
+    const chartHeight = h - padding.top - padding.bottom;
+    const xScale = (i, len) => padding.left + (i / Math.max(1, len - 1)) * chartWidth;
+    const yScale = (val) => padding.top + chartHeight - ((val - minVal) / range) * chartHeight;
+
+    const makePolyline = (series, color, width) => series.map((d, i) => `${xScale(i, series.length)},${yScale(d.value)}`).join(" ");
+    const ownPolyline = makePolyline(own, "#667eea", 2);
+    const refPolyline = ref ? makePolyline(ref, "#000", 2) : "";
+    
+    console.log(`[kommunbild] trend rendering for ${kpiId}:`, { own: own.length, ref: ref?.length, refPolyline: refPolyline.substring(0, 50) });
+
+    const ownCircles = own
+      .map((d, i) => {
+        const cx = xScale(i, own.length);
+        const cy = yScale(d.value);
+        return `
+          <circle cx="${cx}" cy="${cy}" r="4" fill="#667eea" stroke="white" stroke-width="2"/>
+          <text x="${cx}" y="${cy - 8}" text-anchor="middle" font-size="9" font-weight="bold" fill="#334155">${d.value.toFixed(1)}</text>
+          <text x="${cx}" y="${h - 5}" text-anchor="middle" font-size="10" fill="#64748b">${d.year}</text>`;
+      })
+      .join("");
+
+    const refCircles = ref
+      ? ref
+          .map((d, i) => {
+            const cx = xScale(i, ref.length);
+            const cy = yScale(d.value);
+            return `<circle cx="${cx}" cy="${cy}" r="4" fill="#000" stroke="white" stroke-width="1.5" opacity="0.8"/>`;
+          })
+          .join("")
+      : "";
+
+    // Build export payload per request definition
+    const allYears = Array.from(new Set([...
+      own.map(d => d.year), ...(ref ? ref.map(d => d.year) : [])
+    ])).sort((a,b)=>a-b);
+    const missingYears = ref
+      ? allYears.filter(y => ref.find(r=>r.year===y) == null)
+      : allYears; // if no ref, all years missing for benchmark
+    const exportPayload = {
+      kpi_id: kpiId,
+      method: 'A',
+      municipality_series: own.map(d => ({ year: d.year, value: d.value })),
+      benchmark_series: ref ? ref.map(d => ({ year: d.year, value: d.value })) : [],
+      missing_benchmark_years: missingYears
+    };
+
+    const legend = ref
+      ? `<div class="kpi-trend-chart-legend"><span class="legend-swatch" style="background:#667eea"></span>Egen kommun <span class="legend-swatch" style="background:#000"></span>Alla kommuner (median)</div>`
+      : `<div class="kpi-trend-chart-legend"><span class="legend-swatch" style="background:#667eea"></span>Egen kommun</div>`;
+
+    const mockWarningBadge = usedMockData 
+      ? `<div style="display:inline-block;background:#ff9800;color:#fff;font-size:0.7rem;padding:2px 6px;border-radius:3px;margin-left:8px;">⚠️ Mock-data</div>` 
+      : '';
+
+    const exportButton = `<button class="kpi-export-btn" data-export='${escapeHtml(JSON.stringify(exportPayload))}' style="margin-top:6px;font-size:.8rem;">Kopiera trenddata</button>`;
+
+    // Build comparison values for latest year (compact horizontal layout)
+    let trendComparisonBars = "";
+    const latestOwnValue = own.length > 0 ? own[own.length - 1].value : null;
+    const latestRefValue = ref && ref.length > 0 ? ref[ref.length - 1].value : null;
+    const latestYear = own.length > 0 ? own[own.length - 1].year : null;
+    if (latestOwnValue !== null && latestRefValue !== null && latestYear !== null) {
+      trendComparisonBars = `
+        <div style="display:flex;gap:1.5rem;margin-top:0.5rem;font-size:0.85rem;opacity:0.85;">
+          <div style="text-align:center;">
+            <div style="font-weight:bold;font-size:1rem;">${latestRefValue.toFixed(1)}</div>
+            <div style="font-size:0.75rem;opacity:0.75;margin-top:2px;">Alla kommuner (median)</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-weight:bold;font-size:1rem;color:#667eea;">${latestOwnValue.toFixed(1)}</div>
+            <div style="font-size:0.75rem;opacity:0.75;margin-top:2px;">Egen kommun</div>
+          </div>
+        </div>`;
+    }
+
+    trendLineHtml = `
+      <div class="kpi-trend-chart">
+        <div class="kpi-trend-chart-title">5-års trend${mockWarningBadge}</div>
+        ${legend}
+        <svg width="100%" height="120" viewBox="0 0 ${w} ${h}" style="display:block;">
+          ${ref ? `<polyline points="${refPolyline}" fill="none" stroke="#000" stroke-width="2" opacity="0.85"/>` : ""}
+          <polyline points="${ownPolyline}" fill="none" stroke="#667eea" stroke-width="2"/>
+          ${refCircles}
+          ${ownCircles}
+        </svg>
+        ${trendComparisonBars}
+        ${exportButton}
+      </div>`;
+  }
 
   if (isMiniBarTarget) {
     const dataPoints = [];
@@ -410,7 +657,7 @@ function renderKpiCard({
     const refVal = numberOrNull(referenceValue);
     if (prevVal !== null) dataPoints.push({ label: String(previousYear ?? "2023"), value: prevVal });
     if (curVal !== null) dataPoints.push({ label: String(year ?? "2024"), value: curVal });
-    if (kpiId === "N15505" && refVal !== null) dataPoints.push({ label: "Alla kommuner", value: refVal });
+    if (kpiId === "N15505" && refVal !== null) dataPoints.push({ label: "Alla kommuner (median)", value: refVal });
     if (kpiId === "N15505" && curVal !== null) dataPoints.push({ label: "Egen kommun", value: curVal });
     if (kpiId !== "N15505" && refVal !== null) dataPoints.push({ label: "Referens", value: refVal });
 
@@ -444,6 +691,19 @@ function renderKpiCard({
     }
   }
 
+  // For U15401/U15456: show median value as compact text even if no trend chart
+  let medianTextHtml = "";
+  if (["U15401", "U15456"].includes(kpiId) && referenceValue !== null && !trendLineHtml) {
+    const medVal = numberOrNull(referenceValue);
+    if (medVal !== null) {
+      medianTextHtml = `
+        <div style="margin-top:0.5rem;font-size:0.85rem;opacity:0.85;text-align:center;">
+          <span style="font-weight:bold;">${medVal.toFixed(1)}</span>
+          <span style="font-size:0.75rem;opacity:0.75;margin-left:4px;">Alla kommuner (median)</span>
+        </div>`;
+    }
+  }
+
   let compareBarsHtml = "";
   if (kpiId === "N15505" && !barChartHtml) {
     const latest = numberOrNull(value);
@@ -458,7 +718,7 @@ function renderKpiCard({
         <div class="kpi-mini-bar-col">
           <div class="kpi-mini-bar-value">${ref.toFixed(1)}</div>
           <div class="kpi-mini-bar-track vertical"><div class="kpi-mini-bar" style="background:#000;height:${hRef}%"></div></div>
-          <div class="kpi-mini-bar-year">Alla kommuner</div>
+          <div class="kpi-mini-bar-year">Alla kommuner (median)</div>
         </div>
         <div class="kpi-mini-bar-col">
           <div class="kpi-mini-bar-value">${latest.toFixed(1)}</div>
@@ -471,14 +731,16 @@ function renderKpiCard({
 
   return `
     <div class="kpi-item ${statusClass ?? ""}" data-kpi-id="${escapeHtml(kpiId)}">
-      <div class="kpi-label">${safeLabel} ${infoBadge}</div>
+      <div class="kpi-label">${unitIcon ? unitIcon + " " : ""}${safeLabel} ${infoBadge}</div>
       <div class="kpi-value">${escapeHtml(formatValue(value, unit))}</div>
+      ${trendLineHtml}
       ${barChartHtml || miniBarsHtml}
+      ${medianTextHtml}
       ${barChartHtml ? "" : compareBarsHtml}
       <div class="kpi-analysis" style="margin-top:.25rem; opacity:.7;"><strong>År:</strong> ${escapeHtml(String(year ?? "–"))}</div>
       ${safeUrl ? `<div class="kpi-analysis" style="margin-top:.35rem; opacity:.8; font-size:.8rem; word-break:break-all; user-select:text;"><strong>URL:</strong> ${safeUrl}</div>` : ""}
       <div class="kpi-trend ${deltaClass}">${escapeHtml(deltaText)} (Δ mot föregående)</div>
-      ${showComparison ? `<div class="kpi-comparison">${safeComp}</div>` : ""}
+      ${showComparison ? `<div class="kpi-comparison">${safeComp}${gapText ? escapeHtml(gapText) : ""}</div>` : ""}
       ${showComparison ? `<div class="kpi-analysis"><strong>Rank:</strong> ${safeRank}</div>` : ""}
       <div class="kpi-analysis" style="margin-top:.35rem; opacity:.75;"><strong>NID:</strong> ${escapeHtml(kpiId)}</div>
     </div>
@@ -518,7 +780,7 @@ async function computeKpiForMunicipality({ kpi, municipalityId, forcedYear }) {
     if (kpi.rankable === true) {
       try {
         // Use server-side analysis when possible
-        const analysis = await analyzeKpiAcrossMunicipalities(kpi.id, actualYear);
+        const analysis = await analyzeKpiAcrossMunicipalities(kpi.id, actualYear, { gender: 'T', municipality_type: 'K' });
         // Expected-ish shape: { median, total_count, ranks: [{municipality_id, rank}], ... }
         refMedian = numberOrNull(analysis?.median ?? analysis?.stats?.median ?? analysis?.statistics?.median);
         total = Number(analysis?.total ?? analysis?.total_count ?? analysis?.stats?.count ?? analysis?.statistics?.count ?? 0) || 0;
@@ -569,6 +831,65 @@ async function computeKpiForMunicipality({ kpi, municipalityId, forcedYear }) {
       }
     }
 
+    // Fetch 5-year trend for configured KPIs
+    let trendData5Years = null;
+    let trendReference5Years = null;
+    let usedMockData = false;
+    if (TREND_KPI_IDS.has(kpi.id)) {
+      try {
+        const years = [];
+        for (let y = actualYear - 4; y <= actualYear; y++) {
+          years.push(y);
+        }
+        const trendPromises = years.map((y) => fetchMunicipalityValueForYear(kpi.id, municipalityId, y));
+        const trendValues = await Promise.all(trendPromises);
+        trendData5Years = years
+          .map((y, idx) => ({ year: Number(y), value: numberOrNull(trendValues[idx]) }))
+          .filter((d) => d.value !== null);
+        console.log(`[kommunbild] trend own data for ${kpi.id}:`, trendData5Years);
+
+        // Build reference series (black line):
+        // Check if we have an override that means "fetch per-municipality from another KPI" or "fetch median"
+        const refSourceKpi = REFERENCE_MEDIAN_OVERRIDE[kpi.id];
+        
+        if (kpi.id === "N15505" || (refSourceKpi && refSourceKpi !== kpi.id)) {
+          // Mode: per-municipality reference KPI (like N15505→U15458 or U15456→some other KPI)
+          const refKpi = kpi.id === "N15505" ? "U15458" : refSourceKpi;
+          const refPromises = years.map((y) => fetchMunicipalityValueForYear(refKpi, municipalityId, y));
+          const refValues = await Promise.all(refPromises);
+          trendReference5Years = years
+            .map((y, idx) => ({ year: Number(y), value: numberOrNull(refValues[idx]) }))
+            .filter((d) => d.value !== null);
+          console.log(`[kommunbild] trend benchmark (per-muni from ${refKpi}) for ${kpi.id}:`, trendReference5Years);
+        } else {
+          // Mode: median across all municipalities (kommuntyp K, kön T) per year
+          const medianKpi = refSourceKpi ?? kpi.id;
+          const refPromises = years.map((y) => fetchAllMunicipalitiesMedianForYear(medianKpi, y));
+          const refResults = await Promise.all(refPromises);
+          trendReference5Years = refResults
+            .map((r) => ({ year: Number(r.year), value: numberOrNull(r.median) }))
+            .filter((d) => d.value !== null && Number.isFinite(d.value));
+          
+          // Fallback: om inga referensvärden, använd mockdata
+          if (!trendReference5Years.length && MOCK_REFERENCE_DATA[kpi.id]) {
+            console.warn(`[kommunbild] ⚠️ MOCK DATA används för svart linje (Alla kommuner) på ${kpi.id}`);
+            showAnalyzeWarning(`⚠️ Mock-data används för ${kpi.id} trendlinje (Alla kommuner)`);
+            usedMockData = true;
+            trendReference5Years = years
+              .map((y) => ({ year: Number(y), value: numberOrNull(MOCK_REFERENCE_DATA[kpi.id][y]) }))
+              .filter((d) => d.value !== null && Number.isFinite(d.value));
+          }
+          
+          if (!trendReference5Years.length) {
+            showAnalyzeWarning(`Saknar referensdata (Alla kommuner median) för ${kpi.id} ${years[0]}-${years[years.length - 1]}`);
+          }
+          console.log(`[kommunbild] trend benchmark (median) for ${kpi.id}:`, trendReference5Years);
+        }
+      } catch (err) {
+        console.warn("[kommunbild] 5-year trend fetch failed", err);
+      }
+    }
+
     return {
       kpi,
       municipalityId,
@@ -580,6 +901,9 @@ async function computeKpiForMunicipality({ kpi, municipalityId, forcedYear }) {
       rank,
       total: total || rank.total,
       comparisonError,
+      trendData5Years,
+      trendReference5Years,
+      usedMockData,
     };
   } catch (err) {
     console.error("[kommunbild] computeKpiForMunicipality error", kpi?.id, err);
@@ -602,66 +926,66 @@ function renderBlocks(blockResults) {
   const container = document.getElementById("qualityBlocks");
   if (!container) return;
 
-  const all = blockResults.flatMap(({ kpis }) => kpis);
+  const sections = blockResults
+    .filter((br) => br.kpis.length > 0)
+    .map((br) => {
+      const cards = br.kpis
+        .map((r) => {
+          const delta = formatDelta(r.current, r.previous, r.kpi.unit);
+          const showComparison = r.kpi.rankable === true;
+          const isIndexKpi = r.kpi.unit === "index";
+          const isNKpi = r.kpi.kpi_type === "N";
+          const refText = r.refMedian === null 
+            ? (isNKpi ? "Jämförelse mot alla kommuner (median)" : isIndexKpi ? "Jämförelse visas som median för alla kommuner. Ej rangordningsbart." : "Ingen jämförelse möjlig för detta nyckeltal")
+            : `Alla kommuner (median): ${formatValue(r.refMedian, r.kpi.unit)}`;
+          
+          // Compute gap to median if both values exist
+          let gapText = "";
+          if (r.refMedian !== null && r.current !== null) {
+            const gap = numberOrNull(r.current) - numberOrNull(r.refMedian);
+            if (gap !== null && !isNaN(gap)) {
+              const sign = gap > 0 ? "+" : "";
+              const gapFormatted = gap.toFixed(1);
+              gapText = ` (${sign}${gapFormatted} ${r.kpi.unit === "%" ? "p.p" : r.kpi.unit} mot median)`;
+            }
+          }
+          
+          const rankText = r.rank.rank === null ? "–" : `${r.rank.rank} av ${r.rank.total}`;
+          const statusClass = deriveCardStatus({ higherIsBetter: r.kpi.higherIsBetter, value: r.current, reference: r.refMedian });
+          const debugUrl = r?.municipalityId ? buildMunicipalitySeriesUrl({ kpiId: r.kpi.id, municipalityId: r.municipalityId }) : null;
+          return renderKpiCard({
+            label: r.kpi.label,
+            value: r.current,
+            unit: r.kpi.unit,
+            year: r.year ?? "–",
+            previousValue: r.previous,
+            previousYear: r.previousYear,
+            deltaText: delta.text,
+            deltaClass: delta.className,
+            rankText,
+            comparisonText: refText,
+            gapText,
+            showComparison,
+            statusClass,
+            kpiId: r.kpi.id,
+            debugUrl,
+            referenceValue: r.refMedian ?? (r.rank && r.rank.median != null ? r.rank.median : null),
+            trendData5Years: r.trendData5Years,
+            trendReference5Years: r.trendReference5Years,
+            usedMockData: r.usedMockData,
+          });
+        })
+        .join("");
 
-  const renderCards = (items) => items.map((r) => {
-    const delta = formatDelta(r.current, r.previous, r.kpi.unit);
-    const showComparison = r.kpi.rankable === true;
-    const refText = r.refMedian === null ? "Ingen jämförelse möjlig för detta nyckeltal" : `Median alla kommuner: ${formatValue(r.refMedian, r.kpi.unit)}`;
-    const rankText = r.rank.rank === null ? "–" : `${r.rank.rank} av ${r.rank.total}`;
-    const statusClass = deriveCardStatus({ higherIsBetter: r.kpi.higherIsBetter, value: r.current, reference: r.refMedian });
-    const debugUrl = r?.municipalityId ? buildMunicipalitySeriesUrl({ kpiId: r.kpi.id, municipalityId: r.municipalityId }) : null;
-    return renderKpiCard({
-      label: r.kpi.label,
-      value: r.current,
-      unit: r.kpi.unit,
-      year: r.year ?? "–",
-      previousValue: r.previous,
-      previousYear: r.previousYear,
-      deltaText: delta.text,
-      deltaClass: delta.className,
-      rankText,
-      comparisonText: refText,
-      showComparison,
-      statusClass,
-      kpiId: r.kpi.id,
-      debugUrl,
-        referenceValue: r.refMedian ?? (r.rank && r.rank.median != null ? r.rank.median : null),
-    });
-  }).join("");
+      return `
+        <div class="dashboard-section" style="padding: 1.5rem; margin: 1.25rem 0;">
+          <h2>${escapeHtml(br.block.title)}</h2>
+          <div class="kpi-grid">${cards}</div>
+        </div>`;
+    })
+    .join("");
 
-  // Grupper: NP åk 3, NP åk 9, Trygghet
-  const NP_AK3_IDS = new Set(["N15473", "N15472"]);
-  const NP_AK9_IDS = new Set(["U15429", "U15430"]);
-  const TRYG_IDS = new Set(["N15301", "N15302", "N15309", "N15310"]);
-
-  const groupAk3 = all.filter((r) => NP_AK3_IDS.has(r.kpi.id));
-  const groupAk9 = all.filter((r) => NP_AK9_IDS.has(r.kpi.id));
-  const groupTryg = all.filter((r) => TRYG_IDS.has(r.kpi.id));
-  const groupOther = all.filter((r) => !NP_AK3_IDS.has(r.kpi.id) && !NP_AK9_IDS.has(r.kpi.id) && !TRYG_IDS.has(r.kpi.id));
-
-  container.innerHTML = [
-    groupAk3.length ? `
-      <div class="dashboard-section" style="padding: 1.5rem; margin: 1.25rem 0;">
-        <h2>Nationella prov – Åk 3</h2>
-        <div class="kpi-grid">${renderCards(groupAk3)}</div>
-      </div>` : "",
-    groupAk9.length ? `
-      <div class="dashboard-section" style="padding: 1.5rem; margin: 1.25rem 0;">
-        <h2>Nationella prov – Åk 9</h2>
-        <div class="kpi-grid">${renderCards(groupAk9)}</div>
-      </div>` : "",
-    groupTryg.length ? `
-      <div class="dashboard-section" style="padding: 1.5rem; margin: 1.25rem 0;">
-        <h2>Elevenkäten – Åk 5 & Åk 8</h2>
-        <div class="kpi-grid">${renderCards(groupTryg)}</div>
-      </div>` : "",
-    groupOther.length ? `
-      <div class="dashboard-section" style="padding: 1.5rem; margin: 1.25rem 0;">
-        <h2>Övriga KPI:er</h2>
-        <div class="kpi-grid">${renderCards(groupOther)}</div>
-      </div>` : "",
-  ].join("");
+  container.innerHTML = sections;
 }
 
 function renderOrgTable(rows) {
