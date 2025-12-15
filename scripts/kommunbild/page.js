@@ -217,7 +217,8 @@ async function analyzeKpiAcrossMunicipalities(kpiId, year, { gender = 'T', munic
   }
 
   // 3) Fallback: compute median locally from all municipalities for the year
-  showAnalyzeWarning("Analys-endpoint saknas, använder klientberäknad median (Alla kommuner)");
+  // Note: This is the normal mode of operation without MCP server
+  console.log('[kommunbild] Using client-side median calculation (no analyze endpoint configured)');
   return computeMedianAcrossMunicipalities(kpiId, year, municipality_type);
 }
 
@@ -401,15 +402,7 @@ async function mapWithConcurrency(items, limit, mapper) {
   return results;
 }
 
-function setGlobalLoading(visible, message) {
-  const overlay = document.getElementById("globalLoadingScreen");
-  if (!overlay) return;
-  overlay.style.display = visible ? "flex" : "none";
-  if (message) {
-    const h2 = overlay.querySelector("h2");
-    if (h2) h2.textContent = message;
-  }
-}
+
 
 function getSelectedMunicipalityId() {
   const select = $("kommunSelect");
@@ -1080,7 +1073,6 @@ async function onMunicipalityChange() {
     return;
   }
 
-  setGlobalLoading(true, "Laddar kommunbild...");
   try {
     // Erbjud ett fåtal år bakåt, men inkludera även aktuellt år.
     // OBS: Kolada publicerar inte alltid data för senaste år direkt, men användaren ska kunna välja det.
@@ -1091,8 +1083,8 @@ async function onMunicipalityChange() {
     setYearSelectState({ disabled: false, options: suggestedYears, selected: selectedYear });
 
     await renderKommunbildForMunicipality(municipalityId, selectedYear);
-  } finally {
-    setGlobalLoading(false);
+  } catch (err) {
+    throw err;
   }
 }
 
@@ -1100,39 +1092,40 @@ async function main() {
   clearKommunbildContainers();
   setYearSelectState({ disabled: true });
 
-  // Validate KPI metadata early (used to steer year availability & rankability)
-  try {
-    const allKpiIds = [
-      ...KPI_BLOCKS.flatMap((b) => b.kpis.map((k) => k.id)),
-      ...ORG_KPIS.map((k) => k.id),
-    ];
-    const uniq = Array.from(new Set(allKpiIds));
-    await mapWithConcurrency(uniq, 6, async (kpiId) => {
-      const meta = await fetchKpiMeta(kpiId);
-      if (!meta) return;
-      // If config didn't specify, infer a conservative rankable default: N => rankable, U => not.
-      const inferredType = String(meta?.id ?? kpiId).startsWith("N") ? "N" : String(meta?.id ?? kpiId).startsWith("U") ? "U" : null;
-      // No direct mutation of config objects here; we just cache meta for messaging/logic later.
-      const years = getAvailableYearsFromMeta(meta);
-      if (years.length) {
-        console.log(`[kommunbild] KPI ${kpiId} years:`, years.slice(0, 8));
-      }
-      if (inferredType && meta?.id && inferredType !== inferredType) {
-        // noop, placeholder to keep lint quiet
-      }
-    });
-  } catch (err) {
-    console.warn("[kommunbild] KPI meta init failed", err);
-  }
-
+  // Initialize kommun dropdown immediately (fast, uses local data)
   await initKommunSelect();
 
+  // Setup event listeners
   requireEl("kommunSelect").addEventListener("change", onMunicipalityChange);
   requireEl("qualityYearSelect").addEventListener("change", () => {
     onMunicipalityChange();
   });
 
+  // Load data for default municipality (this can take time, but UI is already interactive)
   await onMunicipalityChange();
+
+  // Preload KPI metadata in background (non-blocking, improves subsequent loads)
+  preloadKpiMetadata();
+}
+
+// Non-blocking background preload of KPI metadata
+function preloadKpiMetadata() {
+  const allKpiIds = [
+    ...KPI_BLOCKS.flatMap((b) => b.kpis.map((k) => k.id)),
+    ...ORG_KPIS.map((k) => k.id),
+  ];
+  const uniq = Array.from(new Set(allKpiIds));
+  
+  // Run in background without blocking
+  mapWithConcurrency(uniq, 6, async (kpiId) => {
+    try {
+      await fetchKpiMeta(kpiId);
+    } catch (err) {
+      console.warn(`[kommunbild] Failed to preload meta for ${kpiId}`, err);
+    }
+  }).catch((err) => {
+    console.warn("[kommunbild] KPI meta preload failed", err);
+  });
 }
 
 console.log("[kommunbild] module loaded");
@@ -1145,5 +1138,4 @@ main().catch((err) => {
     status.style.display = "block";
     status.textContent = `Fel: ${err?.message ?? String(err)}`;
   }
-  setGlobalLoading(false);
 });
