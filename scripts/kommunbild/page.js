@@ -104,10 +104,7 @@ const ORG_KPIS = [
   { id: "N15031", label: "Lärare med pedagogisk högskoleexamen", unit: "%", higherIsBetter: true },
   { id: "N15814", label: "Lärare med legitimation och behörighet", unit: "%", higherIsBetter: true },
   { id: "N15034", label: "Elever/lärare grundskola", unit: "antal", higherIsBetter: false },
-  // Tillägg enligt önskemål: lägg U15010, U15200, U15402 under Organisation & struktur
-  { id: "U15010", label: "Resursindex kommunal grundskola F-9", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
   { id: "U15200", label: "Medarbetarengagemang grundskola och förskoleklass", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
-  { id: "U15402", label: "Elevenkätsindex åk 8", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
 ];
 
 function $(id) {
