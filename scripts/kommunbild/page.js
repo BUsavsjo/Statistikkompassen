@@ -7,10 +7,12 @@ const KOLADA_BASE = "https://api.kolada.se/v3";
 const KOLADA_DATA_BASE = `${KOLADA_BASE}/data/kpi`;
 
 const kpiMetaCache = new Map();
+const allMunicipalitiesCache = new Map(); // Cache for fetchAllMunicipalitiesForYear
+const municipalityValueCache = new Map(); // Cache for individual municipality values
 
 const DEFAULTS = {
   municipalityId: "0684", // Sävsjö (bra för dev)
-  maxParallelFetches: 6,
+  maxParallelFetches: 3, // Reduced from 6 to 3 for better mobile performance
   year: 2024,
 };
 
@@ -515,6 +517,13 @@ function buildMunicipalitySeriesUrl({ kpiId, municipalityId }) {
 }
 
 async function fetchMunicipalityValueForYear(kpiId, municipalityId, year) {
+  // Check cache first
+  const cacheKey = `${kpiId}_${municipalityId}_${year}`;
+  if (municipalityValueCache.has(cacheKey)) {
+    console.log(`[kommunbild] using cached value for ${kpiId} ${municipalityId} ${year}`);
+    return municipalityValueCache.get(cacheKey);
+  }
+
   const url = buildMunicipalitySeriesUrl({ kpiId, municipalityId });
   console.log(`[kommunbild] fetching series (for value): ${url}`);
   const json = await fetchJson(url);
@@ -524,8 +533,11 @@ async function fetchMunicipalityValueForYear(kpiId, municipalityId, year) {
     if (Number(entry?.period) !== Number(year)) continue;
     const vals = Array.isArray(entry?.values) ? entry.values : [];
     const total = vals.find((v) => v?.gender === "T") ?? vals[0];
-    return numberOrNull(total?.value);
+    const value = numberOrNull(total?.value);
+    municipalityValueCache.set(cacheKey, value);
+    return value;
   }
+  municipalityValueCache.set(cacheKey, null);
   return null;
 }
 
@@ -541,6 +553,13 @@ async function fetchMunicipalityValueWithFallback(kpiId, municipalityId, year) {
 }
 
 async function fetchAllMunicipalitiesForYear(kpiId, year) {
+  // Check cache first
+  const cacheKey = `${kpiId}_${year}`;
+  if (allMunicipalitiesCache.has(cacheKey)) {
+    console.log(`[kommunbild] using cached data for all municipalities ${kpiId} ${year}`);
+    return allMunicipalitiesCache.get(cacheKey);
+  }
+
   // 1) Try v2 first (more reliable for all KPI types)
   try {
     const urlV2 = `https://api.kolada.se/v2/data/kpi/${encodeURIComponent(kpiId)}/municipality/${encodeURIComponent(year)}`;
@@ -571,12 +590,16 @@ async function fetchAllMunicipalitiesForYear(kpiId, year) {
     }
 
     console.log(`[kommunbild] v2 parsed ${out.length} municipalities for ${kpiId} year ${year}`);
-    if (out.length > 0) return out;
+    if (out.length > 0) {
+      allMunicipalitiesCache.set(cacheKey, out);
+      return out;
+    }
     console.warn('[kommunbild] v2 data/kpi returned 0 valid rows');
   } catch (err) {
     console.warn('[kommunbild] v2 data/kpi fetch failed', err);
   }
 
+  allMunicipalitiesCache.set(cacheKey, []);
   return [];
 }
 
@@ -602,6 +625,12 @@ async function mapWithConcurrency(items, limit, mapper) {
 }
 
 
+
+function clearDataCache() {
+  allMunicipalitiesCache.clear();
+  municipalityValueCache.clear();
+  console.log('[kommunbild] Data cache cleared');
+}
 
 function getSelectedMunicipalityId() {
   const select = $("kommunSelect");
@@ -1367,7 +1396,7 @@ async function renderKommunbildForMunicipality(municipalityId, forcedYear) {
   // 1) Compute KPI results for each configured block
   const blockResults = await mapWithConcurrency(
     KPI_BLOCKS,
-    2,
+    1, // Reduced from 2 to 1 for better mobile performance
     async (block) => {
       const kpis = await mapWithConcurrency(block.kpis, DEFAULTS.maxParallelFetches, async (kpi) => {
         return computeKpiForMunicipality({ kpi, municipalityId, forcedYear });
@@ -1412,6 +1441,7 @@ async function renderKommunbildForMunicipality(municipalityId, forcedYear) {
 
 async function onMunicipalityChange() {
   clearKommunbildContainers();
+  clearDataCache(); // Clear cache when changing municipality
   const municipalityId = getSelectedMunicipalityId();
 
   if (!municipalityId) {
