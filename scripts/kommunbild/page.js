@@ -24,10 +24,6 @@ const KPI_BLOCKS = [
     kpis: [
       { id: "U15401", label: "Kvalitetsindex grundskola", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
       { id: "U15456", label: "Åk 9: Alla ämnen godkända (modellberäknat)", unit: "%", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
-      { id: "U15402", label: "Elevenkätsindex åk 8", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
-      { id: "U15200", label: "Medarbetarengagemang grundskola och förskoleklass", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
-      { id: "U15900", label: "Effektivitetsindex kommunal grundskola F-9", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
-      { id: "U15010", label: "Resursindex kommunal grundskola F-9", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
     ],
   },
   {
@@ -60,6 +56,14 @@ const KPI_BLOCKS = [
       { id: "N15331", label: "Uppföljning av elevers upplevelse av studiero", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
     ],
   },
+];
+
+// Index-tabell KPI:er (visas i separat tabell)
+const INDEX_KPIS = [
+  { id: "U15900", label: "Effektivitetsindex kommunal grundskola F-9", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
+  { id: "U15010", label: "Resursindex kommunal grundskola F-9", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
+  { id: "U15200", label: "Medarbetarengagemang grundskola och förskoleklass", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
+  { id: "U15402", label: "Elevenkätsindex åk 8", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
 ];
 
 // KPIs that should show a 5-year trend line
@@ -98,6 +102,11 @@ const ORG_KPIS = [
   { id: "N15031", label: "Lärare med pedagogisk högskoleexamen", unit: "%", higherIsBetter: true },
   { id: "N15814", label: "Lärare med legitimation och behörighet", unit: "%", higherIsBetter: true },
   { id: "N15034", label: "Elever/lärare grundskola", unit: "antal", higherIsBetter: false },
+  // Tillägg enligt önskemål: lägg U15900, U15010, U15200, U15402 under Organisation & struktur
+  { id: "U15900", label: "Effektivitetsindex kommunal grundskola F-9", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
+  { id: "U15010", label: "Resursindex kommunal grundskola F-9", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
+  { id: "U15200", label: "Medarbetarengagemang grundskola och förskoleklass", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
+  { id: "U15402", label: "Elevenkätsindex åk 8", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
 ];
 
 function $(id) {
@@ -1145,13 +1154,81 @@ async function computeKpiForMunicipality({ kpi, municipalityId, forcedYear }) {
   }
 }
 
-function renderBlocks(blockResults) {
+function renderIndexTable(indexRows) {
+  console.log('[kommunbild] renderIndexTable called with:', indexRows);
+  if (!indexRows || indexRows.length === 0) {
+    console.log('[kommunbild] renderIndexTable returning empty (no rows)');
+    return "";
+  }
+
+  const header = `
+    <div style="margin-bottom: 2rem;">
+      <h3 style="color: #1e40af; margin-bottom: 1rem; font-size: 1.3rem;">📊 Index-översikt</h3>
+      <table style="width:100%; border-collapse: collapse; background: white; border-radius: 10px; overflow:hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <thead>
+          <tr style="background:#667eea; color: white; text-align:left;">
+            <th style="padding:12px 16px; font-weight: 600;">Nyckeltal</th>
+            <th style="padding:12px 16px; font-weight: 600;">Värde</th>
+            <th style="padding:12px 16px; font-weight: 600;">År</th>
+            <th style="padding:12px 16px; font-weight: 600;">Δ</th>
+            <th style="padding:12px 16px; font-weight: 600;">Jämförelse</th>
+            <th style="padding:12px 16px; font-weight: 600;">Rank</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+  
+  const body = indexRows
+    .map((r, idx) => {
+      const delta = formatDelta(r.current, r.previous, r.kpi.unit);
+      const rankText = r.rank.rank === null ? "–" : `${r.rank.rank} av ${r.rank.total}`;
+      const refText = r.refMedian === null ? "–" : formatValue(r.refMedian, r.kpi.unit);
+      
+      // Compute gap to median
+      let gapText = "";
+      if (r.refMedian !== null && r.current !== null) {
+        const gap = numberOrNull(r.current) - numberOrNull(r.refMedian);
+        if (gap !== null && !isNaN(gap)) {
+          const sign = gap > 0 ? "+" : "";
+          const gapFormatted = gap.toFixed(1);
+          gapText = ` (${sign}${gapFormatted})`;
+        }
+      }
+      
+      const rowBg = idx % 2 === 0 ? "#f8fafc" : "white";
+      const deltaColor = delta.className === "trend-improving" ? "#16a34a" : 
+                         delta.className === "trend-declining" ? "#dc2626" : "#64748b";
+      
+      return `
+        <tr style="background:${rowBg}; border-bottom: 1px solid #e2e8f0;">
+          <td style="padding:12px 16px; font-weight: 500;">${escapeHtml(r.kpi.label)}</td>
+          <td style="padding:12px 16px; font-weight: 700; color: #667eea;">${escapeHtml(formatValue(r.current, r.kpi.unit))}</td>
+          <td style="padding:12px 16px;">${escapeHtml(String(r.year ?? "–"))}</td>
+          <td style="padding:12px 16px; color: ${deltaColor}; font-weight: 600;">${escapeHtml(delta.text)}</td>
+          <td style="padding:12px 16px;">${escapeHtml(refText)}${gapText}</td>
+          <td style="padding:12px 16px;">${escapeHtml(rankText)}</td>
+        </tr>
+      `;
+    })
+    .join("");
+  
+  const footer = "</tbody></table></div>";
+  const result = header + body + footer;
+  console.log('[kommunbild] renderIndexTable HTML length:', result.length);
+  return result;
+}
+
+function renderBlocks(blockResults, indexRows) {
+  console.log('[kommunbild] renderBlocks called with indexRows:', indexRows);
   const container = document.getElementById("qualityBlocks");
   if (!container) return;
 
   const sections = blockResults
     .filter((br) => br.kpis.length > 0)
-    .map((br) => {
+    .map((br, blockIndex) => {
+      // Add index table before the first block's KPI cards
+      const indexTableHtml = blockIndex === 0 && indexRows ? renderIndexTable(indexRows) : "";
+      console.log(`[kommunbild] Block ${blockIndex} (${br.block.title}): indexTableHtml length = ${indexTableHtml.length}`);
       const cards = br.kpis
         .map((r) => {
           const delta = formatDelta(r.current, r.previous, r.kpi.unit, r.trendData5Years);
@@ -1206,6 +1283,7 @@ function renderBlocks(blockResults) {
       return `
         <div class="dashboard-section" style="padding: 1.5rem; margin: 1.25rem 0;">
           <h2>${escapeHtml(br.block.title)}</h2>
+          ${indexTableHtml}
           <div class="kpi-grid">${cards}</div>
         </div>`;
     })
@@ -1259,6 +1337,27 @@ function renderOrgTable(rows) {
   container.innerHTML = header + body + footer;
 }
 
+function renderSectionReference(blockResults) {
+  const container = document.getElementById("sectionReference");
+  if (!container) return;
+
+  const titles = [];
+  // Add block titles
+  for (const br of blockResults || []) {
+    if (br?.block?.title) titles.push(br.block.title);
+  }
+  // Add explicit table sections
+  titles.push("Index (tabell)");
+  titles.push("Organisation & struktur (tabell)");
+
+  const listHtml = titles
+    .map((t) => `<li>${escapeHtml(t)}</li>`)
+    .join("");
+  container.innerHTML = `<ul class="narrative-bullets">${listHtml}</ul>`;
+}
+
+
+
 async function renderKommunbildForMunicipality(municipalityId, forcedYear) {
   const status = document.getElementById("kommunbildStatus");
   if (status) {
@@ -1283,14 +1382,22 @@ async function renderKommunbildForMunicipality(municipalityId, forcedYear) {
     return computeKpiForMunicipality({ kpi, municipalityId, forcedYear });
   });
 
+  // 3) Index table
+  const indexRows = await mapWithConcurrency(INDEX_KPIS, DEFAULTS.maxParallelFetches, async (kpi) => {
+    return computeKpiForMunicipality({ kpi, municipalityId, forcedYear });
+  });
+
   // Generate and render executive summary before blocks
   const summary = generateExecutiveSummary(blockResults);
   renderExecutiveSummary(summary);
 
-  renderBlocks(blockResults);
+  // Render section titles reference
+  renderSectionReference(blockResults);
+
+  renderBlocks(blockResults, indexRows);
   renderOrgTable(orgRows);
 
-  // 3) Status text
+  // 4) Status text
   const year = Number.isFinite(Number(forcedYear)) ? Number(forcedYear) : DEFAULTS.year;
   if (status) {
     status.style.display = "block";

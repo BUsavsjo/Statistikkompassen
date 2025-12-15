@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <title>KPI-kort demosida</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="styles/skolenhetsdashboard.css">
+  <style>
+    body {
+      background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .demo-container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      color: #1e3a8a;
+      margin-bottom: 1rem;
+      font-size: 2.5rem;
+    }
+
+    .demo-intro {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      margin-bottom: 2rem;
+      color: #475569;
+      line-height: 1.8;
+    }
+
+    .demo-section {
+      margin-bottom: 3rem;
+    }
+
+    .demo-section h2 {
+      color: #1e40af;
+      font-size: 1.8rem;
+      margin-bottom: 1.5rem;
+      border-bottom: 3px solid #667eea;
+      padding-bottom: 0.75rem;
+    }
+
+    .demo-card-group {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .demo-card-wrapper {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .card-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #667eea;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 1.5rem;
+      display: inline-block;
+      background: #f0f4ff;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+    }
+
+    /* KPI-kort basisstil */
+    .kpi-card {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 1.5rem;
+      min-width: 220px;
+      flex: 1 1 220px;
+      box-shadow: var(--shadow-soft);
+      position: relative;
+      color: var(--text-primary);
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+      border: 1px solid var(--border);
+      border-top: 4px solid var(--accent);
+    }
+
+    .kpi-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-strong);
+    }
+
+    .kpi-card h3 {
+      font-size: 0.95em;
+      margin-bottom: 0.75em;
+      font-weight: 700;
+      color: var(--text-primary);
+      border-bottom: none;
+    }
+
+    .kpi-card .value {
+      font-size: 2.1em;
+      font-weight: 700;
+      margin: 0.35em 0;
+      letter-spacing: -0.01em;
+    }
+
+    .kpi-card .comparison {
+      font-size: 0.9em;
+      color: #4b5563;
+      margin-top: 0.35em;
+    }
+
+    .trend-arrow {
+      position: absolute;
+      top: 1.25em;
+      right: 1.25em;
+      font-size: 1.5em;
+      opacity: 0.8;
+    }
+
+    .trend-up {
+      color: var(--success);
+    }
+
+    .trend-down {
+      color: var(--danger);
+    }
+
+    .trend-stable {
+      color: var(--warning);
+    }
+
+    /* Mini-bars vertikalt */
+    .kpi-mini-bars-vertical {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+      position: relative;
+      padding: 4px 4px 10px;
+      margin-top: 1rem;
+      border-top: 1px solid var(--border);
+      padding-top: 1rem;
+    }
+
+    .kpi-mini-bar-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .kpi-mini-bar-track.vertical {
+      width: 26px;
+      height: 110px;
+      border-radius: 10px;
+      display: flex;
+      align-items: flex-end;
+      border: 1px solid #cbd5e1;
+      background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+    }
+
+    .kpi-mini-bar {
+      width: 100%;
+      border-radius: 8px 8px 0 0;
+      background: #667eea;
+      transition: transform 0.2s ease;
+    }
+
+    .kpi-mini-bar:hover {
+      transform: scaleY(1.05);
+    }
+
+    .kpi-mini-bar-label {
+      font-size: 0.7rem;
+      color: #64748b;
+      font-weight: 600;
+      text-align: center;
+      width: 100%;
+    }
+
+    .kpi-mini-bar-value {
+      font-size: 0.75rem;
+      color: #475569;
+      font-weight: 600;
+    }
+
+    /* Mini-bars horisontalt */
+    .kpi-mini-bar-row {
+      display: grid;
+      grid-template-columns: 64px 1fr 44px;
+      gap: 8px;
+      align-items: center;
+      margin-top: 0.75rem;
+    }
+
+    .kpi-mini-bar-year {
+      font-size: 0.75rem;
+      color: #64748b;
+      font-weight: 600;
+    }
+
+    .kpi-mini-bar-track {
+      height: 8px;
+      background: var(--surface-muted);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .kpi-mini-bar-latest {
+      height: 100%;
+      background: var(--primary);
+      border-radius: 999px;
+    }
+
+    /* Bar chart */
+    .bar-chart {
+      padding: 6px 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: linear-gradient(180deg, var(--surface) 0%, var(--surface-muted) 100%);
+      position: relative;
+      margin-top: 0.5rem;
+    }
+
+    .bar-chart-axis-label {
+      font-size: 0.75rem;
+      color: #475569;
+      margin-bottom: 4px;
+    }
+
+    .bar-chart-bars {
+      display: flex;
+      gap: 16px;
+      align-items: flex-end;
+      padding: 4px 2px 10px;
+      position: relative;
+    }
+
+    .bar-chart-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .bar-chart-value {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .bar-chart-bar {
+      width: 28px;
+      min-height: 6px;
+      border-radius: 6px 6px 2px 2px;
+      background: #2563eb;
+      box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
+      transition: transform 0.2s ease;
+    }
+
+    .bar-chart-bar:hover {
+      transform: translateY(-2px);
+    }
+
+    .bar-chart-label {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      text-align: center;
+    }
+
+    /* Trend chart */
+    .kpi-trend-chart {
+      margin-top: 0.5rem;
+      padding: 0.75rem;
+      background: linear-gradient(180deg, var(--surface-muted) 0%, var(--surface) 100%);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .kpi-trend-chart-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #64748b;
+      margin-bottom: 0.5rem;
+      text-align: center;
+    }
+
+    .kpi-trend-chart-legend {
+      display: flex;
+      gap: 0.6rem;
+      align-items: center;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      margin-bottom: 0.35rem;
+    }
+
+    .kpi-trend-chart-legend .legend-swatch {
+      display: inline-block;
+      width: 14px;
+      height: 4px;
+      border-radius: 999px;
+      background: #667eea;
+    }
+
+    .kpi-trend-chart svg {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      min-height: 80px;
+    }
+
+    /* Status färger */
+    .kpi-card.status-green {
+      border-left: 4px solid #10b981;
+    }
+
+    .kpi-card.status-red {
+      border-left: 4px solid #ef4444;
+    }
+
+    .kpi-card.status-lightgreen {
+      border-left: 4px solid #84cc16;
+    }
+
+    .warning {
+      color: #f39c12;
+      font-size: 0.85em;
+      margin-top: 0.75em;
+      padding: 0.5em;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      font-weight: 500;
+    }
+
+    .back-link {
+      display: inline-block;
+      color: #1e3a8a;
+      text-decoration: none;
+      margin-bottom: 1.5rem;
+      padding: 0.75rem 1.5rem;
+      background: white;
+      border-radius: 8px;
+      transition: all 0.2s;
+      font-weight: 600;
+      border: 2px solid #1e3a8a;
+    }
+
+    .back-link:hover {
+      background: #1e3a8a;
+      color: white;
+    }
+
+    .code-note {
+      font-size: 0.85rem;
+      color: #64748b;
+      background: #f1f5f9;
+      padding: 0.75rem;
+      border-radius: 6px;
+      margin-top: 1rem;
+      border-left: 3px solid #667eea;
+      font-family: 'Courier New', monospace;
+    }
+
+    @media (max-width: 768px) {
+      .demo-card-group {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-container">
+    <a href="index.html" class="back-link">← Till startsidan</a>
+
+    <h1>KPI-kort demosida</h1>
+
+    <div class="demo-intro">
+      <p>
+        Denna sida visar alla KPI-kort-typer med deras namn och layout. 
+        Använd klassnamnen och ID:na för att justera styling och funktioner.
+      </p>
+    </div>
+
+    <!-- Sektion 1: Grundläggande kort -->
+    <div class="demo-section">
+      <h2>1. Grundläggande KPI-kort</h2>
+
+      <div class="demo-card-group">
+        <!-- Typ 1: Enkelt värde-kort -->
+        <div class="demo-card-wrapper">
+          <div class="card-label">basic-kpi-card</div>
+          <div class="kpi-card">
+            <h3>Meritvärde årskurs 9</h3>
+            <span class="trend-arrow trend-up">▲</span>
+            <div class="value">238</div>
+            <div class="comparison">
+              📊 Rikets medel: 241 | Rank: 156/290
+            </div>
+            <div class="warning">
+              Förändring föregående år: -2 poäng (2023: 240)
+            </div>
+          </div>
+          <div class="code-note">.kpi-card { border-top: 4px solid var(--accent); }</div>
+        </div>
+
+        <!-- Typ 2: Grön status -->
+        <div class="demo-card-wrapper">
+          <div class="card-label">status-green-card</div>
+          <div class="kpi-card status-green">
+            <h3>Högutbildade lärare (%)</h3>
+            <span class="trend-arrow trend-up">▲</span>
+            <div class="value">78%</div>
+            <div class="comparison">
+              📊 Rikets medel: 72% | Rank: 45/290
+            </div>
+            <div class="warning">
+              Förändring föregående år: +4% (2023: 74%)
+            </div>
+          </div>
+          <div class="code-note">.kpi-card.status-green { border-left: 4px solid #10b981; }</div>
+        </div>
+
+        <!-- Typ 3: Röd status -->
+        <div class="demo-card-wrapper">
+          <div class="card-label">status-red-card</div>
+          <div class="kpi-card status-red">
+            <h3>Frånvaro (procent)</h3>
+            <span class="trend-arrow trend-down">▼</span>
+            <div class="value">6.8%</div>
+            <div class="comparison">
+              📊 Rikets medel: 5.2% | Rank: 268/290
+            </div>
+            <div class="warning">
+              Förändring föregående år: +1.2% (2023: 5.6%)
+            </div>
+          </div>
+          <div class="code-note">.kpi-card.status-red { border-left: 4px solid #ef4444; }</div>
+        </div>
+
+        <!-- Typ 4: Ljusgrön status -->
+        <div class="demo-card-wrapper">
+          <div class="card-label">status-lightgreen-card</div>
+          <div class="kpi-card status-lightgreen">
+            <h3>Elever per lärare</h3>
+            <span class="trend-arrow trend-stable">●</span>
+            <div class="value">16.5</div>
+            <div class="comparison">
+              📊 Rikets medel: 15.8 | Rank: 142/290
+            </div>
+            <div class="warning">
+              Förändring föregående år: stabil (2023: 16.5)
+            </div>
+          </div>
+          <div class="code-note">.kpi-card.status-lightgreen { border-left: 4px solid #84cc16; }</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sektion 2: Kort med mini-staplar -->
+    <div class="demo-section">
+      <h2>2. KPI-kort med mini-staplar (tidsserier)</h2>
+
+      <div class="demo-card-group">
+        <!-- Typ 5: Vertikala mini-staplar -->
+        <div class="demo-card-wrapper">
+          <div class="card-label">vertical-mini-bars</div>
+          <div class="kpi-card">
+            <h3>Betyg över tid</h3>
+            <div class="value">4.2</div>
+            <div class="comparison">📊 Trend över åren</div>
+            <div class="kpi-mini-bars-vertical">
+              <div class="kpi-mini-bar-col">
+                <div class="kpi-mini-bar-track vertical">
+                  <div class="kpi-mini-bar" style="height: 65%;"></div>
+                </div>
+                <div class="kpi-mini-bar-label">2019</div>
+              </div>
+              <div class="kpi-mini-bar-col">
+                <div class="kpi-mini-bar-track vertical">
+                  <div class="kpi-mini-bar" style="height: 72%;"></div>
+                </div>
+                <div class="kpi-mini-bar-label">2020</div>
+              </div>
+              <div class="kpi-mini-bar-col">
+                <div class="kpi-mini-bar-track vertical">
+                  <div class="kpi-mini-bar" style="height: 78%;"></div>
+                </div>
+                <div class="kpi-mini-bar-label">2021</div>
+              </div>
+              <div class="kpi-mini-bar-col">
+                <div class="kpi-mini-bar-track vertical">
+                  <div class="kpi-mini-bar" style="height: 85%;"></div>
+                </div>
+                <div class="kpi-mini-bar-label">2022</div>
+              </div>
+              <div class="kpi-mini-bar-col">
+                <div class="kpi-mini-bar-track vertical">
+                  <div class="kpi-mini-bar" style="height: 90%;"></div>
+                </div>
+                <div class="kpi-mini-bar-label">2023</div>
+              </div>
+            </div>
+          </div>
+          <div class="code-note">.kpi-mini-bars-vertical { display: flex; gap: 12px; align-items: flex-end; }</div>
+        </div>
+
+        <!-- Typ 6: Horisontala mini-staplar -->
+        <div class="demo-card-wrapper">
+          <div class="card-label">horizontal-mini-bars</div>
+          <div class="kpi-card">
+            <h3>Utveckling senaste åren</h3>
+            <div class="value">85</div>
+            <div class="comparison">📊 År-för-år jämförelse</div>
+            <div style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+              <div class="kpi-mini-bar-row">
+                <div class="kpi-mini-bar-year">2022</div>
+                <div class="kpi-mini-bar-track">
+                  <div class="kpi-mini-bar-latest" style="width: 75%;"></div>
+                </div>
+                <div class="kpi-mini-bar-value">78</div>
+              </div>
+              <div class="kpi-mini-bar-row">
+                <div class="kpi-mini-bar-year">2023</div>
+                <div class="kpi-mini-bar-track">
+                  <div class="kpi-mini-bar-latest" style="width: 90%;"></div>
+                </div>
+                <div class="kpi-mini-bar-value">85</div>
+              </div>
+            </div>
+          </div>
+          <div class="code-note">.kpi-mini-bar-row { display: grid; grid-template-columns: 64px 1fr 44px; }</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sektion 3: Kort med stapeldiagram -->
+    <div class="demo-section">
+      <h2>3. KPI-kort med stapeldiagram (comparison)</h2>
+
+      <div class="demo-card-group">
+        <!-- Typ 7: Vertikalt stapeldiagram -->
+        <div class="demo-card-wrapper">
+          <div class="card-label">bar-chart-vertical</div>
+          <div class="kpi-card">
+            <h3>Betygsfördelning åk 9</h3>
+            <div class="value">Medel 4.2</div>
+            <div class="bar-chart">
+              <div class="bar-chart-axis-label">Fördelning (%)</div>
+              <div class="bar-chart-bars">
+                <div class="bar-chart-col">
+                  <div class="bar-chart-value">8%</div>
+                  <div class="bar-chart-bar" style="height: 80px;"></div>
+                  <div class="bar-chart-label">F</div>
+                </div>
+                <div class="bar-chart-col">
+                  <div class="bar-chart-value">15%</div>
+                  <div class="bar-chart-bar" style="height: 150px;"></div>
+                  <div class="bar-chart-label">E</div>
+                </div>
+                <div class="bar-chart-col">
+                  <div class="bar-chart-value">32%</div>
+                  <div class="bar-chart-bar" style="height: 320px;"></div>
+                  <div class="bar-chart-label">D</div>
+                </div>
+                <div class="bar-chart-col">
+                  <div class="bar-chart-value">28%</div>
+                  <div class="bar-chart-bar" style="height: 280px;"></div>
+                  <div class="bar-chart-label">C</div>
+                </div>
+                <div class="bar-chart-col">
+                  <div class="bar-chart-value">17%</div>
+                  <div class="bar-chart-bar" style="height: 170px;"></div>
+                  <div class="bar-chart-label">B/A</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="code-note">.bar-chart-bars { display: flex; gap: 16px; align-items: flex-end; }</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sektion 4: Kort med trendlinje -->
+    <div class="demo-section">
+      <h2>4. KPI-kort med trendlinje (5-årig trend)</h2>
+
+      <div class="demo-card-group">
+        <!-- Typ 8: Trenddiagram -->
+        <div class="demo-card-wrapper">
+          <div class="card-label">trend-chart-card</div>
+          <div class="kpi-card">
+            <h3>Meritvärde 5-årig trend</h3>
+            <div class="value">238</div>
+            <div class="comparison">📊 Rikets medel: 241</div>
+            <div class="kpi-trend-chart">
+              <div class="kpi-trend-chart-title">Utveckling senaste 5 år</div>
+              <div class="kpi-trend-chart-legend">
+                <span class="legend-swatch"></span>
+                <span>Kommunens trend</span>
+              </div>
+              <svg viewBox="0 0 300 100" style="width: 100%; height: 80px;">
+                <!-- Baseline -->
+                <line x1="20" y1="70" x2="280" y2="70" stroke="#cbd5e1" stroke-width="1"/>
+                <!-- Trend line -->
+                <polyline points="20,60 70,55 120,48 170,42 220,35 280,30" 
+                  stroke="#667eea" stroke-width="2" fill="none" stroke-linecap="round"/>
+                <!-- Data points -->
+                <circle cx="20" cy="60" r="3" fill="#667eea"/>
+                <circle cx="70" cy="55" r="3" fill="#667eea"/>
+                <circle cx="120" cy="48" r="3" fill="#667eea"/>
+                <circle cx="170" cy="42" r="3" fill="#667eea"/>
+                <circle cx="220" cy="35" r="3" fill="#667eea"/>
+                <circle cx="280" cy="30" r="3" fill="#667eea"/>
+              </svg>
+            </div>
+          </div>
+          <div class="code-note">.kpi-trend-chart { padding: 0.75rem; border: 1px solid var(--border); }</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sektion 5: Komplexare kort -->
+    <div class="demo-section">
+      <h2>5. Komplexare kort-kombinationer</h2>
+
+      <div class="demo-card-group">
+        <!-- Typ 9: Kort med multi-component -->
+        <div class="demo-card-wrapper">
+          <div class="card-label">multi-component-card</div>
+          <div class="kpi-card status-green">
+            <h3>Lärartäthet (lärare per 100 elever)</h3>
+            <span class="trend-arrow trend-up">▲</span>
+            <div class="value">12.4</div>
+            <div class="comparison">
+              📊 Rikets medel: 11.2 | Rank: 34/290
+            </div>
+            <div style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+              <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.75rem; font-weight: 600;">
+                Utveckling:
+              </div>
+              <div class="kpi-mini-bar-row">
+                <div class="kpi-mini-bar-year">2022</div>
+                <div class="kpi-mini-bar-track">
+                  <div class="kpi-mini-bar-latest" style="width: 85%;"></div>
+                </div>
+                <div class="kpi-mini-bar-value">11.1</div>
+              </div>
+              <div class="kpi-mini-bar-row">
+                <div class="kpi-mini-bar-year">2023</div>
+                <div class="kpi-mini-bar-track">
+                  <div class="kpi-mini-bar-latest" style="width: 100%;"></div>
+                </div>
+                <div class="kpi-mini-bar-value">12.4</div>
+              </div>
+            </div>
+            <div class="warning">
+              Förändring föregående år: +1.2 (2023: 11.2)
+            </div>
+          </div>
+          <div class="code-note">Kombination av värde, jämförelse, mini-staplar och trendinfo</div>
+        </div>
+
+        <!-- Typ 10: Kort med bara tabell-data (neutral) -->
+        <div class="demo-card-wrapper">
+          <div class="card-label">neutral-data-card</div>
+          <div class="kpi-card">
+            <h3>Antal elever</h3>
+            <div class="value">3,247</div>
+            <div class="comparison">
+              📊 Rikets medelstorlek: 2,800
+            </div>
+            <div style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+              <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.75rem; font-weight: 600;">
+                Fördelning per årskurs:
+              </div>
+              <div style="display: grid; gap: 0.5rem; font-size: 0.9rem;">
+                <div style="display: flex; justify-content: space-between;">
+                  <span>Åk 4-6:</span><span style="font-weight: 600;">1,082</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                  <span>Åk 7-9:</span><span style="font-weight: 600;">1,127</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                  <span>Gymnasiet:</span><span style="font-weight: 600;">1,038</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="code-note">Neutral kortfärg för administrativa/neutral data</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sektion 6: Klassnamn & CSS-variabler -->
+    <div class="demo-section">
+      <h2>6. Klassnamn och CSS-variabler referens</h2>
+
+      <div class="demo-card-wrapper" style="grid-column: 1 / -1;">
+        <div class="card-label">css-referens</div>
+        
+        <h3 style="margin-top: 1.5rem; margin-bottom: 1rem; color: #1e40af;">KPI-kort klassnamn</h3>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 1.5rem;">
+          <tr style="border-bottom: 2px solid #667eea;">
+            <th style="text-align: left; padding: 0.75rem; background: #f0f4ff;">Klassnamn</th>
+            <th style="text-align: left; padding: 0.75rem; background: #f0f4ff;">Beskrivning</th>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 0.75rem;"><code>.kpi-card</code></td>
+            <td style="padding: 0.75rem;">Grundläggande kort med gul översta kant</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 0.75rem;"><code>.kpi-card.status-green</code></td>
+            <td style="padding: 0.75rem;">Grönt kort (bra prestanda)</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 0.75rem;"><code>.kpi-card.status-red</code></td>
+            <td style="padding: 0.75rem;">Rött kort (dålig prestanda)</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 0.75rem;"><code>.kpi-card.status-lightgreen</code></td>
+            <td style="padding: 0.75rem;">Ljusgrönt kort (neutral/bra)</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 0.75rem;"><code>.kpi-card h3</code></td>
+            <td style="padding: 0.75rem;">Kort-titel</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 0.75rem;"><code>.kpi-card .value</code></td>
+            <td style="padding: 0.75rem;">Huvudvärde (stor text)</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 0.75rem;"><code>.kpi-card .comparison</code></td>
+            <td style="padding: 0.75rem;">Jämförelseinformation med ikon</td>
+          </tr>
+        </table>
+
+        <h3 style="margin-bottom: 1rem; color: #1e40af;">Mini-staplar klassnamn</h3>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 1.5rem;">
+          <tr style="border-bottom: 2px solid #667eea;">
+            <th style="text-align: left; padding: 0.75rem; background: #f0f4ff;">Klassnamn</th>
+            <th style="text-align: left; padding: 0.75rem; background: #f0f4ff;">Beskrivning</th>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 0.75rem;"><code>.kpi-mini-bars-vertical</code></td>
+            <td style="padding: 0.75rem;">Container för vertikala staplar (flex, 5 år)</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 0.75rem;"><code>.kpi-mini-bar-col</code></td>
+            <td style="padding: 0.75rem;">En stapel + etikett</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 0.75rem;"><code>.kpi-mini-bar-track</code></td>
+            <td style="padding: 0.75rem;">Bakgrund för stapel (track)</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 0.75rem;"><code>.kpi-mini-bar</code></td>
+            <td style="padding: 0.75rem;">Själva stapeln (bakgrundsfärg)</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 0.75rem;"><code>.kpi-mini-bar-row</code></td>
+            <td style="padding: 0.75rem;">Rad i horisontell stapeltabell</td>
+          </tr>
+        </table>
+
+        <h3 style="margin-bottom: 1rem; color: #1e40af;">Diagram klassnamn</h3>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr style="border-bottom: 2px solid #667eea;">
+            <th style="text-align: left; padding: 0.75rem; background: #f0f4ff;">Klassnamn</th>
+            <th style="text-align: left; padding: 0.75rem; background: #f0f4ff;">Beskrivning</th>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 0.75rem;"><code>.bar-chart</code></td>
+            <td style="padding: 0.75rem;">Container för vertikalt stapeldiagram</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 0.75rem;"><code>.bar-chart-bars</code></td>
+            <td style="padding: 0.75rem;">Flex-container för staplar</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 0.75rem;"><code>.bar-chart-bar</code></td>
+            <td style="padding: 0.75rem;">Enskild stapel</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 0.75rem;"><code>.kpi-trend-chart</code></td>
+            <td style="padding: 0.75rem;">Container för trendlinje (SVG)</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 0.75rem;"><code>.kpi-trend-chart svg</code></td>
+            <td style="padding: 0.75rem;">SVG trendlinjediagram</td>
+          </tr>
+        </table>
+
+        <h3 style="margin: 1.5rem 0 1rem; color: #1e40af;">CSS variabler (`:root`)</h3>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr style="border-bottom: 2px solid #667eea;">
+            <th style="text-align: left; padding: 0.75rem; background: #f0f4ff;">Variabel</th>
+            <th style="text-align: left; padding: 0.75rem; background: #f0f4ff;">Värde</th>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 0.75rem;"><code>--primary</code></td>
+            <td style="padding: 0.75rem;">#2563eb (blå)</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 0.75rem;"><code>--accent</code></td>
+            <td style="padding: 0.75rem;">#f2c811 (gul)</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 0.75rem;"><code>--success</code></td>
+            <td style="padding: 0.75rem;">#2ecc71 (grön)</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 0.75rem;"><code>--danger</code></td>
+            <td style="padding: 0.75rem;">#e74c3c (röd)</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 0.75rem;"><code>--shadow-soft</code></td>
+            <td style="padding: 0.75rem;">0 10px 30px rgba(0,0,0,0.08)</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>
