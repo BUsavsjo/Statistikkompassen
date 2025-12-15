@@ -414,7 +414,8 @@ function rankOfValue(values, value, higherIsBetter) {
 
 // Set this to your proxy endpoint if you want HTTP analyze fallback (used when hook saknas)
 // Example: '/api/analyze' or full URL to your Kolada analyze proxy
-const ANALYZE_HTTP_ENDPOINT = "/api/analyze";
+// Frontend-only: disable backend proxy
+const ANALYZE_HTTP_ENDPOINT = null;
 
 let analyzeWarningShown = false;
 
@@ -698,17 +699,26 @@ function setYearSelectState({ disabled, options, selected }) {
 }
 
 function clearKommunbildContainers() {
+  // Show loader bar
+  const loader = document.getElementById("loadingBar");
+  if (loader) loader.classList.add("active");
+
   const status = document.getElementById("kommunbildStatus");
   if (status) {
-    status.style.display = "none";
-    status.textContent = "";
+    status.style.display = "block";
+    status.innerHTML = "<h4>Laddar</h4><ul class=\"narrative-bullets\"><li><strong>Hämtar</strong>: kommunvärden, jämförelse och rank.</li></ul>";
   }
 
   const blocks = document.getElementById("qualityBlocks");
-  if (blocks) blocks.innerHTML = "";
+  if (blocks) blocks.innerHTML = "<div class=\"kpi-item skeleton\"><div class=\"kpi-label\">Laddar…</div><div class=\"kpi-value\">—</div></div>";
 
   const org = document.getElementById("orgTableContainer");
-  if (org) org.innerHTML = "";
+  if (org) org.innerHTML = "<div class=\"panel-description\">Tabell laddas…</div>";
+}
+
+function hideLoadingBar() {
+  const loader = document.getElementById("loadingBar");
+  if (loader) loader.classList.remove("active");
 }
 
 async function initKommunSelect() {
@@ -1492,6 +1502,9 @@ async function renderKommunbildForMunicipality(municipalityId, forcedYear) {
 
   renderBlocks(blockResults, indexRows);
   renderOrgTable(orgRows);
+
+  // Hide loader bar
+  hideLoadingBar();
 
   // 4) Status text
   const year = Number.isFinite(Number(forcedYear)) ? Number(forcedYear) : DEFAULTS.year;
