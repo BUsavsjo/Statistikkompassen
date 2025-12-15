@@ -97,6 +97,7 @@ const MOCK_REFERENCE_DATA = {
 };
 
 const ORG_KPIS = [
+  { id: "U15401", label: "Kvalitetsindex grundskola", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
   { id: "U15011", label: "Nettokostnad per elev grundskolan", unit: "kr", higherIsBetter: false },
   { id: "N15006", label: "Kostnad grundskola åk 1-9 hemkommun, kr/elev", unit: "kr", higherIsBetter: false },
   { id: "N15031", label: "Lärare med pedagogisk högskoleexamen", unit: "%", higherIsBetter: true },
