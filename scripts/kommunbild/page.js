@@ -70,11 +70,10 @@ const TREND_KPI_IDS = new Set(["U15401", "U15456", "N15505", "N15419", "N15436",
 const MINI_TREND_KPI_IDS = new Set(["U15402", "U15200"]);
 
 // Optional: per-KPI referenskälla för svart linje.
-// Om värdet är olika från KPI själv → hämtar per-kommun-värde från det KPI:t (som N15505→U15458).
+// Om värdet är olika från KPI själv → hämtar per-kommun-värde från det KPI:t.
 // Om värdet är samma som KPI → hämtar median över alla kommuner för det KPI:t.
+// N15505, N15419, N15436, N15540 har egen specialhantering: använder riket (0000) istället för median
 const REFERENCE_MEDIAN_OVERRIDE = {
-  // N15505 har egen specialhantering i koden (U15458 per kommun), behöver ej här
-  // Men för andra: sätt till samma KPI = använd median; sätt till annat KPI = per-muni från det KPI:t
   U15456: null,  // null = standard median över alla för U15456
   N15419: null,
   N15436: null,
@@ -82,14 +81,15 @@ const REFERENCE_MEDIAN_OVERRIDE = {
   U15401: null,
 };
 
-// Mock-data för svart linje (Alla kommuner median) som fallback när riktiga anrop misslyckas
+// Mock-data för svart linje (referensvärde) som fallback när riktiga anrop misslyckas
+// N15505, N15419, N15436, N15540 = riket (0000), övriga = alla kommuner median
 const MOCK_REFERENCE_DATA = {
   U15456: { 2020: 71.4, 2021: 71.95, 2022: 69.57, 2023: 68.85, 2024: 67.49 },
-  N15419: { 2020: 70.2, 2021: 70.8, 2022: 69.1, 2023: 68.5, 2024: 67.15 },
-  N15436: { 2020: 81.5, 2021: 81.8, 2022: 80.9, 2023: 81.2, 2024: 80.8 },
-  N15540: { 2020: 68.3, 2021: 68.9, 2022: 67.8, 2023: 67.4, 2024: 66.9 },
+  N15419: { 2020: 85.2, 2021: 84.9, 2022: 84.3, 2023: 83.8, 2024: 83.2 }, // Riket
+  N15436: { 2020: 91.3, 2021: 91.1, 2022: 90.8, 2023: 90.5, 2024: 90.2 }, // Riket
+  N15540: { 2020: 78.5, 2021: 78.2, 2022: 77.8, 2023: 77.4, 2024: 77.0 }, // Riket
   U15401: { 2020: 52.3, 2021: 51.8, 2022: 50.9, 2023: 50.5, 2024: 50.17 },
-  N15505: { 2020: 217.8, 2021: 216.5, 2022: 215.2, 2023: 214.8, 2024: 213.95 },
+  N15505: { 2020: 227.4, 2021: 226.8, 2022: 225.9, 2023: 225.2, 2024: 224.6 }, // Riket
 };
 
 const ORG_KPIS = [
@@ -597,8 +597,10 @@ function renderKpiCard({
       missing_benchmark_years: missingYears
     };
 
+    const isRiketKpi = ["N15505", "N15419", "N15436", "N15540"].includes(kpiId);
+    const benchmarkLabel = isRiketKpi ? "Riket" : "Alla kommuner (median)";
     const legend = ref
-      ? `<div class="kpi-trend-chart-legend"><span class="legend-swatch" style="background:#667eea"></span>Egen kommun <span class="legend-swatch" style="background:#000"></span>Alla kommuner (median)</div>`
+      ? `<div class="kpi-trend-chart-legend"><span class="legend-swatch" style="background:#667eea"></span>Egen kommun <span class="legend-swatch" style="background:#000"></span>${benchmarkLabel}</div>`
       : `<div class="kpi-trend-chart-legend"><span class="legend-swatch" style="background:#667eea"></span>Egen kommun</div>`;
 
     const mockWarningBadge = usedMockData 
@@ -617,7 +619,7 @@ function renderKpiCard({
         <div style="display:flex;gap:1.5rem;margin-top:0.5rem;font-size:0.85rem;opacity:0.85;">
           <div style="text-align:center;">
             <div style="font-weight:bold;font-size:1rem;">${latestRefValue.toFixed(1)}</div>
-            <div style="font-size:0.75rem;opacity:0.75;margin-top:2px;">Alla kommuner (median)</div>
+            <div style="font-size:0.75rem;opacity:0.75;margin-top:2px;">${benchmarkLabel}</div>
           </div>
           <div style="text-align:center;">
             <div style="font-weight:bold;font-size:1rem;color:#667eea;">${latestOwnValue.toFixed(1)}</div>
@@ -648,7 +650,7 @@ function renderKpiCard({
     const refVal = numberOrNull(referenceValue);
     if (prevVal !== null) dataPoints.push({ label: String(previousYear ?? "2023"), value: prevVal });
     if (curVal !== null) dataPoints.push({ label: String(year ?? "2024"), value: curVal });
-    if (kpiId === "N15505" && refVal !== null) dataPoints.push({ label: "Alla kommuner (median)", value: refVal });
+    if (kpiId === "N15505" && refVal !== null) dataPoints.push({ label: "Riket", value: refVal });
     if (kpiId === "N15505" && curVal !== null) dataPoints.push({ label: "Egen kommun", value: curVal });
     if (kpiId !== "N15505" && refVal !== null) dataPoints.push({ label: "Referens", value: refVal });
 
@@ -709,7 +711,7 @@ function renderKpiCard({
         <div class="kpi-mini-bar-col">
           <div class="kpi-mini-bar-value">${ref.toFixed(1)}</div>
           <div class="kpi-mini-bar-track vertical"><div class="kpi-mini-bar" style="background:#000;height:${hRef}%"></div></div>
-          <div class="kpi-mini-bar-year">Alla kommuner (median)</div>
+          <div class="kpi-mini-bar-year">Riket</div>
         </div>
         <div class="kpi-mini-bar-col">
           <div class="kpi-mini-bar-value">${latest.toFixed(1)}</div>
@@ -810,15 +812,16 @@ async function computeKpiForMunicipality({ kpi, municipalityId, forcedYear }) {
       }
     }
 
-    // Special: for meritvärde N15505, use U15458 as comparison bar if available
-    if (kpi.id === "N15505") {
+    // Special: for N15505, N15419, N15436, N15540 use riket (0000) as reference
+    if (["N15505", "N15419", "N15436", "N15540"].includes(kpi.id)) {
       try {
-        const altRef = await fetchMunicipalityValueWithFallback("U15458", municipalityId, actualYear);
-        if (altRef?.value !== null && altRef?.value !== undefined) {
-          refMedian = numberOrNull(altRef.value);
+        const riketRef = await fetchMunicipalityValueForYear(kpi.id, "0000", actualYear);
+        if (riketRef !== null && riketRef !== undefined) {
+          refMedian = numberOrNull(riketRef);
+          console.log(`[kommunbild] Using riket (0000) as refMedian for ${kpi.id}: ${refMedian}`);
         }
       } catch (err) {
-        console.warn("[kommunbild] U15458 fallback failed", err);
+        console.warn(`[kommunbild] Riket (0000) fetch failed for ${kpi.id}`, err);
       }
     }
 
@@ -843,15 +846,22 @@ async function computeKpiForMunicipality({ kpi, municipalityId, forcedYear }) {
         // Check if we have an override that means "fetch per-municipality from another KPI" or "fetch median"
         const refSourceKpi = REFERENCE_MEDIAN_OVERRIDE[kpi.id];
         
-        if (kpi.id === "N15505" || (refSourceKpi && refSourceKpi !== kpi.id)) {
-          // Mode: per-municipality reference KPI (like N15505→U15458 or U15456→some other KPI)
-          const refKpi = kpi.id === "N15505" ? "U15458" : refSourceKpi;
-          const refPromises = years.map((y) => fetchMunicipalityValueForYear(refKpi, municipalityId, y));
+        if (["N15505", "N15419", "N15436", "N15540"].includes(kpi.id)) {
+          // Special: These KPIs use national average (municipality 0000 = riket)
+          const refPromises = years.map((y) => fetchMunicipalityValueForYear(kpi.id, "0000", y));
           const refValues = await Promise.all(refPromises);
           trendReference5Years = years
             .map((y, idx) => ({ year: Number(y), value: numberOrNull(refValues[idx]) }))
             .filter((d) => d.value !== null);
-          console.log(`[kommunbild] trend benchmark (per-muni from ${refKpi}) for ${kpi.id}:`, trendReference5Years);
+          console.log(`[kommunbild] trend benchmark (riket 0000) for ${kpi.id}:`, trendReference5Years);
+        } else if (refSourceKpi && refSourceKpi !== kpi.id) {
+          // Mode: per-municipality reference KPI (for other KPIs if configured)
+          const refPromises = years.map((y) => fetchMunicipalityValueForYear(refSourceKpi, municipalityId, y));
+          const refValues = await Promise.all(refPromises);
+          trendReference5Years = years
+            .map((y, idx) => ({ year: Number(y), value: numberOrNull(refValues[idx]) }))
+            .filter((d) => d.value !== null);
+          console.log(`[kommunbild] trend benchmark (per-muni from ${refSourceKpi}) for ${kpi.id}:`, trendReference5Years);
         } else {
           // Mode: median across all municipalities (kommuntyp K, kön T) per year
           const medianKpi = refSourceKpi ?? kpi.id;
@@ -926,9 +936,11 @@ function renderBlocks(blockResults) {
           const showComparison = r.kpi.rankable === true;
           const isIndexKpi = r.kpi.unit === "index";
           const isNKpi = r.kpi.kpi_type === "N";
+          const isRiketKpi = ["N15505", "N15419", "N15436", "N15540"].includes(r.kpi.id);
+          const refLabel = isRiketKpi ? "Riket" : "Alla kommuner (median)";
           const refText = r.refMedian === null 
-            ? (isNKpi ? "Jämförelse mot alla kommuner (median)" : isIndexKpi ? "Jämförelse visas som median för alla kommuner. Ej rangordningsbart." : "Ingen jämförelse möjlig för detta nyckeltal")
-            : `Alla kommuner (median): ${formatValue(r.refMedian, r.kpi.unit)}`;
+            ? (isNKpi ? `Jämförelse mot ${refLabel}` : isIndexKpi ? `Jämförelse visas som median för alla kommuner. Ej rangordningsbart.` : "Ingen jämförelse möjlig för detta nyckeltal")
+            : `${refLabel}: ${formatValue(r.refMedian, r.kpi.unit)}`;
           
           // Compute gap to median if both values exist
           let gapText = "";
