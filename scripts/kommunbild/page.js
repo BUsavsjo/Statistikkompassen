@@ -109,7 +109,149 @@ function requireEl(id) {
   if (!el) throw new Error(`Missing element #${id}`);
   return el;
 }
+function generateExecutiveSummary(blockResults) {
+  // Flatten all KPIs from all blocks
+  const allKpis = blockResults.flatMap((br) => br.kpis);
+  
+  // Filter out invalid KPIs
+  const validKpis = allKpis.filter((r) => 
+    r.current !== null && 
+    r.previous !== null &&
+    r.refMedian !== null
+  );
 
+  if (validKpis.length === 0) return null;
+
+  // Find biggest improvement
+  const improvements = validKpis
+    .map((r) => ({
+      ...r,
+      change: numberOrNull(r.current) - numberOrNull(r.previous),
+      changePercent: ((numberOrNull(r.current) - numberOrNull(r.previous)) / Math.abs(numberOrNull(r.previous))) * 100
+    }))
+    .filter((r) => r.change > 0);
+  
+  const biggestImprovement = improvements.length > 0
+    ? improvements.reduce((best, curr) => Math.abs(curr.change) > Math.abs(best.change) ? curr : best)
+    : null;
+
+  // Find biggest decline
+  const declines = validKpis
+    .map((r) => ({
+      ...r,
+      change: numberOrNull(r.current) - numberOrNull(r.previous),
+      changePercent: ((numberOrNull(r.current) - numberOrNull(r.previous)) / Math.abs(numberOrNull(r.previous))) * 100
+    }))
+    .filter((r) => r.change < 0);
+  
+  const biggestDecline = declines.length > 0
+    ? declines.reduce((worst, curr) => Math.abs(curr.change) > Math.abs(worst.change) ? curr : worst)
+    : null;
+
+  // Find clearly above median (top quartile by gap)
+  const aboveMedian = validKpis
+    .map((r) => ({
+      ...r,
+      gap: numberOrNull(r.current) - numberOrNull(r.refMedian),
+      gapPercent: ((numberOrNull(r.current) - numberOrNull(r.refMedian)) / Math.abs(numberOrNull(r.refMedian))) * 100
+    }))
+    .filter((r) => r.gap > 0 && r.kpi.higherIsBetter);
+  
+  const clearlyAbove = aboveMedian.length > 0
+    ? aboveMedian.reduce((best, curr) => Math.abs(curr.gap) > Math.abs(best.gap) ? curr : best)
+    : null;
+
+  // Find clearly below median (bottom quartile by gap)
+  const belowMedian = validKpis
+    .map((r) => ({
+      ...r,
+      gap: numberOrNull(r.current) - numberOrNull(r.refMedian),
+      gapPercent: ((numberOrNull(r.current) - numberOrNull(r.refMedian)) / Math.abs(numberOrNull(r.refMedian))) * 100
+    }))
+    .filter((r) => r.gap < 0 && r.kpi.higherIsBetter);
+  
+  const clearlyBelow = belowMedian.length > 0
+    ? belowMedian.reduce((worst, curr) => Math.abs(curr.gap) > Math.abs(worst.gap) ? curr : worst)
+    : null;
+
+  return {
+    biggestImprovement,
+    biggestDecline,
+    clearlyAbove,
+    clearlyBelow
+  };
+}
+
+function renderExecutiveSummary(summary) {
+  const container = document.getElementById("executiveSummary");
+  if (!container || !summary) return;
+
+  const items = [];
+
+  if (summary.biggestImprovement) {
+    const r = summary.biggestImprovement;
+    const delta = formatDelta(r.current, r.previous, r.kpi.unit, r.trendData5Years);
+    items.push(`
+      <div class="executive-summary-item positive">
+        <div class="executive-summary-item-title">📈 Största förbättring</div>
+        <div class="executive-summary-item-content">${delta.text}</div>
+        <div class="executive-summary-item-label">${escapeHtml(r.kpi.label)}</div>
+      </div>
+    `);
+  }
+
+  if (summary.biggestDecline) {
+    const r = summary.biggestDecline;
+    const delta = formatDelta(r.current, r.previous, r.kpi.unit, r.trendData5Years);
+    items.push(`
+      <div class="executive-summary-item negative">
+        <div class="executive-summary-item-title">📉 Största försämring</div>
+        <div class="executive-summary-item-content">${delta.text}</div>
+        <div class="executive-summary-item-label">${escapeHtml(r.kpi.label)}</div>
+      </div>
+    `);
+  }
+
+  if (summary.clearlyAbove) {
+    const r = summary.clearlyAbove;
+    const gap = (numberOrNull(r.current) - numberOrNull(r.refMedian)).toFixed(1);
+    const isRiketKpi = ["N15505", "N15419", "N15436", "N15540"].includes(r.kpi.id);
+    const refLabel = isRiketKpi ? "riket" : "median";
+    items.push(`
+      <div class="executive-summary-item above">
+        <div class="executive-summary-item-title">⭐ Tydligt över ${refLabel}</div>
+        <div class="executive-summary-item-content">+${gap} ${r.kpi.unit}</div>
+        <div class="executive-summary-item-label">${escapeHtml(r.kpi.label)}</div>
+      </div>
+    `);
+  }
+
+  if (summary.clearlyBelow) {
+    const r = summary.clearlyBelow;
+    const gap = Math.abs(numberOrNull(r.current) - numberOrNull(r.refMedian)).toFixed(1);
+    const isRiketKpi = ["N15505", "N15419", "N15436", "N15540"].includes(r.kpi.id);
+    const refLabel = isRiketKpi ? "riket" : "median";
+    items.push(`
+      <div class="executive-summary-item below">
+        <div class="executive-summary-item-title">⚠️ Tydligt under ${refLabel}</div>
+        <div class="executive-summary-item-content">-${gap} ${r.kpi.unit}</div>
+        <div class="executive-summary-item-label">${escapeHtml(r.kpi.label)}</div>
+      </div>
+    `);
+  }
+
+  if (items.length > 0) {
+    container.style.display = "block";
+    container.innerHTML = `
+      <div class="executive-summary">
+        <h3>🎯 Sammanfattning för beslutsfattare</h3>
+        <div class="executive-summary-grid">
+          ${items.join("")}
+        </div>
+      </div>
+    `;
+  }
+}
 function escapeHtml(text) {
   return String(text)
     .replaceAll("&", "&amp;")
@@ -532,6 +674,7 @@ function renderKpiCard({
   statusClass,
   kpiId,
   debugUrl,
+  meta,
   referenceValue,
   trendData5Years,
   trendReference5Years,
@@ -559,6 +702,34 @@ function renderKpiCard({
     if (kpiId === "U15200") return `<span class="kpi-info" title="${escapeHtml(infoTextU15200)}">ℹ️</span>`;
     return "";
   })();
+
+  // Metadata presentation (soft, not techy)
+  const metaTitle = meta?.title ?? label;
+  const metaDesc = meta?.description ?? meta?.definition ?? "Beskrivning saknas.";
+  const interpret = (() => {
+    if (unit === "%" || unit === "p") {
+      return kpiId && typeof kpiId === "string" && kpiId.startsWith("N") ? "Högre är bättre (andel/poäng)" : "Högre värde = bättre utfall";
+    }
+    if (unit === "index") return "Högre är bättre (index)";
+    return meta?.direction ? meta.direction : kpiId && kpiId.startsWith("N") ? "Högre är bättre" : "Tolka i kontext";
+  })();
+  const updated = meta?.updated ?? meta?.latest_update ?? meta?.last_updated ?? "Okänt";
+  const source = meta?.source ?? meta?.data_source ?? "Kolada";
+  const apiUrl = `${KOLADA_BASE}/kpi/${encodeURIComponent(kpiId)}`;
+
+  const metadataHtml = `
+    <details class="kpi-meta" style="margin-top:0.6rem;">
+      <summary style="cursor:pointer;font-weight:600;color:#1f2937;">Visa metadata</summary>
+      <div style="margin-top:0.35rem;font-size:0.9rem;line-height:1.4;color:#1f2937;">
+        <div style="margin-bottom:0.4rem;"><strong>Vad mäts?</strong><br>${escapeHtml(metaTitle)}</div>
+        <div style="margin-bottom:0.4rem;"><strong>Hur tolkas?</strong><br>${escapeHtml(interpret)}</div>
+        <div style="margin-bottom:0.4rem;"><strong>Beskrivning</strong><br>${escapeHtml(metaDesc)}</div>
+        <div style="margin-bottom:0.25rem;opacity:0.85;">Senast uppdaterad: ${escapeHtml(String(updated))}</div>
+        <div style="margin-bottom:0.25rem;opacity:0.85;">Datakälla: ${escapeHtml(String(source))}</div>
+        <div style="margin-bottom:0.1rem;opacity:0.85;">NID: ${escapeHtml(kpiId)}</div>
+        <div style="opacity:0.85;">URL: <a href="${escapeHtml(apiUrl)}" target="_blank" rel="noreferrer">${escapeHtml(apiUrl)}</a></div>
+      </div>
+    </details>`;
   const isMiniBarTarget =
     ["N15505", "N15504", "U15011", "U15401", "U15402"].includes(kpiId) ||
     /meritvärde|yrkesprogram|kostnad per elev|kvalitetsindex|elevenkätsindex/i.test(label || "");
@@ -780,11 +951,10 @@ function renderKpiCard({
       ${medianTextHtml}
       ${barChartHtml ? "" : compareBarsHtml}
       <div class="kpi-analysis" style="margin-top:.25rem; opacity:.7;"><strong>År:</strong> ${escapeHtml(String(year ?? "–"))}</div>
-      ${safeUrl ? `<div class="kpi-analysis" style="margin-top:.35rem; opacity:.8; font-size:.8rem; word-break:break-all; user-select:text;"><strong>URL:</strong> ${safeUrl}</div>` : ""}
       <div class="kpi-trend ${deltaClass}">${escapeHtml(deltaText)} (Δ mot föregående)</div>
       ${showComparison ? `<div class="kpi-comparison">${safeComp}${gapText ? escapeHtml(gapText) : ""}</div>` : ""}
       ${showComparison ? `<div class="kpi-analysis"><strong>Rank:</strong> ${safeRank}</div>` : ""}
-      <div class="kpi-analysis" style="margin-top:.35rem; opacity:.75;"><strong>NID:</strong> ${escapeHtml(kpiId)}</div>
+      ${metadataHtml}
     </div>
   `;
 }
@@ -806,6 +976,7 @@ function deriveCardStatus({ higherIsBetter, value, reference }) {
 
 async function computeKpiForMunicipality({ kpi, municipalityId, forcedYear }) {
   try {
+    const meta = await fetchKpiMeta(kpi.id);
     const year = Number.isFinite(Number(forcedYear)) ? Number(forcedYear) : DEFAULTS.year;
 
     const currentResult = await fetchMunicipalityValueWithFallback(kpi.id, municipalityId, year);
@@ -942,6 +1113,7 @@ async function computeKpiForMunicipality({ kpi, municipalityId, forcedYear }) {
 
     return {
       kpi,
+      meta,
       municipalityId,
       year: actualYear,
       current,
@@ -959,6 +1131,7 @@ async function computeKpiForMunicipality({ kpi, municipalityId, forcedYear }) {
     console.error("[kommunbild] computeKpiForMunicipality error", kpi?.id, err);
     return {
       kpi,
+      meta: null,
       municipalityId,
       year: Number.isFinite(Number(forcedYear)) ? Number(forcedYear) : DEFAULTS.year,
       current: null,
@@ -1021,6 +1194,7 @@ function renderBlocks(blockResults) {
             statusClass,
             kpiId: r.kpi.id,
             debugUrl,
+            meta: r.meta,
             referenceValue: r.refMedian ?? (r.rank && r.rank.median != null ? r.rank.median : null),
             trendData5Years: r.trendData5Years,
             trendReference5Years: r.trendReference5Years,
@@ -1108,6 +1282,10 @@ async function renderKommunbildForMunicipality(municipalityId, forcedYear) {
   const orgRows = await mapWithConcurrency(ORG_KPIS, DEFAULTS.maxParallelFetches, async (kpi) => {
     return computeKpiForMunicipality({ kpi, municipalityId, forcedYear });
   });
+
+  // Generate and render executive summary before blocks
+  const summary = generateExecutiveSummary(blockResults);
+  renderExecutiveSummary(summary);
 
   renderBlocks(blockResults);
   renderOrgTable(orgRows);

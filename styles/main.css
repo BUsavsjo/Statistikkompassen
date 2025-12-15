@@ -4,9 +4,27 @@
     box-sizing: border-box;
 }
 
+:root {
+    --font-base: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    --bg-app: #f5f7fb;
+    --bg-hero-start: #1e3a8a;
+    --bg-hero-mid: #2563eb;
+    --bg-hero-end: #1e40af;
+    --surface: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --primary: #2563eb;
+    --primary-strong: #1e3a8a;
+    --accent: #f2c811;
+    --shadow-strong: 0 20px 40px rgba(0, 0, 0, 0.3);
+    --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.2);
+    --radius-lg: 15px;
+    --radius-md: 12px;
+}
+
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #1e40af 100%);
+    font-family: var(--font-base);
+    background: linear-gradient(135deg, var(--bg-hero-start) 0%, var(--bg-hero-mid) 50%, var(--bg-hero-end) 100%);
     min-height: 100vh;
     display: flex;
     align-items: center;
@@ -48,40 +66,40 @@ h1 {
 }
 
 .card {
-    background: white;
-    border-radius: 15px;
+    background: var(--surface);
+    border-radius: var(--radius-lg);
     padding: 40px 30px;
     text-align: center;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--shadow-soft);
     animation: fadeInUp 0.8s ease-out;
     animation-fill-mode: both;
 }
 
 .card:nth-child(1) {
     animation-delay: 0.1s;
-    border-top: 4px solid #2563eb;
+    border-top: 4px solid var(--primary);
 }
 
 .card:nth-child(2) {
     animation-delay: 0.2s;
-    border-top: 4px solid #1e40af;
+    border-top: 4px solid var(--primary-strong);
 }
 
 .card:nth-child(3) {
     animation-delay: 0.3s;
-    border-top: 4px solid #fbbf24;
+    border-top: 4px solid var(--accent);
 }
 
 .card:nth-child(4) {
     animation-delay: 0.4s;
-    border-top: 4px solid #10b981;
+    border-top: 4px solid var(--primary);
 }
 
 .card:hover {
     transform: translateY(-10px);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow-strong);
 }
 
 .card-icon {
@@ -90,15 +108,16 @@ h1 {
     display: block;
 }
 
+
 .card h2 {
     font-size: 1.8rem;
-    color: #333;
+    color: var(--text-primary);
     margin-bottom: 15px;
     font-weight: 600;
 }
 
 .card p {
-    color: #666;
+    color: var(--text-secondary);
     font-size: 1rem;
     line-height: 1.6;
     margin-bottom: 27px;
@@ -106,7 +125,7 @@ h1 {
 
 .card-link {
     display: inline-block;
-    background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-strong) 100%);
     color: white;
     padding: 12px 30px;
     border-radius: 25px;

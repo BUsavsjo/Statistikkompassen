@@ -1,14 +1,31 @@
+:root {
+  --font-base: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  --bg-app: #f5f7fb;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --primary: #2563eb;
+  --primary-strong: #1e3a8a;
+  --accent: #f2c811;
+  --border: #e2e8f0;
+  --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.12);
+  --shadow-strong: 0 20px 40px rgba(0, 0, 0, 0.16);
+  --radius-md: 12px;
+}
+
 body {
-  font-family: Arial, sans-serif;
+  font-family: var(--font-base);
   padding: 2rem;
-  background: #e3f2fd;
+  background: var(--bg-app);
+  color: var(--text-primary);
 }
 
 canvas {
-  background: white;
+  background: var(--surface);
   padding: 1rem;
-  border-radius: 8px;
-  box-shadow: 0 0 10px #ccc;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
 }
 
 .filter-container {
@@ -20,35 +37,35 @@ canvas {
 
 .filter-btn {
   padding: 0.75rem 1.5rem;
-  border: 2px solid #2563eb;
-  background: white;
-  color: #2563eb;
-  border-radius: 8px;
+  border: 2px solid var(--primary);
+  background: var(--surface);
+  color: var(--primary);
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-weight: bold;
   transition: all 0.3s ease;
 }
 
 .filter-btn:hover {
-  background: #f0f9ff;
+  background: var(--surface-muted);
 }
 
 .filter-btn.active {
-  background: #2563eb;
+  background: var(--primary);
   color: white;
 }
 
 h1 {
-  color: #1e40af;
+  color: var(--primary-strong);
   margin-bottom: 1rem;
 }
 
 .kpi-selector {
   margin-bottom: 1.5rem;
   padding: 1rem;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 0 10px #ccc;
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
 }
 
 .selector-row {
@@ -65,18 +82,18 @@ h1 {
 
 .kpi-selector label {
   font-weight: bold;
-  color: #1e40af;
+  color: var(--primary-strong);
   display: block;
   font-size: 0.95rem;
 }
 
 .kpi-selector select {
   padding: 0.5rem 1rem;
-  border: 2px solid #2563eb;
-  border-radius: 8px;
+  border: 2px solid var(--primary);
+  border-radius: var(--radius-md);
   font-weight: bold;
   cursor: pointer;
-  background: white;
+  background: var(--surface);
   min-width: 300px;
 }
 
@@ -89,16 +106,16 @@ h1 {
   display: inline-block;
   margin-bottom: 1rem;
   padding: 0.5rem 0.75rem;
-  background: white;
-  color: #1e40af;
-  border: 2px solid #2563eb;
-  border-radius: 8px;
+  background: var(--surface);
+  color: var(--primary-strong);
+  border: 2px solid var(--primary);
+  border-radius: var(--radius-md);
   text-decoration: none;
   font-weight: 600;
 }
 
 .back-link:hover {
-  background: #f0f9ff;
+  background: var(--surface-muted);
 }
 
 .analysis-container {
@@ -109,21 +126,21 @@ h1 {
 }
 
 .analysis-box {
-  background: white;
+  background: var(--surface);
   padding: 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 0 10px #ccc;
-  border-left: 4px solid #2563eb;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+  border-left: 4px solid var(--primary);
 }
 
 .analysis-box h3 {
-  color: #1e40af;
+  color: var(--primary-strong);
   margin-bottom: 1rem;
   font-size: 1.1rem;
 }
 
 .analysis-text {
-  color: #333;
+  color: var(--text-primary);
   line-height: 1.6;
   font-size: 0.95rem;
 }
@@ -167,8 +184,8 @@ h1 {
   max-width: 800px;
   padding: 0.75rem 1rem;
   background: #fef3c7;
-  border: 1px solid #fbbf24;
-  border-radius: 8px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
   color: #92400e;
   font-weight: 600;
   display: none;
