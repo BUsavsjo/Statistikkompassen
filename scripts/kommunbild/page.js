@@ -1458,25 +1458,15 @@ async function renderKommunbildForMunicipality(municipalityId, forcedYear) {
   const status = document.getElementById("kommunbildStatus");
   if (status) {
     status.style.display = "block";
-    status.innerHTML = "<h4>Laddar</h4><ul class=\"narrative-bullets\"><li><strong>Hämtar</strong>: kommunvärden, jämförelse och rank.</li></ul>";
+    status.innerHTML = "<h4>Laddar</h4><ul class=\"narrative-bullets\"><li><strong>Fas 1</strong>: Hämtar organisation och index.</li></ul>";
   }
 
-  // 1) Compute KPI results for each configured block
-  const blockResults = await mapWithConcurrency(
-    KPI_BLOCKS,
-    1, // Reduced from 2 to 1 for better mobile performance
-    async (block) => {
-      const kpis = await mapWithConcurrency(block.kpis, DEFAULTS.maxParallelFetches, async (kpi) => {
-        return computeKpiForMunicipality({ kpi, municipalityId, forcedYear });
-      });
-      return { block, kpis };
-    }
-  );
+  const year = Number.isFinite(Number(forcedYear)) ? Number(forcedYear) : DEFAULTS.year;
 
-  // 2) Org table
+  // === FASE 1: SNABB - Rendrera billiga kort direkt ===
+  // ORG_KPIS och INDEX_KPIS kräver bara ~3 anrop vardera (värde + år + riket)
   const orgRows = await mapWithConcurrency(ORG_KPIS, DEFAULTS.maxParallelFetches, async (kpi) => {
-    const result = await computeKpiForMunicipality({ kpi, municipalityId, forcedYear });
-    // Fetch riket value for comparison in org table
+    const result = await computeKpiForMunicipality({ kpi, municipalityId, year });
     try {
       const riketValue = await fetchMunicipalityValueForYear(kpi.id, "0000", result.year);
       result.riketValue = numberOrNull(riketValue);
@@ -1487,27 +1477,52 @@ async function renderKommunbildForMunicipality(municipalityId, forcedYear) {
     return result;
   });
 
-  // 3) Index table
   const indexRows = await mapWithConcurrency(INDEX_KPIS, DEFAULTS.maxParallelFetches, async (kpi) => {
-    const result = await computeKpiForMunicipality({ kpi, municipalityId, forcedYear });
+    const result = await computeKpiForMunicipality({ kpi, municipalityId, year });
     return result;
   });
 
-  // Generate and render executive summary before blocks
+  // Rendera org och index direkt
+  renderOrgTable(orgRows);
+
+  // Uppdatera status för fase 2
+  if (status) {
+    status.innerHTML = "<h4>Laddar</h4><ul class=\"narrative-bullets\"><li><strong>Fas 1</strong>: ✓ Klar - Organisation &amp; index</li><li><strong>Fas 2</strong>: Hämtar trenddata (långsammare)...</li></ul>";
+  }
+
+  // === FASE 2: LÅNGSAM - Ladda trenddata parallellt ===
+  // Denna körs medan användaren redan ser org/index
+  const blockResultsPromise = (async () => {
+    const blockResults = await mapWithConcurrency(
+      KPI_BLOCKS,
+      1,
+      async (block) => {
+        const kpis = await mapWithConcurrency(block.kpis, DEFAULTS.maxParallelFetches, async (kpi) => {
+          return computeKpiForMunicipality({ kpi, municipalityId, year });
+        });
+        return { block, kpis };
+      }
+    );
+    return blockResults;
+  })();
+
+  // Vänta på blocks att bli klara
+  const blockResults = await blockResultsPromise;
+
+  // Generate and render executive summary
   const summary = generateExecutiveSummary(blockResults);
   renderExecutiveSummary(summary);
 
   // Render section titles reference
   renderSectionReference(blockResults);
 
+  // Rendera blocks nu när trenddata är klar
   renderBlocks(blockResults, indexRows);
-  renderOrgTable(orgRows);
 
   // Hide loader bar
   hideLoadingBar();
 
-  // 4) Status text
-  const year = Number.isFinite(Number(forcedYear)) ? Number(forcedYear) : DEFAULTS.year;
+  // 4) Status text - allt klart
   if (status) {
     status.style.display = "block";
     status.innerHTML = `
@@ -1515,6 +1530,7 @@ async function renderKommunbildForMunicipality(municipalityId, forcedYear) {
       <ul class="narrative-bullets">
         <li><strong>Kommun</strong>: ${escapeHtml(municipalityId)}</li>
         <li><strong>År</strong>: ${escapeHtml(String(year))}</li>
+        <li><strong>Status</strong>: Alla KPI:er inladdade</li>
       </ul>
     `;
   }
