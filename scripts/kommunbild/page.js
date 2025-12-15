@@ -22,7 +22,6 @@ const KPI_BLOCKS = [
   {
     title: "Övergripande kvalitet och index",
     kpis: [
-      { id: "U15401", label: "Kvalitetsindex grundskola", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
       { id: "U15456", label: "Åk 9: Alla ämnen godkända (modellberäknat)", unit: "%", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
     ],
   },
@@ -60,6 +59,7 @@ const KPI_BLOCKS = [
 
 // Index-tabell KPI:er (visas i separat tabell)
 const INDEX_KPIS = [
+  { id: "U15401", label: "Kvalitetsindex grundskola", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
   { id: "U15900", label: "Effektivitetsindex kommunal grundskola F-9", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
   { id: "U15010", label: "Resursindex kommunal grundskola F-9", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
   { id: "U15200", label: "Medarbetarengagemang grundskola och förskoleklass", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
@@ -97,7 +97,6 @@ const MOCK_REFERENCE_DATA = {
 };
 
 const ORG_KPIS = [
-  { id: "U15401", label: "Kvalitetsindex grundskola", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
   { id: "U15011", label: "Nettokostnad per elev grundskolan", unit: "kr", higherIsBetter: false },
   { id: "N15006", label: "Kostnad grundskola åk 1-9 hemkommun, kr/elev", unit: "kr", higherIsBetter: false },
   { id: "N15031", label: "Lärare med pedagogisk högskoleexamen", unit: "%", higherIsBetter: true },
