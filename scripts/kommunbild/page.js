@@ -274,6 +274,44 @@ function numberOrNull(value) {
   return Number.isFinite(num) ? num : null;
 }
 
+// Klassificera nivå och trend utan riket-jämförelse
+function classifyLevel(value) {
+  const v = numberOrNull(value);
+  if (v === null) return { label: "Ingen nivå", color: "#94a3b8", band: null };
+  if (v >= 90) return { label: "Stark nivå", color: "#16a34a", band: "strong" };
+  if (v >= 80) return { label: "Acceptabel nivå", color: "#0ea5e9", band: "ok" };
+  if (v >= 70) return { label: "Risknivå", color: "#f97316", band: "risk" };
+  return { label: "Problemnivå", color: "#dc2626", band: "problem" };
+}
+
+function classifyTrend(current, previous) {
+  const c = numberOrNull(current);
+  const p = numberOrNull(previous);
+  if (c === null || p === null) return { label: "Ingen trend", color: "#94a3b8", dir: null, strength: "none", delta: null };
+  const delta = c - p;
+  const abs = Math.abs(delta);
+  let strength = "stabil";
+  if (abs > 5) strength = "kraftig";
+  else if (abs > 3) strength = "tydlig";
+  else if (abs > 1) strength = "svag";
+  const dir = delta > 0 ? "up" : delta < 0 ? "down" : null;
+  const directionLabel = dir === "up" ? "ökning" : dir === "down" ? "minskning" : "stabilt";
+  const label = strength === "stabil" ? "Stabilt" : `${strength[0].toUpperCase()}${strength.slice(1)} ${directionLabel}`;
+  const color = dir === null ? "#94a3b8" : dir === "up" ? "#16a34a" : "#dc2626";
+  return { label, color, dir, strength, delta };
+}
+
+function buildInterpretation(levelBand, trendDir, trendStrength) {
+  if (!trendDir || trendStrength === "none") return "Ingen trend";
+  const isHigh = levelBand === "strong" || levelBand === "ok";
+  const isLow = levelBand === "risk" || levelBand === "problem";
+  if (isHigh && trendDir === "down") return "Varningssignal";
+  if (isLow && trendDir === "up") return "Förbättring pågår";
+  if (isLow && trendDir === "down") return "Prioriterat problem";
+  if (isHigh && trendStrength === "stabil") return "Robust läge";
+  return "Balanserat läge";
+}
+
 function formatValue(value, unit) {
   if (value === null) return "Ej publicerat för valt år";
   const num = numberOrNull(value);
@@ -1194,9 +1232,9 @@ function renderIndexTable(indexRows) {
           <tr style="background:#667eea; color: white; text-align:left;">
             <th style="padding:12px 16px; font-weight: 600;">Nyckeltal</th>
             <th style="padding:12px 16px; font-weight: 600;">Värde</th>
+            <th style="padding:12px 16px; font-weight: 600;">Analys</th>
             <th style="padding:12px 16px; font-weight: 600;">År</th>
             <th style="padding:12px 16px; font-weight: 600;">Δ</th>
-            <th style="padding:12px 16px; font-weight: 600;">Jämförelse</th>
             <th style="padding:12px 16px; font-weight: 600;">Rank</th>
           </tr>
         </thead>
@@ -1207,18 +1245,11 @@ function renderIndexTable(indexRows) {
     .map((r, idx) => {
       const delta = formatDelta(r.current, r.previous, r.kpi.unit);
       const rankText = r.rank.rank === null ? "–" : `${r.rank.rank} av ${r.rank.total}`;
-      const refText = r.refMedian === null ? "–" : formatValue(r.refMedian, r.kpi.unit);
-      
-      // Compute gap to median
-      let gapText = "";
-      if (r.refMedian !== null && r.current !== null) {
-        const gap = numberOrNull(r.current) - numberOrNull(r.refMedian);
-        if (gap !== null && !isNaN(gap)) {
-          const sign = gap > 0 ? "+" : "";
-          const gapFormatted = gap.toFixed(1);
-          gapText = ` (${sign}${gapFormatted})`;
-        }
-      }
+      const level = classifyLevel(r.current);
+      const trend = classifyTrend(r.current, r.previous);
+      const interpretation = buildInterpretation(level.band, trend.dir, trend.strength);
+      const analysisText = `${level.label} • ${trend.label} • ${interpretation}`;
+      const analysisColor = trend.dir === "down" ? "#dc2626" : trend.dir === "up" ? "#16a34a" : level.color;
       
       const rowBg = idx % 2 === 0 ? "#f8fafc" : "white";
       const deltaColor = delta.className === "trend-improving" ? "#16a34a" : 
@@ -1228,9 +1259,9 @@ function renderIndexTable(indexRows) {
         <tr style="background:${rowBg}; border-bottom: 1px solid #e2e8f0;">
           <td style="padding:12px 16px; font-weight: 500;">${escapeHtml(r.kpi.label)}</td>
           <td style="padding:12px 16px; font-weight: 700; color: #667eea;">${escapeHtml(formatValue(r.current, r.kpi.unit))}</td>
+          <td style="padding:12px 16px; color:${analysisColor}; font-weight:600;">${escapeHtml(analysisText)}</td>
           <td style="padding:12px 16px;">${escapeHtml(String(r.year ?? "–"))}</td>
           <td style="padding:12px 16px; color: ${deltaColor}; font-weight: 600;">${escapeHtml(delta.text)}</td>
-          <td style="padding:12px 16px;">${escapeHtml(refText)}${gapText}</td>
           <td style="padding:12px 16px;">${escapeHtml(rankText)}</td>
         </tr>
       `;
@@ -1332,6 +1363,8 @@ function renderOrgTable(rows) {
         <tr style="background:#f1f5f9; text-align:left;">
           <th style="padding:10px 12px;">Nyckeltal</th>
           <th style="padding:10px 12px;">Värde</th>
+          <th style="padding:10px 12px;">Riket</th>
+          <th style="padding:10px 12px;">Analys</th>
           <th style="padding:10px 12px;">År</th>
           <th style="padding:10px 12px;">Δ</th>
           <th style="padding:10px 12px;">Rank</th>
@@ -1340,15 +1373,43 @@ function renderOrgTable(rows) {
       </thead>
       <tbody>
   `;
+
   const body = rows
     .map((r) => {
       const delta = formatDelta(r.current, r.previous, r.kpi.unit, r.trendData5Years);
       const rankText = r.rank.rank === null ? "–" : `${r.rank.rank} av ${r.rank.total}`;
       const deltaTooltip = delta.isLargeChange ? "title=\"Större än normal variation\"" : "";
+      const riketValue = r.riketValue !== null && r.riketValue !== undefined ? formatValue(r.riketValue, r.kpi.unit) : "–";
+      // Prefer riket-based analysis when available; otherwise fallback to level/trend interpretation
+      let analysisText = "–";
+      let analysisColor = "#94a3b8";
+      if (r.current !== null && r.riketValue !== null) {
+        const diff = r.current - r.riketValue;
+        const tolerance = Math.abs(r.riketValue) * 0.05;
+        if (Math.abs(diff) <= tolerance) {
+          analysisText = "Nivå med riket";
+          analysisColor = "#0284c7";
+        } else if ((r.kpi.higherIsBetter && diff > 0) || (!r.kpi.higherIsBetter && diff < 0)) {
+          analysisText = "Över riket";
+          analysisColor = "#16a34a";
+        } else {
+          analysisText = "Under riket";
+          analysisColor = "#dc2626";
+        }
+      } else {
+        const level = classifyLevel(r.current);
+        const trend = classifyTrend(r.current, r.previous);
+        const interpretation = buildInterpretation(level.band, trend.dir, trend.strength);
+        analysisText = `${level.label} • ${trend.label} • ${interpretation}`;
+        analysisColor = trend.dir === "down" ? "#dc2626" : trend.dir === "up" ? "#16a34a" : level.color;
+      }
+
       return `
         <tr style="border-top: 1px solid #e2e8f0;">
           <td style="padding:10px 12px; font-weight:600; color:#0f172a;">${escapeHtml(r.kpi.label)}</td>
           <td style="padding:10px 12px;">${escapeHtml(formatValue(r.current, r.kpi.unit))}</td>
+          <td style="padding:10px 12px; color:#64748b;">${escapeHtml(riketValue)}</td>
+          <td style="padding:10px 12px; color:${analysisColor}; font-weight:600;">${escapeHtml(analysisText)}</td>
           <td style="padding:10px 12px;">${escapeHtml(String(r.year ?? "–"))}</td>
           <td style="padding:10px 12px;" class="${delta.className}" ${deltaTooltip}>${escapeHtml(delta.text)}</td>
           <td style="padding:10px 12px;">${escapeHtml(rankText)}</td>
@@ -1357,8 +1418,8 @@ function renderOrgTable(rows) {
       `;
     })
     .join("");
-  const footer = "</tbody></table>";
 
+  const footer = "</tbody></table>";
   container.innerHTML = header + body + footer;
 }
 
@@ -1404,12 +1465,22 @@ async function renderKommunbildForMunicipality(municipalityId, forcedYear) {
 
   // 2) Org table
   const orgRows = await mapWithConcurrency(ORG_KPIS, DEFAULTS.maxParallelFetches, async (kpi) => {
-    return computeKpiForMunicipality({ kpi, municipalityId, forcedYear });
+    const result = await computeKpiForMunicipality({ kpi, municipalityId, forcedYear });
+    // Fetch riket value for comparison in org table
+    try {
+      const riketValue = await fetchMunicipalityValueForYear(kpi.id, "0000", result.year);
+      result.riketValue = numberOrNull(riketValue);
+    } catch (err) {
+      console.warn(`[kommunbild] Could not fetch riket value for ${kpi.id}:`, err);
+      result.riketValue = null;
+    }
+    return result;
   });
 
   // 3) Index table
   const indexRows = await mapWithConcurrency(INDEX_KPIS, DEFAULTS.maxParallelFetches, async (kpi) => {
-    return computeKpiForMunicipality({ kpi, municipalityId, forcedYear });
+    const result = await computeKpiForMunicipality({ kpi, municipalityId, forcedYear });
+    return result;
   });
 
   // Generate and render executive summary before blocks
