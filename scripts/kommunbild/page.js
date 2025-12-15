@@ -137,20 +137,69 @@ function formatValue(value, unit) {
   return `${nf.format(num)}${unit ? ` ${unit}` : ""}`;
 }
 
-function formatDelta(current, previous, unit) {
-  if (current === null || previous === null) return { text: "Ingen förändring beräknad", className: "trend-stable" };
+function formatDelta(current, previous, unit, trendData5Years = null) {
+  if (current === null || previous === null) return { text: "Ingen förändring beräknad", className: "trend-stable", icon: "" };
   const c = numberOrNull(current);
   const p = numberOrNull(previous);
-  if (c === null || p === null) return { text: "Ingen förändring beräknad", className: "trend-stable" };
+  if (c === null || p === null) return { text: "Ingen förändring beräknad", className: "trend-stable", icon: "" };
   const d = c - p;
 
-  const nf = new Intl.NumberFormat("sv-SE", { maximumFractionDigits: unit === "%" ? 1 : 2 });
-  const sign = d > 0 ? "+" : d < 0 ? "" : "";
-
+  // Standardized decimals: always 1 decimal for consistency
+  const nf = new Intl.NumberFormat("sv-SE", { 
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1 
+  });
+  
+  // Direction icon and text
+  let icon = "";
+  let direction = "";
   let className = "trend-stable";
-  if (Math.abs(d) > 0) className = d > 0 ? "trend-improving" : "trend-declining";
+  
+  if (Math.abs(d) < 0.05) {
+    // Negligible change
+    icon = "→";
+    direction = "oförändrat";
+    className = "trend-stable";
+  } else if (d > 0) {
+    icon = "↑";
+    direction = "upp";
+    className = "trend-improving";
+  } else {
+    icon = "↓";
+    direction = "ner";
+    className = "trend-declining";
+  }
 
-  return { text: `${sign}${nf.format(d)}${unit ? ` ${unit}` : ""}`, className };
+  // Check if this is a large change (> 2x standard deviation from 5-year changes)
+  let isLargeChange = false;
+  if (trendData5Years && trendData5Years.length >= 3) {
+    const changes = [];
+    for (let i = 1; i < trendData5Years.length; i++) {
+      const change = trendData5Years[i].value - trendData5Years[i - 1].value;
+      if (change !== null && !isNaN(change)) changes.push(Math.abs(change));
+    }
+    if (changes.length >= 2) {
+      const mean = changes.reduce((a, b) => a + b, 0) / changes.length;
+      const variance = changes.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / changes.length;
+      const stdDev = Math.sqrt(variance);
+      if (Math.abs(d) > mean + 2 * stdDev) {
+        isLargeChange = true;
+      }
+    }
+  }
+
+  const sign = d > 0 ? "+" : d < 0 ? "" : "±";
+  const deltaValue = Math.abs(d) < 0.05 ? "0.0" : nf.format(d);
+  const unitStr = unit ? ` ${unit}` : "";
+  const largeChangeBadge = isLargeChange ? " ⚠️" : "";
+  
+  return { 
+    text: `${icon} ${sign}${deltaValue}${unitStr}${largeChangeBadge}`, 
+    className,
+    icon,
+    direction,
+    isLargeChange
+  };
 }
 
 function median(nums) {
@@ -932,7 +981,7 @@ function renderBlocks(blockResults) {
     .map((br) => {
       const cards = br.kpis
         .map((r) => {
-          const delta = formatDelta(r.current, r.previous, r.kpi.unit);
+          const delta = formatDelta(r.current, r.previous, r.kpi.unit, r.trendData5Years);
           const showComparison = r.kpi.rankable === true;
           const isIndexKpi = r.kpi.unit === "index";
           const isNKpi = r.kpi.kpi_type === "N";
@@ -1016,14 +1065,15 @@ function renderOrgTable(rows) {
   `;
   const body = rows
     .map((r) => {
-      const delta = formatDelta(r.current, r.previous, r.kpi.unit);
+      const delta = formatDelta(r.current, r.previous, r.kpi.unit, r.trendData5Years);
       const rankText = r.rank.rank === null ? "–" : `${r.rank.rank} av ${r.rank.total}`;
+      const deltaTooltip = delta.isLargeChange ? "title=\"Större än normal variation\"" : "";
       return `
         <tr style="border-top: 1px solid #e2e8f0;">
           <td style="padding:10px 12px; font-weight:600; color:#0f172a;">${escapeHtml(r.kpi.label)}</td>
           <td style="padding:10px 12px;">${escapeHtml(formatValue(r.current, r.kpi.unit))}</td>
           <td style="padding:10px 12px;">${escapeHtml(String(r.year ?? "–"))}</td>
-          <td style="padding:10px 12px;" class="${delta.className}">${escapeHtml(delta.text)}</td>
+          <td style="padding:10px 12px;" class="${delta.className}" ${deltaTooltip}>${escapeHtml(delta.text)}</td>
           <td style="padding:10px 12px;">${escapeHtml(rankText)}</td>
           <td style="padding:10px 12px; opacity:.8;">${escapeHtml(r.kpi.id)}</td>
         </tr>
