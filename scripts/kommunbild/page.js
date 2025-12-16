@@ -22,14 +22,9 @@ const DEFAULTS = {
  */
 const KPI_BLOCKS = [
   {
-    title: "Övergripande kvalitet och index",
+    title: "Kunskapsresultat",
     kpis: [
       { id: "U15456", label: "Åk 9: Alla ämnen godkända (modellberäknat)", unit: "%", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
-    ],
-  },
-  {
-    title: "Kunskapsresultat – betyg och måluppfyllelse",
-    kpis: [
       { id: "N15505", label: "Meritvärde åk 9 (kommunala skolor)", unit: "p", higherIsBetter: true, kpi_type: "N", rankable: true },
       { id: "N15419", label: "Åk 9: Alla ämnen godkända (kommunala skolor)", unit: "%", higherIsBetter: true, kpi_type: "N", rankable: true },
       { id: "N15436", label: "Åk 9: Behöriga till yrkesprogram (kommunala skolor)", unit: "%", higherIsBetter: true, kpi_type: "N", rankable: true },
@@ -37,22 +32,17 @@ const KPI_BLOCKS = [
     ],
   },
   {
-    title: "Nationella prov tidiga resultat",
+    title: "Tidiga signaler",
     kpis: [
       { id: "N15473", label: "Elever i åk 3 som klarat alla delar av nationella proven för ämnesprovet i matematik, hemkommun, andel (%)", unit: "%", higherIsBetter: true, kpi_type: "N", rankable: true },
       { id: "N15472", label: "Elever i åk 3 som klarat alla delar av nationella proven för ämnesprovet i svenska och svenska som andraspråk, hemkommun, andel (%)", unit: "%", higherIsBetter: true, kpi_type: "N", rankable: true },
     ],
   },
   {
-    title: "Trygghet – elever",
+    title: "Trygghet och studiero",
     kpis: [
       { id: "N15613", label: "Trygghet i skolan åk 5", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
       { id: "N15643", label: "Trygghet i skolan åk 8", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
-    ],
-  },
-  {
-    title: "Trygghet och studiero – personal",
-    kpis: [
       { id: "N15313", label: "Pedagogisk personal: studiero på lektioner", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
       { id: "N15331", label: "Uppföljning av elevers upplevelse av studiero", unit: "index", higherIsBetter: true, kpi_type: "N", rankable: true },
     ],
@@ -104,7 +94,6 @@ const ORG_KPIS = [
   { id: "N15031", label: "Lärare med pedagogisk högskoleexamen", unit: "%", higherIsBetter: true },
   { id: "N15814", label: "Lärare med legitimation och behörighet", unit: "%", higherIsBetter: true },
   { id: "N15034", label: "Elever/lärare grundskola", unit: "antal", higherIsBetter: false },
-  { id: "U15200", label: "Medarbetarengagemang grundskola och förskoleklass", unit: "index", higherIsBetter: true, kpi_type: "U", rankable: true, comparison_type: "median" },
 ];
 
 function $(id) {
@@ -714,6 +703,9 @@ function clearKommunbildContainers() {
 
   const org = document.getElementById("orgTableContainer");
   if (org) org.innerHTML = "<div class=\"panel-description\">Tabell laddas…</div>";
+
+  const indexTable = document.getElementById("indexTableContainer");
+  if (indexTable) indexTable.innerHTML = "<div class=\"panel-description\">Index laddas…</div>";
 }
 
 function hideLoadingBar() {
@@ -1291,10 +1283,7 @@ function renderBlocks(blockResults, indexRows) {
 
   const sections = blockResults
     .filter((br) => br.kpis.length > 0)
-    .map((br, blockIndex) => {
-      // Add index table before the first block's KPI cards
-      const indexTableHtml = blockIndex === 0 && indexRows ? renderIndexTable(indexRows) : "";
-      console.log(`[kommunbild] Block ${blockIndex} (${br.block.title}): indexTableHtml length = ${indexTableHtml.length}`);
+    .map((br) => {
       const cards = br.kpis
         .map((r) => {
           const delta = formatDelta(r.current, r.previous, r.kpi.unit, r.trendData5Years);
@@ -1349,7 +1338,6 @@ function renderBlocks(blockResults, indexRows) {
       return `
         <div class="dashboard-section" style="padding: 1.5rem; margin: 1.25rem 0;">
           <h2>${escapeHtml(br.block.title)}</h2>
-          ${indexTableHtml}
           <div class="kpi-grid">${cards}</div>
         </div>`;
     })
@@ -1482,8 +1470,15 @@ async function renderKommunbildForMunicipality(municipalityId, forcedYear) {
     return result;
   });
 
-  // Rendera org och index direkt
+  // Rendera org och index direkt (Fas 1)
   renderOrgTable(orgRows);
+  
+  // Rendera index-tabell i egen container
+  const indexContainer = document.getElementById("indexTableContainer");
+  if (indexContainer && indexRows) {
+    indexContainer.innerHTML = renderIndexTable(indexRows);
+    console.log('[kommunbild] Index table rendered in Fas 1');
+  }
 
   // Uppdatera status för fase 2
   if (status) {
@@ -1586,6 +1581,7 @@ function preloadKpiMetadata() {
   const allKpiIds = [
     ...KPI_BLOCKS.flatMap((b) => b.kpis.map((k) => k.id)),
     ...ORG_KPIS.map((k) => k.id),
+    ...INDEX_KPIS.map((k) => k.id),
   ];
   const uniq = Array.from(new Set(allKpiIds));
   

@@ -766,6 +766,15 @@
       <div id="kommunbildStatus" class="narrativ-text" style="display:block; min-height: 60px;"></div>
     </div>
 
+    <!-- === INDEX-ÖVERSIKT SEKTION === -->
+    <!-- Visar övergripande index (kvalitet, effektivitet, resurser, medarbetare, elever) som tabell -->
+    <div class="dashboard-section" id="kommunbildIndex">
+      <h2>Index-översikt</h2>
+      <p class="panel-description">Övergripande index som sammanfattar verksamhetens kvalitet, effektivitet, resurser och engagemang.</p>
+      <!-- Index-tabell genereras av JS -->
+      <div id="indexTableContainer"></div>
+    </div>
+
     <!-- === KVALITETS-SEKTION === -->
     <!-- Visar KPI-kort för verksamhetens kvalitet (resultat, trivsel, betyg etc.) -->
     <!-- Alla kort i denna sektion genereras dynamiskt av JS baserat på OVERVIEW_KPIS -->
@@ -780,7 +789,7 @@
     <!-- Data från OVERVIEW_KPIS i scripts/kommunbild/page.js -->
     <div class="dashboard-section" id="kommunbildOrg">
       <h2>Organisation &amp; struktur</h2>
-      <p class="panel-description">Nyckeltal om resurser, struktur och organisation. Visas som tabell (utan diagram).</p>
+      <p class="panel-description">Insatser och förutsättningar (resurser, personal, gruppstorlek). Visas som tabell (utan diagram).</p>
       <!-- Tabell genereras av JS -->
       <div id="orgTableContainer"></div>
     </div>
@@ -814,6 +823,6 @@
        - Skapar styrande analys och trafikljus
        - Hanterar användarinteraktion (val av kommun/år)
   -->
-  <script type="module" src="scripts/kommunbild/page.js?v=14"></script>
+  <script type="module" src="scripts/kommunbild/page.js?v=17"></script>
 </body>
 </html>
