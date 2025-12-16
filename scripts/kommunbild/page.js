@@ -37,7 +37,7 @@ const KPI_BLOCKS = [
     ],
   },
   {
-    title: "Nationella prov – genomförande",
+    title: "Nationella prov tidiga resultat",
     kpis: [
       { id: "N15473", label: "Elever i åk 3 som klarat alla delar av nationella proven för ämnesprovet i matematik, hemkommun, andel (%)", unit: "%", higherIsBetter: true, kpi_type: "N", rankable: true },
       { id: "N15472", label: "Elever i åk 3 som klarat alla delar av nationella proven för ämnesprovet i svenska och svenska som andraspråk, hemkommun, andel (%)", unit: "%", higherIsBetter: true, kpi_type: "N", rankable: true },
