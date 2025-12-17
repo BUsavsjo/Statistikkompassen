@@ -1454,7 +1454,7 @@ async function renderKommunbildForMunicipality(municipalityId, forcedYear) {
   // === FASE 1: SNABB - Rendrera billiga kort direkt ===
   // ORG_KPIS och INDEX_KPIS kräver bara ~3 anrop vardera (värde + år + riket)
   const orgRows = await mapWithConcurrency(ORG_KPIS, DEFAULTS.maxParallelFetches, async (kpi) => {
-    const result = await computeKpiForMunicipality({ kpi, municipalityId, year });
+    const result = await computeKpiForMunicipality({ kpi, municipalityId, forcedYear: year });
     try {
       const riketValue = await fetchMunicipalityValueForYear(kpi.id, "0000", result.year);
       result.riketValue = numberOrNull(riketValue);
@@ -1466,7 +1466,7 @@ async function renderKommunbildForMunicipality(municipalityId, forcedYear) {
   });
 
   const indexRows = await mapWithConcurrency(INDEX_KPIS, DEFAULTS.maxParallelFetches, async (kpi) => {
-    const result = await computeKpiForMunicipality({ kpi, municipalityId, year });
+    const result = await computeKpiForMunicipality({ kpi, municipalityId, forcedYear: year });
     return result;
   });
 
@@ -1493,7 +1493,7 @@ async function renderKommunbildForMunicipality(municipalityId, forcedYear) {
       1,
       async (block) => {
         const kpis = await mapWithConcurrency(block.kpis, DEFAULTS.maxParallelFetches, async (kpi) => {
-          return computeKpiForMunicipality({ kpi, municipalityId, year });
+          return computeKpiForMunicipality({ kpi, municipalityId, forcedYear: year });
         });
         return { block, kpis };
       }
