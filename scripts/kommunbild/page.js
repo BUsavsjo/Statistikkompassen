@@ -9,6 +9,7 @@ const KOLADA_DATA_BASE = `${KOLADA_BASE}/data/kpi`;
 const kpiMetaCache = new Map();
 const allMunicipalitiesCache = new Map(); // Cache for fetchAllMunicipalitiesForYear
 const municipalityValueCache = new Map(); // Cache for individual municipality values
+const trendBundleCache = new Map(); // Cache for trend bundles: key = "kpiId_municipalityId_year"
 
 const DEFAULTS = {
   municipalityId: "0684", // Sävsjö (bra för dev)
@@ -60,10 +61,38 @@ const INDEX_KPIS = [
 
 // KPIs that should show a 5-year trend line
 // KPIs that should show a 5-year trend with comparison to all municipalities
-const TREND_KPI_IDS = new Set(["U15401", "U15456", "N15505", "N15419", "N15436", "N15540"]);
+// Trendspann per KPI (standard 5 år om inte specificerat)
+const TREND_YEARS_5 = new Set([
+  // Kunskapsresultat (5 år)
+  "U15456", "N15505", "N15419", "N15436", "N15540",
+  // Tidiga signaler (5 år)
+  "N15473", "N15472",
+  // Index – långa trender (5 år)
+  "U15401", "U15900", "U15010",
+  // Organisation & struktur (5 år)
+  "U15011", "N15006", "N15031", "N15814", "N15034",
+]);
 
-// KPIs that should show mini-trend (2-3 years) - enkätkort
-const MINI_TREND_KPI_IDS = new Set(["U15402", "U15200"]);
+const TREND_YEARS_3 = new Set([
+  // Trygghet och studiero (3 år – enkätbrus)
+  "N15613", "N15643", "N15313", "N15331",
+  // Index – kortare enkättrender (3 år)
+  "U15200", "U15402",
+]);
+
+// === PATCH: kritiska crash-fixar (lägg nära dina TREND_YEARS_* set) ===
+// 1) TREND_KPI_IDS saknades (används i computeKpiForMunicipality)
+const TREND_KPI_IDS = new Set([...TREND_YEARS_5, ...TREND_YEARS_3]);
+
+// 2) MINI_TREND_KPI_IDS saknades (används i renderKpiCard)
+// Om du inte använder renderKpiCard längre kan du istället ta bort villkoret där.
+// Men detta gör att det aldrig kraschar oavsett.
+const MINI_TREND_KPI_IDS = new Set();
+
+function getTrendSpanYears(kpiId) {
+  if (TREND_YEARS_3.has(kpiId)) return 3;
+  return 5; // default
+}
 
 // Optional: per-KPI referenskälla för svart linje.
 // Om värdet är olika från KPI själv → hämtar per-kommun-värde från det KPI:t.
@@ -77,7 +106,7 @@ const REFERENCE_MEDIAN_OVERRIDE = {
   U15401: null,
 };
 
-// Mock-data för svart linje (referensvärde) som fallback när riktiga anrop misslyckas
+// Uppskattning för svart linje (referensvärde) som fallback när riktiga anrop misslyckas
 // N15505, N15419, N15436, N15540 = riket (0000), övriga = alla kommuner median
 const MOCK_REFERENCE_DATA = {
   U15456: { 2020: 71.4, 2021: 71.95, 2022: 69.57, 2023: 68.85, 2024: 67.49 },
@@ -106,69 +135,83 @@ function requireEl(id) {
   return el;
 }
 function generateExecutiveSummary(blockResults) {
-  // Flatten all KPIs from all blocks
   const allKpis = blockResults.flatMap((br) => br.kpis);
-  
-  // Filter out invalid KPIs
-  const validKpis = allKpis.filter((r) => 
-    r.current !== null && 
+  const validKpis = allKpis.filter((r) =>
+    r.current !== null &&
     r.previous !== null &&
     r.refMedian !== null
   );
 
   if (validKpis.length === 0) return null;
 
-  // Find biggest improvement
-  const improvements = validKpis
-    .map((r) => ({
-      ...r,
-      change: numberOrNull(r.current) - numberOrNull(r.previous),
-      changePercent: ((numberOrNull(r.current) - numberOrNull(r.previous)) / Math.abs(numberOrNull(r.previous))) * 100
-    }))
-    .filter((r) => r.change > 0);
-  
-  const biggestImprovement = improvements.length > 0
-    ? improvements.reduce((best, curr) => Math.abs(curr.change) > Math.abs(best.change) ? curr : best)
-    : null;
+  // --- Förändring mot föregående år (bättre riktning) ---
+  const withChange = validKpis
+    .map((r) => {
+      const c = numberOrNull(r.current);
+      const p = numberOrNull(r.previous);
+      const betterChange = orientedDiff(c, p, r.kpi.higherIsBetter); // >0 = förbättring
+      const changePercent =
+        c !== null && p !== null && p !== 0
+          ? ((c - p) / Math.abs(p)) * 100
+          : null;
 
-  // Find biggest decline
-  const declines = validKpis
-    .map((r) => ({
-      ...r,
-      change: numberOrNull(r.current) - numberOrNull(r.previous),
-      changePercent: ((numberOrNull(r.current) - numberOrNull(r.previous)) / Math.abs(numberOrNull(r.previous))) * 100
-    }))
-    .filter((r) => r.change < 0);
-  
-  const biggestDecline = declines.length > 0
-    ? declines.reduce((worst, curr) => Math.abs(curr.change) > Math.abs(worst.change) ? curr : worst)
-    : null;
+      return { ...r, betterChange, changePercent };
+    })
+    .filter((r) => r.betterChange !== null);
 
-  // Find clearly above median (top quartile by gap)
-  const aboveMedian = validKpis
-    .map((r) => ({
-      ...r,
-      gap: numberOrNull(r.current) - numberOrNull(r.refMedian),
-      gapPercent: ((numberOrNull(r.current) - numberOrNull(r.refMedian)) / Math.abs(numberOrNull(r.refMedian))) * 100
-    }))
-    .filter((r) => r.gap > 0 && r.kpi.higherIsBetter);
-  
-  const clearlyAbove = aboveMedian.length > 0
-    ? aboveMedian.reduce((best, curr) => Math.abs(curr.gap) > Math.abs(best.gap) ? curr : best)
-    : null;
+  const improvements = withChange.filter((r) => r.betterChange > 0);
+  const declines = withChange.filter((r) => r.betterChange < 0);
 
-  // Find clearly below median (bottom quartile by gap)
-  const belowMedian = validKpis
-    .map((r) => ({
-      ...r,
-      gap: numberOrNull(r.current) - numberOrNull(r.refMedian),
-      gapPercent: ((numberOrNull(r.current) - numberOrNull(r.refMedian)) / Math.abs(numberOrNull(r.refMedian))) * 100
-    }))
-    .filter((r) => r.gap < 0 && r.kpi.higherIsBetter);
-  
-  const clearlyBelow = belowMedian.length > 0
-    ? belowMedian.reduce((worst, curr) => Math.abs(curr.gap) > Math.abs(worst.gap) ? curr : worst)
-    : null;
+  // välj "störst" baserat på procent om möjligt (minskar unit-bias), annars fall tillbaka på abs-diff
+  const pickBiggest = (arr) => {
+    if (!arr.length) return null;
+    const withPct = arr.filter((x) => x.changePercent !== null && Number.isFinite(x.changePercent));
+    if (withPct.length) {
+      return withPct.reduce((best, curr) =>
+        Math.abs(curr.changePercent) > Math.abs(best.changePercent) ? curr : best
+      );
+    }
+    return arr.reduce((best, curr) =>
+      Math.abs(curr.betterChange) > Math.abs(best.betterChange) ? curr : best
+    );
+  };
+
+  const biggestImprovement = pickBiggest(improvements);
+  const biggestDecline = pickBiggest(declines);
+
+  // --- Gap mot referens (bättre riktning) ---
+  const withGap = validKpis
+    .map((r) => {
+      const c = numberOrNull(r.current);
+      const m = numberOrNull(r.refMedian);
+      const betterGap = orientedDiff(c, m, r.kpi.higherIsBetter); // >0 = bättre än ref
+      const gapPercent =
+        c !== null && m !== null && m !== 0
+          ? ((c - m) / Math.abs(m)) * 100
+          : null;
+      return { ...r, betterGap, gapPercent };
+    })
+    .filter((r) => r.betterGap !== null);
+
+  const aboveRef = withGap.filter((r) => r.betterGap > 0);
+  const belowRef = withGap.filter((r) => r.betterGap < 0);
+
+  // välj "tydligast" = största avvikelse (procent om möjligt)
+  const pickMostExtreme = (arr) => {
+    if (!arr.length) return null;
+    const withPct = arr.filter((x) => x.gapPercent !== null && Number.isFinite(x.gapPercent));
+    if (withPct.length) {
+      return withPct.reduce((best, curr) =>
+        Math.abs(curr.gapPercent) > Math.abs(best.gapPercent) ? curr : best
+      );
+    }
+    return arr.reduce((best, curr) =>
+      Math.abs(curr.betterGap) > Math.abs(best.betterGap) ? curr : best
+    );
+  };
+
+  const clearlyAbove = pickMostExtreme(aboveRef);
+  const clearlyBelow = pickMostExtreme(belowRef);
 
   return {
     biggestImprovement,
@@ -186,7 +229,7 @@ function renderExecutiveSummary(summary) {
 
   if (summary.biggestImprovement) {
     const r = summary.biggestImprovement;
-    const delta = formatDelta(r.current, r.previous, r.kpi.unit, r.trendData5Years);
+    const delta = formatDelta(r.current, r.previous, r.kpi.unit, r.trendData5Years, r.kpi.higherIsBetter);
     items.push(`
       <div class="executive-summary-item positive">
         <div class="executive-summary-item-title">📈 Största förbättring</div>
@@ -198,7 +241,7 @@ function renderExecutiveSummary(summary) {
 
   if (summary.biggestDecline) {
     const r = summary.biggestDecline;
-    const delta = formatDelta(r.current, r.previous, r.kpi.unit, r.trendData5Years);
+    const delta = formatDelta(r.current, r.previous, r.kpi.unit, r.trendData5Years, r.kpi.higherIsBetter);
     items.push(`
       <div class="executive-summary-item negative">
         <div class="executive-summary-item-title">📉 Största försämring</div>
@@ -210,13 +253,15 @@ function renderExecutiveSummary(summary) {
 
   if (summary.clearlyAbove) {
     const r = summary.clearlyAbove;
-    const gap = (numberOrNull(r.current) - numberOrNull(r.refMedian)).toFixed(1);
+    const rawGap = numberOrNull(r.current) - numberOrNull(r.refMedian);
+    const shown = rawGap === null ? null : rawGap.toFixed(1);
+    const prefix = rawGap > 0 ? "+" : ""; // negativt får minus automatiskt
     const isRiketKpi = ["N15505", "N15419", "N15436", "N15540"].includes(r.kpi.id);
     const refLabel = isRiketKpi ? "riket" : "median";
     items.push(`
       <div class="executive-summary-item above">
         <div class="executive-summary-item-title">⭐ Tydligt över ${refLabel}</div>
-        <div class="executive-summary-item-content">+${gap} ${r.kpi.unit}</div>
+        <div class="executive-summary-item-content">${prefix}${shown} ${r.kpi.unit}</div>
         <div class="executive-summary-item-label">${escapeHtml(r.kpi.label)}</div>
       </div>
     `);
@@ -224,13 +269,15 @@ function renderExecutiveSummary(summary) {
 
   if (summary.clearlyBelow) {
     const r = summary.clearlyBelow;
-    const gap = Math.abs(numberOrNull(r.current) - numberOrNull(r.refMedian)).toFixed(1);
+    const rawGap = numberOrNull(r.current) - numberOrNull(r.refMedian);
+    const shown = rawGap === null ? null : Math.abs(rawGap).toFixed(1);
+    const prefix = rawGap > 0 ? "+" : "-";
     const isRiketKpi = ["N15505", "N15419", "N15436", "N15540"].includes(r.kpi.id);
     const refLabel = isRiketKpi ? "riket" : "median";
     items.push(`
       <div class="executive-summary-item below">
         <div class="executive-summary-item-title">⚠️ Tydligt under ${refLabel}</div>
-        <div class="executive-summary-item-content">-${gap} ${r.kpi.unit}</div>
+        <div class="executive-summary-item-content">${prefix}${shown} ${r.kpi.unit}</div>
         <div class="executive-summary-item-label">${escapeHtml(r.kpi.label)}</div>
       </div>
     `);
@@ -263,6 +310,15 @@ function numberOrNull(value) {
   return Number.isFinite(num) ? num : null;
 }
 
+// Convert difference to "better" direction based on KPI polarity
+function orientedDiff(current, reference, higherIsBetter) {
+  const c = numberOrNull(current);
+  const r = numberOrNull(reference);
+  if (c === null || r === null) return null;
+  const raw = c - r;                   // >0 = numeriskt högre
+  return higherIsBetter ? raw : -raw;   // >0 = "bättre"
+}
+
 // Klassificera nivå och trend utan riket-jämförelse
 function classifyLevel(value) {
   const v = numberOrNull(value);
@@ -284,8 +340,16 @@ function classifyTrend(current, previous) {
   else if (abs > 3) strength = "tydlig";
   else if (abs > 1) strength = "svag";
   const dir = delta > 0 ? "up" : delta < 0 ? "down" : null;
-  const directionLabel = dir === "up" ? "ökning" : dir === "down" ? "minskning" : "stabilt";
-  const label = strength === "stabil" ? "Stabilt" : `${strength[0].toUpperCase()}${strength.slice(1)} ${directionLabel}`;
+  // Strength-driven phrasing; use "Tydlig" for the strongest band to avoid overstatement
+  let label;
+  if (!dir) {
+    label = "Stabilt";
+  } else if (strength === "kraftig") {
+    label = dir === "up" ? "Tydlig förbättring" : "Tydlig minskning";
+  } else {
+    const directionLabel = dir === "up" ? "ökning" : "minskning";
+    label = `${strength[0].toUpperCase()}${strength.slice(1)} ${directionLabel}`;
+  }
   const color = dir === null ? "#94a3b8" : dir === "up" ? "#16a34a" : "#dc2626";
   return { label, color, dir, strength, delta };
 }
@@ -294,11 +358,16 @@ function buildInterpretation(levelBand, trendDir, trendStrength) {
   if (!trendDir || trendStrength === "none") return "Ingen trend";
   const isHigh = levelBand === "strong" || levelBand === "ok";
   const isLow = levelBand === "risk" || levelBand === "problem";
-  if (isHigh && trendDir === "down") return "Varningssignal";
-  if (isLow && trendDir === "up") return "Förbättring pågår";
-  if (isLow && trendDir === "down") return "Prioriterat problem";
+
+  // Nivån väger tyngre än trenden
+  if (isHigh && trendDir === "down") return "Försämring från hög nivå";
+  if (isLow && trendDir === "down") return "Kräver fördjupad analys";
+  if (isLow && trendDir === "up") return "Positiv utveckling";
   if (isHigh && trendStrength === "stabil") return "Robust läge";
-  return "Balanserat läge";
+
+  // Default positive/neutral framing for uppgång, otherwise uppföljning
+  if (trendDir === "up") return "Positiv utveckling";
+  return "Bör följas";
 }
 
 function formatValue(value, unit) {
@@ -313,10 +382,10 @@ function formatValue(value, unit) {
   return `${nf.format(num)}${unit ? ` ${unit}` : ""}`;
 }
 
-function formatDelta(current, previous, unit, trendData5Years = null) {
+function formatDelta(current, previous, unit, trendData5Years = null, higherIsBetter = true) {
   if (current === null || previous === null) return { text: "Ingen förändring beräknad", className: "trend-stable", icon: "" };
-  const c = numberOrNull(current);
-  const p = numberOrNull(previous);
+    const c = numberOrNull(current);
+    const p = numberOrNull(previous);
   if (c === null || p === null) return { text: "Ingen förändring beräknad", className: "trend-stable", icon: "" };
   const d = c - p;
 
@@ -326,7 +395,7 @@ function formatDelta(current, previous, unit, trendData5Years = null) {
     maximumFractionDigits: 1 
   });
   
-  // Direction icon and text
+  // Direction icon and text - respect higherIsBetter
   let icon = "";
   let direction = "";
   let className = "trend-stable";
@@ -339,11 +408,13 @@ function formatDelta(current, previous, unit, trendData5Years = null) {
   } else if (d > 0) {
     icon = "↑";
     direction = "upp";
-    className = "trend-improving";
+    // Up is good if higherIsBetter, bad otherwise
+    className = higherIsBetter ? "trend-improving" : "trend-declining";
   } else {
     icon = "↓";
     direction = "ner";
-    className = "trend-declining";
+    // Down is bad if higherIsBetter, good otherwise
+    className = higherIsBetter ? "trend-declining" : "trend-improving";
   }
 
   // Check if this is a large change (> 2x standard deviation from 5-year changes)
@@ -619,9 +690,51 @@ async function fetchAllMunicipalitiesForYear(kpiId, year) {
       allMunicipalitiesCache.set(cacheKey, out);
       return out;
     }
-    console.warn('[kommunbild] v2 data/kpi returned 0 valid rows');
+    console.warn('[kommunbild] v2 data/kpi returned 0 valid rows for year', year, '- trying fallback with series endpoint');
   } catch (err) {
     console.warn('[kommunbild] v2 data/kpi fetch failed', err);
+  }
+
+  // 2) Fallback: Hämta alla år via /municipality (utan year-filter) och filtrera server-side
+  try {
+    const urlSeries = `https://api.kolada.se/v2/data/kpi/${encodeURIComponent(kpiId)}/municipality?per_page=500`;
+    console.log(`[kommunbild] fallback: fetching all municipalities (series): ${urlSeries}`);
+    const json = await fetchJson(urlSeries);
+    
+    // Expected: { values: [ { kpi:"...", values:[ {municipality:"0684", values:[{period,values:[{gender,value}]}]} ] } ] }
+    const root = Array.isArray(json?.values) ? json.values : [];
+    let rows = [];
+    if (root.length && Array.isArray(root[0]?.values)) {
+      rows = root[0].values || [];
+    } else {
+      rows = root;
+    }
+    
+    const out = [];
+    for (const row of rows) {
+      const municipality = row?.municipality ?? row?.municipality_id ?? null;
+      if (!municipality) continue;
+      
+      const periods = Array.isArray(row?.values) ? row.values : [];
+      const point = periods.find((p) => Number(p?.period) === Number(year));
+      if (!point) continue;
+      
+      const vals = Array.isArray(point?.values) ? point.values : [];
+      const total = vals.find((v) => v?.gender === 'T') ?? vals[0];
+      const val = numberOrNull(total?.value);
+      if (val !== null) {
+        out.push({ municipality, value: val });
+      }
+    }
+    
+    console.log(`[kommunbild] fallback parsed ${out.length} municipalities for ${kpiId} year ${year}`);
+    if (out.length > 0) {
+      allMunicipalitiesCache.set(cacheKey, out);
+      return out;
+    }
+    console.warn('[kommunbild] fallback series also returned 0 valid rows for year', year);
+  } catch (err) {
+    console.warn('[kommunbild] fallback series fetch failed', kpiId, year, err);
   }
 
   allMunicipalitiesCache.set(cacheKey, []);
@@ -654,7 +767,8 @@ async function mapWithConcurrency(items, limit, mapper) {
 function clearDataCache() {
   allMunicipalitiesCache.clear();
   municipalityValueCache.clear();
-  console.log('[kommunbild] Data cache cleared');
+  trendBundleCache.clear(); // Clear trend bundle cache when changing municipality/year
+  console.log('[kommunbild] Data cache cleared (including trend bundles)');
 }
 
 function getSelectedMunicipalityId() {
@@ -758,12 +872,12 @@ function renderKpiCard({
   const safeComp = escapeHtml(comparisonText ?? "");
   const safeRank = escapeHtml(rankText ?? "");
   const safeUrl = debugUrl ? escapeHtml(debugUrl) : "";
-  const infoTextU15401 =
-    "Indexet baseras på avvikelse från modellberäknat värde för meritvärde, andel elever som når målen i alla ämnen och behöriga till yrkesprogram, samt ett elevenkätsindex. " +
-    "Alla nyckeltalen avser kommunal grundskola. Nyckeltalen normaliseras så att alla kommunernas värden placeras på en skala från 0 till 100 där 0 är sämst och 100 är bäst. " +
-    "För att inte extremvärden ska få för stort genomslag sätts värdet till 0 för kommuner med värden under percentil 2,5, och 100 för kommuner med värden över percentil 97,5. " +
-    "För de kommuner som har data på alla nyckeltalen beräknas det ovägda medelvärdet, och därefter normaliseras även medelvärdet till en skala från 0 till 100 på samma sätt. " +
-    "Index utgörs av det normaliserade medelvärdet. Källa: RKA:s beräkningar baserade på uppgifter från SKR, SCB och Skolverket. ID: U15401";
+    const infoTextU15401 =
+      "Indexet baseras på avvikelse från modellberäknat värde för meritvärde, andel elever som når målen i alla ämnen och behöriga till yrkesprogram, samt ett elevenkätsindex. " +
+      "Alla nyckeltalen avser kommunal grundskola. Nyckeltalen normaliseras så att alla kommunernas värden placeras på en skala från 0 till 100 där 0 är sämst och 100 är bäst. " +
+      "För att inte extremvärden ska få för stort genomslag sätts värdet till 0 för kommuner med värden under percentil 2,5, och 100 för kommuner med värden över percentil 97,5. " +
+      "För de kommuner som har data på alla nyckeltalen beräknas det ovägda medelvärdet, och därefter normaliseras även medelvärdet till en skala från 0 till 100 på samma sätt. " +
+      "Index utgörs av det normaliserade medelvärdet. Källa: RKA:s beräkningar baserade på uppgifter från SKR, SCB och Skolverket. ID: U15401";
 
   const infoTextU15200 =
     "Engagemangsindex för grundskola enligt resultat från medarbetarenkät. HME står för Hållbart medarbetarengagemang och mäter såväl nivån på medarbetarnas engagemang som chefernas och organisationens förmåga att ta tillvara på och skapa engagemang. " +
@@ -898,7 +1012,7 @@ function renderKpiCard({
       : `<div class="kpi-trend-chart-legend"><span class="legend-swatch" style="background:#667eea"></span>Egen kommun</div>`;
 
     const mockWarningBadge = usedMockData 
-      ? `<div style="display:inline-block;background:#ff9800;color:#fff;font-size:0.7rem;padding:2px 6px;border-radius:3px;margin-left:8px;">⚠️ Mock-data</div>` 
+      ? `<div style="display:inline-block;background:#ff9800;color:#fff;font-size:0.7rem;padding:2px 6px;border-radius:3px;margin-left:8px;">⚠️ Uppskattning</div>` 
       : '';
 
     const exportButton = `<button class="kpi-export-btn" data-export='${escapeHtml(JSON.stringify(exportPayload))}' style="margin-top:6px;font-size:.8rem;">Kopiera trenddata</button>`;
@@ -1165,10 +1279,10 @@ async function computeKpiForMunicipality({ kpi, municipalityId, forcedYear }) {
             .map((r) => ({ year: Number(r.year), value: numberOrNull(r.median) }))
             .filter((d) => d.value !== null && Number.isFinite(d.value));
           
-          // Fallback: om inga referensvärden, använd mockdata
+          // Fallback: om inga referensvärden, använd uppskattning
           if (!trendReference5Years.length && MOCK_REFERENCE_DATA[kpi.id]) {
-            console.warn(`[kommunbild] ⚠️ MOCK DATA används för svart linje (Alla kommuner) på ${kpi.id}`);
-            showAnalyzeWarning(`⚠️ Mock-data används för ${kpi.id} trendlinje (Alla kommuner)`);
+            console.warn(`[kommunbild] ⚠️ UPPSKATTNING används för svart linje (Alla kommuner) på ${kpi.id}`);
+            showAnalyzeWarning(`⚠️ Uppskattning används för ${kpi.id} trendlinje (Alla kommuner)`);
             usedMockData = true;
             trendReference5Years = years
               .map((y) => ({ year: Number(y), value: numberOrNull(MOCK_REFERENCE_DATA[kpi.id][y]) }))
@@ -1219,6 +1333,207 @@ async function computeKpiForMunicipality({ kpi, municipalityId, forcedYear }) {
   }
 }
 
+/**
+ * ===== LAYER 1: SNAPSHOT (Fast, no trends) =====
+ * Hämta snapshot av KPI-värde, tidigare år, jämförelse, rank - UTAN trend-anrop
+ */
+async function computeKpiSnapshot({ kpi, municipalityId, forcedYear }) {
+  try {
+    const meta = await fetchKpiMeta(kpi.id);
+    const year = Number.isFinite(Number(forcedYear)) ? Number(forcedYear) : DEFAULTS.year;
+
+    const currentResult = await fetchMunicipalityValueWithFallback(kpi.id, municipalityId, year);
+    const actualYear = currentResult.year;
+    const current = currentResult.value;
+    const previous = await fetchMunicipalityValueForYear(kpi.id, municipalityId, actualYear - 1);
+
+    let refMedian = null;
+    let referenceKind = "median"; // median | riket | custom
+    let rank = { rank: null, total: 0 };
+    let total = 0;
+
+    if (kpi.rankable === true) {
+      try {
+        const analysis = await analyzeKpiAcrossMunicipalities(kpi.id, actualYear, { gender: 'T', municipality_type: 'K' });
+        if (analysis) {
+          refMedian = numberOrNull(analysis?.median ?? analysis?.stats?.median ?? analysis?.statistics?.median);
+          total = Number(analysis?.total ?? analysis?.total_count ?? analysis?.stats?.count ?? analysis?.statistics?.count ?? 0) || 0;
+          const rankEntry =
+            Array.isArray(analysis?.ranks) ? analysis.ranks.find((x) => String(x?.municipality_id ?? x?.municipality) === String(municipalityId)) : null;
+          const computedRank = Number(rankEntry?.rank);
+          if (Number.isFinite(computedRank) && total) {
+            rank = { rank: computedRank, total };
+          } else {
+            const values = Array.isArray(analysis?.values) ? analysis.values : null;
+            if (values) {
+              const allValues = values.map((v) => numberOrNull(v?.value)).filter((v) => v !== null);
+              refMedian = refMedian ?? median(allValues);
+              const rnk = rankOfValue(allValues, current, kpi.higherIsBetter);
+              rank = rnk;
+              total = rnk.total;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[kommunbild] snapshot comparison analysis failed", kpi.id, err);
+      }
+
+      // Fallback 1: Om analyzeKpiAcrossMunicipalities inte returnerade refMedian, försök via fetchAllMunicipalitiesForYear
+      if (refMedian === null) {
+        try {
+          console.log(`[kommunbild] snapshot: Attempting fallback 1 for ${kpi.id} year ${actualYear}`);
+          const all = await fetchAllMunicipalitiesForYear(kpi.id, actualYear);
+          const vals = all.map((x) => numberOrNull(x.value)).filter((v) => v !== null);
+          if (vals.length) {
+            refMedian = median(vals);
+            total = vals.length;
+            console.log(`[kommunbild] snapshot: Fallback 1 succeeded - computed median ${refMedian} from ${vals.length} municipalities`);
+          }
+        } catch (err) {
+          console.warn("[kommunbild] snapshot median fallback failed", kpi.id, err);
+        }
+      }
+    }
+
+    // Special: for N15505, N15419, N15436, N15540 use riket (0000) as reference
+    if (["N15505", "N15419", "N15436", "N15540"].includes(kpi.id)) {
+      try {
+        const riketRef = await fetchMunicipalityValueForYear(kpi.id, "0000", actualYear);
+        if (riketRef !== null && riketRef !== undefined) {
+          refMedian = numberOrNull(riketRef);
+          referenceKind = "riket";
+          console.log(`[kommunbild] snapshot: Using riket (0000) as refMedian for ${kpi.id}: ${refMedian}`);
+        }
+      } catch (err) {
+        console.warn(`[kommunbild] snapshot: Riket (0000) fetch failed for ${kpi.id}`, err);
+      }
+    }
+
+    return {
+      kpi,
+      meta,
+      municipalityId,
+      year: actualYear,
+      current,
+      previous,
+      previousYear: actualYear - 1,
+      refMedian,
+      referenceKind,
+      rank,
+      total,
+    };
+  } catch (err) {
+    console.error("[kommunbild] computeKpiSnapshot error", kpi?.id, err);
+    return {
+      kpi,
+      meta: null,
+      municipalityId,
+      year: Number.isFinite(Number(forcedYear)) ? Number(forcedYear) : DEFAULTS.year,
+      current: null,
+      previous: null,
+      previousYear: null,
+      refMedian: null,
+      rank: { rank: null, total: 0 },
+      total: 0,
+      error: err,
+    };
+  }
+}
+
+/**
+ * ===== LAYER 2: TREND BUNDLE (Lazy-loaded, cached) =====
+ * Hämta 5-årsdata och referenslinje för ett KPI
+ * Körs bara när användaren expanderar en rad
+ * Cachas by "kpiId_municipalityId_year"
+ */
+async function fetchKpiTrendBundle({ kpi, municipalityId, year }) {
+  const cacheKey = `${kpi.id}_${municipalityId}_${year}`;
+
+  if (trendBundleCache.has(cacheKey)) {
+    console.log(`[kommunbild] trend bundle cache HIT for ${cacheKey}`);
+    return trendBundleCache.get(cacheKey);
+  }
+
+  console.log(`[kommunbild] trend bundle cache MISS for ${cacheKey}, fetching...`);
+
+  // ✅ spanYears måste ligga här (utanför try) så catch aldrig kan crasha
+  const spanYears = getTrendSpanYears(kpi.id);
+  let referenceKind = "median"; // median | riket | custom
+
+  try {
+    let trendData5Years = null;
+    let trendReference5Years = null;
+    let usedMockData = false;
+
+    const years = [];
+    for (let y = year - (spanYears - 1); y <= year; y++) years.push(y);
+
+    // Hämta egna värden
+    const trendValues = await Promise.all(
+      years.map((y) => fetchMunicipalityValueForYear(kpi.id, municipalityId, y))
+    );
+
+    trendData5Years = years
+      .map((y, idx) => ({ year: Number(y), value: numberOrNull(trendValues[idx]) }))
+      .filter((d) => d.value !== null);
+
+    // Hämta referenslinje
+    if (["N15505", "N15419", "N15436", "N15540"].includes(kpi.id)) {
+      const refValues = await Promise.all(
+        years.map((y) => fetchMunicipalityValueForYear(kpi.id, "0000", y))
+      );
+      trendReference5Years = years
+        .map((y, idx) => ({ year: Number(y), value: numberOrNull(refValues[idx]) }))
+        .filter((d) => d.value !== null);
+      referenceKind = "riket";
+    } else {
+      const refSourceKpi = REFERENCE_MEDIAN_OVERRIDE[kpi.id];
+
+      if (refSourceKpi === undefined || refSourceKpi === kpi.id) {
+        // Standard: median per år
+        const refValues = await Promise.all(
+          years.map(async (y) => {
+            try {
+              const all = await fetchAllMunicipalitiesForYear(kpi.id, y);
+              const vals = all.map((x) => numberOrNull(x.value)).filter((v) => v !== null);
+              return vals.length ? median(vals) : null;
+            } catch (err) {
+              console.warn(`[kommunbild] trend median fetch failed for ${kpi.id} year ${y}`, err);
+              return MOCK_REFERENCE_DATA[kpi.id]?.[y] ?? null;
+            }
+          })
+        );
+
+        trendReference5Years = years
+          .map((y, idx) => ({ year: Number(y), value: numberOrNull(refValues[idx]) }))
+          .filter((d) => d.value !== null);
+      } else if (refSourceKpi === null) {
+        // Explicit mock
+        usedMockData = true;
+        trendReference5Years = years
+          .map((y) => ({ year: Number(y), value: numberOrNull(MOCK_REFERENCE_DATA[kpi.id]?.[y]) }))
+          .filter((d) => d.value !== null);
+        referenceKind = "custom";
+      }
+    }
+
+    const result = { spanYears, referenceKind, trendData5Years, trendReference5Years, usedMockData };
+    trendBundleCache.set(cacheKey, result);
+    console.log(`[kommunbild] trend bundle cached for ${cacheKey}`);
+    return result;
+  } catch (err) {
+    console.error("[kommunbild] fetchKpiTrendBundle error", kpi?.id, err);
+    return {
+      spanYears,
+      referenceKind,
+      trendData5Years: null,
+      trendReference5Years: null,
+      usedMockData: false,
+      error: err,
+    };
+  }
+}
+
 function renderIndexTable(indexRows) {
   console.log('[kommunbild] renderIndexTable called with:', indexRows);
   if (!indexRows || indexRows.length === 0) {
@@ -1236,8 +1551,7 @@ function renderIndexTable(indexRows) {
             <th style="padding:12px 16px; font-weight: 600;">Värde</th>
             <th style="padding:12px 16px; font-weight: 600;">Analys</th>
             <th style="padding:12px 16px; font-weight: 600;">År</th>
-            <th style="padding:12px 16px; font-weight: 600;">Δ</th>
-            <th style="padding:12px 16px; font-weight: 600;">Rank</th>
+            <th style="padding:12px 16px; font-weight: 600;">Δ (mot föregående mätning)</th>
           </tr>
         </thead>
         <tbody>
@@ -1245,8 +1559,7 @@ function renderIndexTable(indexRows) {
   
   const body = indexRows
     .map((r, idx) => {
-      const delta = formatDelta(r.current, r.previous, r.kpi.unit);
-      const rankText = r.rank.rank === null ? "–" : `${r.rank.rank} av ${r.rank.total}`;
+      const delta = formatDelta(r.current, r.previous, r.kpi.unit, null, r.kpi.higherIsBetter);
       const level = classifyLevel(r.current);
       const trend = classifyTrend(r.current, r.previous);
       const interpretation = buildInterpretation(level.band, trend.dir, trend.strength);
@@ -1264,7 +1577,6 @@ function renderIndexTable(indexRows) {
           <td style="padding:12px 16px; color:${analysisColor}; font-weight:600;">${escapeHtml(analysisText)}</td>
           <td style="padding:12px 16px;">${escapeHtml(String(r.year ?? "–"))}</td>
           <td style="padding:12px 16px; color: ${deltaColor}; font-weight: 600;">${escapeHtml(delta.text)}</td>
-          <td style="padding:12px 16px;">${escapeHtml(rankText)}</td>
         </tr>
       `;
     })
@@ -1277,73 +1589,398 @@ function renderIndexTable(indexRows) {
 }
 
 function renderBlocks(blockResults, indexRows) {
-  console.log('[kommunbild] renderBlocks called with indexRows:', indexRows);
+  console.log('[kommunbild] renderBlocks called - delegating to renderBlockTables');
+  renderBlockTables(blockResults, window.CURRENT_FORCED_YEAR);
+}
+
+/**
+ * ===== TABLE RENDERING WITH EXPANDABLE ROWS =====
+ * Renderar KPI-block som tabeller istället för kort-grid
+ * Varje KPI är en rad med en expanderbar details-rad under
+ */
+function renderBlockTables(blockResults, forcedYear) {
   const container = document.getElementById("qualityBlocks");
   if (!container) return;
 
+  if (!blockResults || blockResults.length === 0) {
+    container.innerHTML = `<div class="panel-description">Inga KPI-block att visa.</div>`;
+    return;
+  }
+
   const sections = blockResults
-    .filter((br) => br.kpis.length > 0)
+    .filter((br) => br.kpis && br.kpis.length > 0)
     .map((br) => {
-      const cards = br.kpis
-        .map((r) => {
-          const delta = formatDelta(r.current, r.previous, r.kpi.unit, r.trendData5Years);
-          const showComparison = r.kpi.rankable === true;
-          const isIndexKpi = r.kpi.unit === "index";
-          const isNKpi = r.kpi.kpi_type === "N";
-          const isRiketKpi = ["N15505", "N15419", "N15436", "N15540"].includes(r.kpi.id);
-          const refLabel = isRiketKpi ? "Riket" : "Alla kommuner (median)";
-          const refText = r.refMedian === null 
-            ? (isNKpi ? `Jämförelse mot ${refLabel}` : isIndexKpi ? `Jämförelse visas som median för alla kommuner. Ej rangordningsbart.` : "Ingen jämförelse möjlig för detta nyckeltal")
-            : `${refLabel}: ${formatValue(r.refMedian, r.kpi.unit)}`;
-          
-          // Compute gap to median if both values exist
-          let gapText = "";
-          if (r.refMedian !== null && r.current !== null) {
-            const gap = numberOrNull(r.current) - numberOrNull(r.refMedian);
-            if (gap !== null && !isNaN(gap)) {
-              const sign = gap > 0 ? "+" : "";
-              const gapFormatted = gap.toFixed(1);
-              gapText = ` (${sign}${gapFormatted} ${r.kpi.unit === "%" ? "p.p" : r.kpi.unit} mot median)`;
-            }
-          }
-          
-          const rankText = r.rank.rank === null ? "–" : `${r.rank.rank} av ${r.rank.total}`;
-          const statusClass = deriveCardStatus({ higherIsBetter: r.kpi.higherIsBetter, value: r.current, reference: r.refMedian });
-          const debugUrl = r?.municipalityId ? buildMunicipalitySeriesUrl({ kpiId: r.kpi.id, municipalityId: r.municipalityId }) : null;
-          return renderKpiCard({
-            label: r.kpi.label,
-            value: r.current,
-            unit: r.kpi.unit,
-            year: r.year ?? "–",
-            previousValue: r.previous,
-            previousYear: r.previousYear,
-            deltaText: delta.text,
-            deltaClass: delta.className,
-            rankText,
-            comparisonText: refText,
-            gapText,
-            showComparison,
-            statusClass,
-            kpiId: r.kpi.id,
-            debugUrl,
-            meta: r.meta,
-            referenceValue: r.refMedian ?? (r.rank && r.rank.median != null ? r.rank.median : null),
-            trendData5Years: r.trendData5Years,
-            trendReference5Years: r.trendReference5Years,
-            usedMockData: r.usedMockData,
-          });
+      // Bygg tabell med KPI-rader
+      const tableRows = br.kpis
+        .map((kpiResult, kpiIdx) => {
+          const r = kpiResult;
+          const delta = formatDelta(r.current, r.previous, r.kpi.unit, null, r.kpi.higherIsBetter);
+          const comparisonText = r.refMedian !== null ? formatValue(r.refMedian, r.kpi.unit) : "–";
+          const comparisonKind = r.referenceKind || ( ["N15505","N15419","N15436","N15540"].includes(r.kpi.id) ? "riket" : "median" );
+          const comparisonBadge = r.refMedian !== null
+            ? `<span style=\"color:#94a3b8; font-size:0.8em; margin-left:0.35rem;\">(${comparisonKind === 'riket' ? 'Riket' : comparisonKind === 'custom' ? 'Referens' : 'Median'})</span>`
+            : "";
+          const rowId = `kpi-row-${br.block.title.replace(/\s+/g, '-')}-${kpiIdx}`;
+          const detailId = `detail-${rowId}`;
+          const dataRowId = `data-${rowId}`;
+
+          // Visa "(senast YYYY)" badge om valt år ≠ faktiskt år
+          const yearBadge = forcedYear && r.year && Number(forcedYear) !== Number(r.year)
+            ? ` <span style="color:#f59e0b; font-size:0.85em;">(senast ${r.year})</span>`
+            : "";
+
+          const rowBg = kpiIdx % 2 === 0 ? "#f8fafc" : "white";
+          const deltaColor = delta.className === "trend-improving" ? "#16a34a" : 
+                             delta.className === "trend-declining" ? "#dc2626" : "#64748b";
+
+          return `
+            <!-- KPI-rad -->
+            <tr data-kpi-id="${escapeHtml(r.kpi.id)}" style="background:${rowBg}; border-bottom: 1px solid #e2e8f0;">
+              <td style="padding:12px 16px; font-weight: 500; max-width: 300px;">${escapeHtml(r.kpi.label)}</td>
+              <td style="padding:12px 16px; font-weight: 700; color: #667eea;">${escapeHtml(formatValue(r.current, r.kpi.unit))}</td>
+              <td style="padding:12px 16px;">${escapeHtml(String(r.year ?? "–"))}${yearBadge}</td>
+              <td style="padding:12px 16px; color: ${deltaColor}; font-weight: 600;">${escapeHtml(delta.text)}</td>
+              <td style="padding:12px 16px; color: #0284c7;">${escapeHtml(comparisonText)} ${comparisonBadge}</td>
+              <td style="padding:12px 16px; text-align:center;">
+                <button class="expand-btn" data-target="${detailId}" data-kpi-id="${escapeHtml(r.kpi.id)}" data-municipality-id="${escapeHtml(r.municipalityId)}" data-year="${r.year}" data-rank="${r.rank?.rank ?? ''}" data-total="${r.rank?.total ?? ''}" style="background:none; border:none; cursor:pointer; font-size:1.2rem; color:#667eea;">▸</button>
+              </td>
+            </tr>
+            <!-- Details-rad (hidden by default) -->
+            <tr id="${detailId}" class="detail-row" data-loaded="0" style="display:none; background:#f8fafc;">
+              <td colspan="6" style="padding:20px 16px;">
+                <div class="trend-container" id="trend-${dataRowId}" style="min-height:300px; display:flex; align-items:center; justify-content:center; color:#64748b;">
+                  <div>Laddar trend…</div>
+                </div>
+              </td>
+            </tr>
+          `;
         })
         .join("");
 
       return `
         <div class="dashboard-section" style="padding: 1.5rem; margin: 1.25rem 0;">
           <h2>${escapeHtml(br.block.title)}</h2>
-          <div class="kpi-grid">${cards}</div>
+          <table style="width:100%; border-collapse: collapse; background: white; border-radius: 8px; overflow:hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <thead>
+              <tr style="background:#667eea; color: white; text-align:left;">
+                <th style="padding:12px 16px; font-weight: 600;">Nyckeltal</th>
+                <th style="padding:12px 16px; font-weight: 600;">Värde</th>
+                <th style="padding:12px 16px; font-weight: 600;">År</th>
+                <th style="padding:12px 16px; font-weight: 600;">Δ (mot föregående mätning)</th>
+                <th style="padding:12px 16px; font-weight: 600;">Jämförelse</th>
+                <th style="padding:12px 16px; text-align:center; font-weight: 600;">Fördjupa</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
         </div>`;
     })
     .join("");
 
   container.innerHTML = sections;
+
+  // Setup expand button listeners
+  setupExpandableRowListeners();
+}
+
+/**
+ * Setup event listeners för expandera-knappar
+ * Vid klick: toggle details-rad, ladda trend vid första öppning
+ */
+function setupExpandableRowListeners() {
+  document.querySelectorAll(".expand-btn").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const targetId = btn.dataset.target;
+      const detailRow = document.getElementById(targetId);
+      if (!detailRow) return;
+
+      const isVisible = detailRow.style.display !== "none";
+      
+      if (isVisible) {
+        // Dölj details-raden
+        detailRow.style.display = "none";
+        btn.textContent = "▸";
+      } else {
+        // Visa details-raden
+        detailRow.style.display = "table-row";
+        btn.textContent = "▾";
+
+        // Ladda trend om inte redan gjort
+        const loaded = detailRow.dataset.loaded === "1";
+        if (!loaded) {
+          await loadAndRenderTrendChart(btn, detailRow);
+        }
+      }
+    });
+  });
+}
+
+/**
+ * Ladda trenddata och rendera chart när användare expanderar rad
+ */
+async function loadAndRenderTrendChart(btn, detailRow) {
+  const kpiId = btn.dataset.kpiId;
+  const municipalityId = btn.dataset.municipalityId;
+  const year = Number(btn.dataset.year);
+  const rank = Number(btn.dataset.rank);
+  const total = Number(btn.dataset.total);
+
+  const hasRank = Number.isFinite(rank) && Number.isFinite(total) && total > 0 && rank > 0;
+  const percentile = hasRank ? Math.round(((total - rank + 1) / total) * 100) : null;
+
+  const trendContainerId = `trend-data-${btn.dataset.target}`;
+  const trendContainer = detailRow.querySelector(".trend-container");
+  if (!trendContainer) return;
+
+  try {
+    // Fetch KPI metadata för att ha label och unit
+    const meta = await fetchKpiMeta(kpiId);
+    
+    // Find KPI definition to get info
+    let kpiDef = null;
+    for (const block of KPI_BLOCKS) {
+      kpiDef = block.kpis.find((k) => k.id === kpiId);
+      if (kpiDef) break;
+    }
+    if (!kpiDef) {
+      trendContainer.innerHTML = `<div style="color:#dc2626;">KPI definition not found</div>`;
+      return;
+    }
+
+    // Fetch trend bundle
+    const bundle = await fetchKpiTrendBundle({ kpi: kpiDef, municipalityId, year });
+    
+    if (bundle.error) {
+      trendContainer.innerHTML = `<div style="color:#dc2626;">Kunde inte ladda trend: ${bundle.error?.message}</div>`;
+      return;
+    }
+
+    // Rendera SVG-chart eller fallback-lägen
+    const chartHtml = renderTrendChart({
+      kpiId,
+      label: kpiDef.label,
+      unit: kpiDef.unit,
+      spanYears: bundle.spanYears,
+      referenceKind: bundle.referenceKind,
+      trendData5Years: bundle.trendData5Years,
+      trendReference5Years: bundle.trendReference5Years,
+      usedMockData: bundle.usedMockData,
+    });
+
+    const rankBadge = hasRank
+      ? `
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; flex-wrap:wrap;">
+          <div style="font-weight:700; color:#0f172a;">Placering: ${rank} av ${total} kommuner</div>
+          <div style="background:#eef2ff; color:#312e81; padding:6px 10px; border-radius:8px; font-weight:600;">
+            Övre ${Math.min(100, Math.max(1, percentile))} %
+          </div>
+        </div>`
+      : "";
+
+    trendContainer.innerHTML = `${rankBadge}${chartHtml}`;
+    detailRow.dataset.loaded = "1";
+    console.log(`[kommunbild] Trend chart loaded for ${kpiId}`);
+  } catch (err) {
+    console.error("[kommunbild] Error loading trend chart:", err);
+    trendContainer.innerHTML = `<div style="color:#dc2626;">Fel vid laddning av trend: ${err?.message}</div>`;
+  }
+}
+
+/**
+ * Rendera trend-chart som SVG (enkel linjegraf) med fallback-lägen
+ * Fallback 1: 0 datapunkter - visa informativt meddelande
+ * Fallback 2: 1 datapunkt - visa stort värde
+ * Normal: 2+ datapunkter - rendera SVG linjegraf
+ */
+function renderTrendChart({ kpiId, label, unit, spanYears, referenceKind = "median", trendData5Years, trendReference5Years, usedMockData }) {
+  // FALLBACK 1: Ingen data
+  if (!trendData5Years || trendData5Years.length === 0) {
+    return `
+      <div style="padding:2rem; text-align:center; background:#f9fafb; border-radius:6px;">
+        <div style="font-size:1.25rem; font-weight:600; color:#1f2937; margin-bottom:0.5rem;">Ingen trend att visa</div>
+        <div style="color:#6b7280; margin-bottom:1rem;">Enkäter publiceras inte varje år</div>
+        <div style="font-size:0.85rem; color:#9ca3af;">Prova att välja ett annat år eller bläddra bland andra nyckeltal</div>
+      </div>
+    `;
+  }
+
+  // FALLBACK 2: En datapunkt - visa som stort värde
+  if (trendData5Years.length === 1) {
+    const point = trendData5Years[0];
+    const refValue = trendReference5Years && trendReference5Years.length > 0
+      ? trendReference5Years[0].value
+      : null;
+    
+    return `
+      <div style="padding:2rem; text-align:center; background:#f9fafb; border-radius:6px;">
+        <div style="font-size:3rem; font-weight:700; color:#667eea; margin-bottom:0.5rem;">${point.value.toFixed(1)}</div>
+        <div style="color:#6b7280; margin-bottom:1rem;">År ${point.year}</div>
+        ${refValue ? `<div style="color:#9ca3af; font-size:0.9rem;">Referensvärde: <strong>${refValue.toFixed(1)}</strong></div>` : ""}
+        <div style="color:#9ca3af; font-size:0.85rem; margin-top:1rem;">Enhet: ${escapeHtml(unit)}</div>
+      </div>
+    `;
+  }
+
+  // Bestäm trendlabel baserat på spanYears
+  const trendLabel = spanYears === 3 ? "Senaste mätningar (upp till 3 år)" : "Trend (5 år)";
+
+  // Simple SVG chart dimensions
+  const width = 600;
+  const height = 300;
+  const padding = 40;
+  const plotWidth = width - 2 * padding;
+  const plotHeight = height - 2 * padding;
+
+  // Get all years from both series
+  const allYears = new Set();
+  trendData5Years.forEach((d) => allYears.add(d.year));
+  if (trendReference5Years) {
+    trendReference5Years.forEach((d) => allYears.add(d.year));
+  }
+  const sortedYears = Array.from(allYears).sort();
+  const minYear = Math.min(...sortedYears);
+  const maxYear = Math.max(...sortedYears);
+
+  // Get value ranges
+  const allValues = [
+    ...trendData5Years.map((d) => d.value),
+    ...(trendReference5Years ? trendReference5Years.map((d) => d.value) : []),
+  ].filter((v) => v !== null);
+  const minValue = Math.min(...allValues);
+  const maxValue = Math.max(...allValues);
+  const valueRange = maxValue - minValue || 1;
+  const valuePadding = valueRange * 0.1;
+
+  // Scale functions
+  const scaleX = (year) => {
+    const ratio = (year - minYear) / (maxYear - minYear || 1);
+    return padding + ratio * plotWidth;
+  };
+  const scaleY = (value) => {
+    const ratio = (maxValue + valuePadding - value) / (valueRange + 2 * valuePadding);
+    return padding + ratio * plotHeight;
+  };
+
+  // Build data points paths
+  const ownPath = trendData5Years
+    .map((d, idx) => {
+      const x = scaleX(d.year);
+      const y = scaleY(d.value);
+      return idx === 0 ? `M${x},${y}` : `L${x},${y}`;
+    })
+    .join(" ");
+
+  const refPath = trendReference5Years && trendReference5Years.length > 0
+    ? trendReference5Years
+        .map((d, idx) => {
+          const x = scaleX(d.year);
+          const y = scaleY(d.value);
+          return idx === 0 ? `M${x},${y}` : `L${x},${y}`;
+        })
+        .join(" ")
+    : null;
+
+  // Build grid lines
+  const gridLines = sortedYears
+    .map((year) => {
+      const x = scaleX(year);
+      return `<line x1="${x}" y1="${padding}" x2="${x}" y2="${height - padding}" stroke="#e2e8f0" stroke-width="1"/>`;
+    })
+    .join("");
+
+  // Data point circles for own data
+  const ownCircles = trendData5Years
+    .map((d) => {
+      const x = scaleX(d.year);
+      const y = scaleY(d.value);
+      return `<circle cx="${x}" cy="${y}" r="4" fill="#667eea" stroke="white" stroke-width="2"/>`;
+    })
+    .join("");
+
+    // Value labels for own data points
+    const ownValueLabels = trendData5Years
+      .map((d) => {
+        const x = scaleX(d.year);
+        const y = scaleY(d.value);
+        const yOffset = y > padding + plotHeight / 2 ? -12 : 15;
+        const valueStr = d.value.toFixed(1);
+        return `<text x="${x}" y="${y + yOffset}" text-anchor="middle" font-size="11" font-weight="600" fill="#667eea">${valueStr}</text>`;
+      })
+      .join("");
+
+    // Value labels for reference line
+    const refValueLabels = refPath && trendReference5Years && trendReference5Years.length > 0
+      ? trendReference5Years
+          .map((d) => {
+            const x = scaleX(d.year);
+            const y = scaleY(d.value);
+            const yOffset = y > padding + plotHeight / 2 ? 15 : -12;
+            const valueStr = d.value.toFixed(1);
+            return `<text x="${x}" y="${y + yOffset}" text-anchor="middle" font-size="10" fill="#333">${valueStr}</text>`;
+          })
+          .join("")
+      : "";
+
+    // Labels for years
+  const yearLabels = sortedYears
+    .map((year) => {
+      const x = scaleX(year);
+      return `<text x="${x}" y="${height - 10}" text-anchor="middle" font-size="12" fill="#64748b">${year}</text>`;
+    })
+    .join("");
+
+  // Left axis label
+  const minLabel = minValue.toFixed(1);
+  const maxLabel = (maxValue + valuePadding).toFixed(1);
+  const yAxisLabels = `
+    <text x="10" y="${scaleY(minValue) + 5}" text-anchor="end" font-size="12" fill="#64748b">${minLabel}</text>
+    <text x="10" y="${scaleY(maxValue + valuePadding) + 5}" text-anchor="end" font-size="12" fill="#64748b">${maxLabel}</text>
+  `;
+
+  const svg = `
+    <div style="overflow-x:auto;">
+      <svg width="${width}" height="${height}" style="border:1px solid #e2e8f0; border-radius:6px; background:white;">
+        <!-- Grid -->
+        ${gridLines}
+        
+        <!-- Axes -->
+        <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}" stroke="#0f172a" stroke-width="2"/>
+        <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="#0f172a" stroke-width="2"/>
+        
+        <!-- Reference line (black, dashed) -->
+        ${refPath ? `<path d="${refPath}" stroke="#000" stroke-width="2" stroke-dasharray="4,4" fill="none"/>` : ""}
+        
+        <!-- Own data line (blue) -->
+        <path d="${ownPath}" stroke="#667eea" stroke-width="3" fill="none"/>
+        
+        <!-- Data points -->
+        ${ownCircles}
+        
+          <!-- Value labels for data points -->
+          ${ownValueLabels}
+          ${refValueLabels}
+        
+        <!-- Year labels -->
+        ${yearLabels}
+        
+        <!-- Y-axis labels -->
+        ${yAxisLabels}
+      </svg>
+    </div>
+    
+    <div style="margin-top:1rem; font-size:0.85rem; color:#64748b;">
+      <div style="font-weight:600; margin-bottom:0.5rem;">${trendLabel}</div>
+      <div><strong>Blå linje:</strong> ${escapeHtml(label)} (denna kommun)</div>
+      ${refPath ? `<div><strong>Svart linje:</strong> Referensvärde (${referenceKind === 'riket' ? 'Riket' : referenceKind === 'custom' ? 'Custom' : 'Median'})</div>` : ""}
+      ${usedMockData ? `<div style="color:#f59e0b;"><strong>⚠️ OBS:</strong> Använder uppskattning för referensvärde</div>` : ""}
+      <div style="margin-top:0.5rem;">Enhet: ${escapeHtml(unit)}</div>
+    </div>
+  `;
+
+  return svg;
 }
 
 function renderOrgTable(rows) {
@@ -1364,8 +2001,7 @@ function renderOrgTable(rows) {
           <th style="padding:10px 12px;">Riket</th>
           <th style="padding:10px 12px;">Analys</th>
           <th style="padding:10px 12px;">År</th>
-          <th style="padding:10px 12px;">Δ</th>
-          <th style="padding:10px 12px;">Rank</th>
+          <th style="padding:10px 12px;">Δ (mot föregående mätning)</th>
           <th style="padding:10px 12px;">NID</th>
         </tr>
       </thead>
@@ -1374,8 +2010,7 @@ function renderOrgTable(rows) {
 
   const body = rows
     .map((r) => {
-      const delta = formatDelta(r.current, r.previous, r.kpi.unit, r.trendData5Years);
-      const rankText = r.rank.rank === null ? "–" : `${r.rank.rank} av ${r.rank.total}`;
+      const delta = formatDelta(r.current, r.previous, r.kpi.unit, r.trendData5Years, r.kpi.higherIsBetter);
       const deltaTooltip = delta.isLargeChange ? "title=\"Större än normal variation\"" : "";
       const riketValue = r.riketValue !== null && r.riketValue !== undefined ? formatValue(r.riketValue, r.kpi.unit) : "–";
       // Prefer riket-based analysis when available; otherwise fallback to level/trend interpretation
@@ -1385,14 +2020,16 @@ function renderOrgTable(rows) {
         const diff = r.current - r.riketValue;
         const tolerance = Math.abs(r.riketValue) * 0.05;
         if (Math.abs(diff) <= tolerance) {
-          analysisText = "Nivå med riket";
+          analysisText = "I nivå med riket";
           analysisColor = "#0284c7";
-        } else if ((r.kpi.higherIsBetter && diff > 0) || (!r.kpi.higherIsBetter && diff < 0)) {
-          analysisText = "Över riket";
-          analysisColor = "#16a34a";
         } else {
-          analysisText = "Under riket";
-          analysisColor = "#dc2626";
+          if (diff < 0) {
+            analysisText = "Lägre än riket";
+          } else {
+            analysisText = "Högre än riket";
+          }
+          const better = r.kpi.higherIsBetter ? (diff > 0) : (diff < 0);
+          analysisColor = better ? "#16a34a" : "#dc2626";
         }
       } else {
         const level = classifyLevel(r.current);
@@ -1410,7 +2047,6 @@ function renderOrgTable(rows) {
           <td style="padding:10px 12px; color:${analysisColor}; font-weight:600;">${escapeHtml(analysisText)}</td>
           <td style="padding:10px 12px;">${escapeHtml(String(r.year ?? "–"))}</td>
           <td style="padding:10px 12px;" class="${delta.className}" ${deltaTooltip}>${escapeHtml(delta.text)}</td>
-          <td style="padding:10px 12px;">${escapeHtml(rankText)}</td>
           <td style="padding:10px 12px; opacity:.8;">${escapeHtml(r.kpi.id)}</td>
         </tr>
       `;
@@ -1446,15 +2082,15 @@ async function renderKommunbildForMunicipality(municipalityId, forcedYear) {
   const status = document.getElementById("kommunbildStatus");
   if (status) {
     status.style.display = "block";
-    status.innerHTML = "<h4>Laddar</h4><ul class=\"narrative-bullets\"><li><strong>Fas 1</strong>: Hämtar organisation och index.</li></ul>";
+    status.innerHTML = "<h4>Laddar</h4><ul class=\"narrative-bullets\"><li><strong>Fas 1</strong>: Hämtar organisation och index (snapshots).</li></ul>";
   }
 
   const year = Number.isFinite(Number(forcedYear)) ? Number(forcedYear) : DEFAULTS.year;
 
-  // === FASE 1: SNABB - Rendrera billiga kort direkt ===
-  // ORG_KPIS och INDEX_KPIS kräver bara ~3 anrop vardera (värde + år + riket)
+  // === FASE 1: SNABB - Rendrera snapshots direkt (UTAN trend-anrop) ===
+  // ORG_KPIS och INDEX_KPIS använder computeKpiSnapshot för snabb laddning
   const orgRows = await mapWithConcurrency(ORG_KPIS, DEFAULTS.maxParallelFetches, async (kpi) => {
-    const result = await computeKpiForMunicipality({ kpi, municipalityId, forcedYear: year });
+    const result = await computeKpiSnapshot({ kpi, municipalityId, forcedYear: year });
     try {
       const riketValue = await fetchMunicipalityValueForYear(kpi.id, "0000", result.year);
       result.riketValue = numberOrNull(riketValue);
@@ -1466,7 +2102,7 @@ async function renderKommunbildForMunicipality(municipalityId, forcedYear) {
   });
 
   const indexRows = await mapWithConcurrency(INDEX_KPIS, DEFAULTS.maxParallelFetches, async (kpi) => {
-    const result = await computeKpiForMunicipality({ kpi, municipalityId, forcedYear: year });
+    const result = await computeKpiSnapshot({ kpi, municipalityId, forcedYear: year });
     return result;
   });
 
@@ -1482,18 +2118,18 @@ async function renderKommunbildForMunicipality(municipalityId, forcedYear) {
 
   // Uppdatera status för fase 2
   if (status) {
-    status.innerHTML = "<h4>Laddar</h4><ul class=\"narrative-bullets\"><li><strong>Fas 1</strong>: ✓ Klar - Organisation &amp; index</li><li><strong>Fas 2</strong>: Hämtar trenddata (långsammare)...</li></ul>";
+    status.innerHTML = "<h4>Laddar</h4><ul class=\"narrative-bullets\"><li><strong>Fas 1</strong>: ✓ Klar - Organisation &amp; index</li><li><strong>Fas 2</strong>: Rendar tabeller (expand för trend)</li></ul>";
   }
 
-  // === FASE 2: LÅNGSAM - Ladda trenddata parallellt ===
-  // Denna körs medan användaren redan ser org/index
+  // === FASE 2: Ladda block snapshots parallellt (UTAN trends ännu) ===
+  // Trends hämtas lazy när användaren expanderar en rad
   const blockResultsPromise = (async () => {
     const blockResults = await mapWithConcurrency(
       KPI_BLOCKS,
       1,
       async (block) => {
         const kpis = await mapWithConcurrency(block.kpis, DEFAULTS.maxParallelFetches, async (kpi) => {
-          return computeKpiForMunicipality({ kpi, municipalityId, forcedYear: year });
+          return computeKpiSnapshot({ kpi, municipalityId, forcedYear: year });
         });
         return { block, kpis };
       }
@@ -1501,7 +2137,7 @@ async function renderKommunbildForMunicipality(municipalityId, forcedYear) {
     return blockResults;
   })();
 
-  // Vänta på blocks att bli klara
+  // Vänta på blocks snapshots att bli klara
   const blockResults = await blockResultsPromise;
 
   // Generate and render executive summary
@@ -1511,8 +2147,8 @@ async function renderKommunbildForMunicipality(municipalityId, forcedYear) {
   // Render section titles reference
   renderSectionReference(blockResults);
 
-  // Rendera blocks nu när trenddata är klar
-  renderBlocks(blockResults, indexRows);
+  // Rendera blocks som tabeller (utan trends - de laddar lazy)
+  renderBlockTables(blockResults, year);
 
   // Hide loader bar
   hideLoadingBar();
