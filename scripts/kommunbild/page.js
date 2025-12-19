@@ -1763,6 +1763,7 @@ async function loadAndRenderTrendChart(btn, detailRow) {
       kpiId,
       label: kpiDef.label,
       unit: kpiDef.unit,
+      higherIsBetter: kpiDef.higherIsBetter,
       spanYears: bundle.spanYears,
       referenceKind: bundle.referenceKind,
       trendData5Years: bundle.trendData5Years,
@@ -1795,9 +1796,14 @@ async function loadAndRenderTrendChart(btn, detailRow) {
  * Fallback 2: 1 datapunkt - visa stort värde
  * Normal: 2+ datapunkter - rendera SVG linjegraf
  */
-function renderTrendChart({ kpiId, label, unit, spanYears, referenceKind = "median", trendData5Years, trendReference5Years, usedMockData }) {
+function renderTrendChart({ kpiId, label, unit, higherIsBetter = true, spanYears, referenceKind = "median", trendData5Years, trendReference5Years, usedMockData }) {
+  const ownSeries = Array.isArray(trendData5Years) ? [...trendData5Years] : [];
+  const refSeries = Array.isArray(trendReference5Years)
+    ? trendReference5Years.filter((d) => d && d.value !== null && d.value !== undefined)
+    : [];
+
   // FALLBACK 1: Ingen data
-  if (!trendData5Years || trendData5Years.length === 0) {
+  if (!ownSeries.length) {
     return `
       <div style="padding:2rem; text-align:center; background:#f9fafb; border-radius:6px;">
         <div style="font-size:1.25rem; font-weight:600; color:#1f2937; margin-bottom:0.5rem;">Ingen trend att visa</div>
@@ -1807,11 +1813,14 @@ function renderTrendChart({ kpiId, label, unit, spanYears, referenceKind = "medi
     `;
   }
 
+  ownSeries.sort((a, b) => a.year - b.year);
+  refSeries.sort((a, b) => a.year - b.year);
+
   // FALLBACK 2: En datapunkt - visa som stort värde
-  if (trendData5Years.length === 1) {
-    const point = trendData5Years[0];
-    const refValue = trendReference5Years && trendReference5Years.length > 0
-      ? trendReference5Years[0].value
+  if (ownSeries.length === 1) {
+    const point = ownSeries[0];
+    const refValue = refSeries && refSeries.length > 0
+      ? refSeries[0].value
       : null;
     
     return `
@@ -1827,6 +1836,11 @@ function renderTrendChart({ kpiId, label, unit, spanYears, referenceKind = "medi
   // Bestäm trendlabel baserat på spanYears
   const trendLabel = spanYears === 3 ? "Senaste mätningar (upp till 3 år)" : "Trend (5 år)";
 
+  const expectedYears = spanYears || 5;
+  const refYearCount = new Set(refSeries.map((d) => d.year)).size;
+  const refCoverage = expectedYears ? refYearCount / expectedYears : 0;
+  const showRef = refSeries.length >= 3 && refCoverage >= 0.6 && usedMockData !== true;
+
   // Simple SVG chart dimensions
   const width = 600;
   const height = 300;
@@ -1836,36 +1850,40 @@ function renderTrendChart({ kpiId, label, unit, spanYears, referenceKind = "medi
 
   // Get all years from both series
   const allYears = new Set();
-  trendData5Years.forEach((d) => allYears.add(d.year));
-  if (trendReference5Years) {
-    trendReference5Years.forEach((d) => allYears.add(d.year));
+  ownSeries.forEach((d) => allYears.add(d.year));
+  if (showRef) {
+    refSeries.forEach((d) => allYears.add(d.year));
   }
   const sortedYears = Array.from(allYears).sort();
   const minYear = Math.min(...sortedYears);
   const maxYear = Math.max(...sortedYears);
 
   // Get value ranges
-  const allValues = [
-    ...trendData5Years.map((d) => d.value),
-    ...(trendReference5Years ? trendReference5Years.map((d) => d.value) : []),
-  ].filter((v) => v !== null);
-  const minValue = Math.min(...allValues);
-  const maxValue = Math.max(...allValues);
-  const valueRange = maxValue - minValue || 1;
-  const valuePadding = valueRange * 0.1;
+  const valuesForScale = showRef ? ownSeries.concat(refSeries) : ownSeries;
+  const allValues = valuesForScale.map((d) => d.value).filter((v) => v !== null);
+  const boundedUnit = unit === "%" || unit === "index";
+  const rawMin = Math.min(...allValues);
+  const rawMax = Math.max(...allValues);
+  const domainMin = boundedUnit ? 0 : rawMin;
+  const domainMax = boundedUnit ? 100 : rawMax;
+  const hasOutOfRange = boundedUnit && (rawMin < 0 || rawMax > 100);
+  const valueRange = domainMax - domainMin || 1;
+  const valuePadding = boundedUnit ? 0 : valueRange * 0.1;
 
   // Scale functions
+  const clampValue = (v) => boundedUnit ? Math.min(Math.max(v, domainMin), domainMax) : v;
   const scaleX = (year) => {
     const ratio = (year - minYear) / (maxYear - minYear || 1);
     return padding + ratio * plotWidth;
   };
   const scaleY = (value) => {
-    const ratio = (maxValue + valuePadding - value) / (valueRange + 2 * valuePadding);
+    const v = clampValue(value);
+    const ratio = (domainMax + valuePadding - v) / ((domainMax - domainMin) + 2 * valuePadding);
     return padding + ratio * plotHeight;
   };
 
   // Build data points paths
-  const ownPath = trendData5Years
+  const ownPath = ownSeries
     .map((d, idx) => {
       const x = scaleX(d.year);
       const y = scaleY(d.value);
@@ -1873,8 +1891,8 @@ function renderTrendChart({ kpiId, label, unit, spanYears, referenceKind = "medi
     })
     .join(" ");
 
-  const refPath = trendReference5Years && trendReference5Years.length > 0
-    ? trendReference5Years
+  const refPath = showRef && refSeries.length > 0
+    ? refSeries
         .map((d, idx) => {
           const x = scaleX(d.year);
           const y = scaleY(d.value);
@@ -1892,7 +1910,7 @@ function renderTrendChart({ kpiId, label, unit, spanYears, referenceKind = "medi
     .join("");
 
   // Data point circles for own data
-  const ownCircles = trendData5Years
+  const ownCircles = ownSeries
     .map((d) => {
       const x = scaleX(d.year);
       const y = scaleY(d.value);
@@ -1900,31 +1918,33 @@ function renderTrendChart({ kpiId, label, unit, spanYears, referenceKind = "medi
     })
     .join("");
 
-    // Value labels for own data points
-    const ownValueLabels = trendData5Years
-      .map((d) => {
-        const x = scaleX(d.year);
-        const y = scaleY(d.value);
-        const yOffset = y > padding + plotHeight / 2 ? -12 : 15;
-        const valueStr = d.value.toFixed(1);
-        return `<text x="${x}" y="${y + yOffset}" text-anchor="middle" font-size="11" font-weight="600" fill="#667eea">${valueStr}</text>`;
-      })
-      .join("");
+  const showAllLabels = spanYears === 3;
+  const ownLabelPoints = showAllLabels ? ownSeries : [ownSeries[ownSeries.length - 1]];
+  const refLabelPoints = showRef && refSeries.length ? (showAllLabels ? refSeries : [refSeries[refSeries.length - 1]]) : [];
 
-    // Value labels for reference line
-    const refValueLabels = refPath && trendReference5Years && trendReference5Years.length > 0
-      ? trendReference5Years
-          .map((d) => {
-            const x = scaleX(d.year);
-            const y = scaleY(d.value);
-            const yOffset = y > padding + plotHeight / 2 ? 15 : -12;
-            const valueStr = d.value.toFixed(1);
-            return `<text x="${x}" y="${y + yOffset}" text-anchor="middle" font-size="10" fill="#333">${valueStr}</text>`;
-          })
-          .join("")
-      : "";
+  const ownValueLabels = ownLabelPoints
+    .map((d) => {
+      const x = scaleX(d.year);
+      const y = scaleY(d.value);
+      const yOffset = y > padding + plotHeight / 2 ? -12 : 15;
+      const valueStr = d.value.toFixed(1);
+      return `<text x="${x}" y="${y + yOffset}" text-anchor="middle" font-size="11" font-weight="600" fill="#667eea">${valueStr}</text>`;
+    })
+    .join("");
 
-    // Labels for years
+  const refValueLabels = refLabelPoints.length
+    ? refLabelPoints
+        .map((d) => {
+          const x = scaleX(d.year);
+          const y = scaleY(d.value);
+          const yOffset = y > padding + plotHeight / 2 ? 15 : -12;
+          const valueStr = d.value.toFixed(1);
+          return `<text x="${x}" y="${y + yOffset}" text-anchor="middle" font-size="10" fill="#333">${valueStr}</text>`;
+        })
+        .join("")
+    : "";
+
+  // Labels for years
   const yearLabels = sortedYears
     .map((year) => {
       const x = scaleX(year);
@@ -1933,16 +1953,55 @@ function renderTrendChart({ kpiId, label, unit, spanYears, referenceKind = "medi
     .join("");
 
   // Left axis label
-  const minLabel = minValue.toFixed(1);
-  const maxLabel = (maxValue + valuePadding).toFixed(1);
-  const yAxisLabels = `
-    <text x="10" y="${scaleY(minValue) + 5}" text-anchor="end" font-size="12" fill="#64748b">${minLabel}</text>
-    <text x="10" y="${scaleY(maxValue + valuePadding) + 5}" text-anchor="end" font-size="12" fill="#64748b">${maxLabel}</text>
+  const yAxisLabels = boundedUnit
+    ? `
+    <text x="10" y="${scaleY(0) + 5}" text-anchor="end" font-size="12" fill="#64748b">0</text>
+    <text x="10" y="${scaleY(50) + 5}" text-anchor="end" font-size="12" fill="#64748b">50</text>
+    <text x="10" y="${scaleY(100) + 5}" text-anchor="end" font-size="12" fill="#64748b">100</text>
+  `
+    : `
+    <text x="10" y="${scaleY(domainMin) + 5}" text-anchor="end" font-size="12" fill="#64748b">${domainMin.toFixed(1)}</text>
+    <text x="10" y="${scaleY(domainMax) + 5}" text-anchor="end" font-size="12" fill="#64748b">${domainMax.toFixed(1)}</text>
+  `;
+
+  const latest = ownSeries[ownSeries.length - 1];
+  const previous = ownSeries.length > 1 ? ownSeries[ownSeries.length - 2] : null;
+  const level = classifyLevel(latest?.value);
+  const trend = previous
+    ? classifyTrend(
+        higherIsBetter ? latest?.value : -latest?.value,
+        higherIsBetter ? previous?.value : -previous?.value
+      )
+    : { label: "Ingen trend (för få mätpunkter)", color: "#94a3b8", dir: null, strength: "none", delta: null };
+  const interpretation = buildInterpretation(level.band, trend.dir, trend.strength);
+  const interpretationColor = trend.dir === "down" ? "#dc2626" : trend.dir === "up" ? "#16a34a" : level.color;
+  const trendText = previous ? trend.label : "Ingen trend (för få mätpunkter)";
+
+  const mockBadge = usedMockData
+    ? `<span style="background:#fef3c7; color:#b45309; padding:4px 8px; border-radius:6px; font-weight:600;">⚠️ referens uppskattad</span>`
+    : "";
+  const refBadge = !showRef
+    ? `<span style="background:#e2e8f0; color:#475569; padding:4px 8px; border-radius:6px; font-weight:600;">Referens ej jämförbar</span>`
+    : "";
+  const outOfRangeBadge = hasOutOfRange
+    ? `<span style="background:#fee2e2; color:#991b1b; padding:4px 8px; border-radius:6px; font-weight:600;">Värden utanför 0–100 klippta i grafen</span>`
+    : "";
+
+  const interpretationRow = `
+    <div style="display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px; background:#f8fafc; padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0;">
+      <div style="font-weight:700; color:${interpretationColor};" title="Nivåband baserat på senaste värdet">Nivå: ${level.label}</div>
+      <div style="color:${interpretationColor};">Trend: ${trendText}</div>
+      <div style="color:${interpretationColor}; font-weight:600;">Tolkning: ${interpretation}</div>
+      ${mockBadge}
+      ${refBadge}
+      ${outOfRangeBadge}
+    </div>
   `;
 
   const svg = `
+    ${interpretationRow}
     <div style="overflow-x:auto;">
-      <svg width="${width}" height="${height}" style="border:1px solid #e2e8f0; border-radius:6px; background:white;">
+      <svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" style="border:1px solid #e2e8f0; border-radius:6px; background:white;">
         <!-- Grid -->
         ${gridLines}
         
@@ -1975,7 +2034,9 @@ function renderTrendChart({ kpiId, label, unit, spanYears, referenceKind = "medi
       <div style="font-weight:600; margin-bottom:0.5rem;">${trendLabel}</div>
       <div><strong>Blå linje:</strong> ${escapeHtml(label)} (denna kommun)</div>
       ${refPath ? `<div><strong>Svart linje:</strong> Referensvärde (${referenceKind === 'riket' ? 'Riket' : referenceKind === 'custom' ? 'Custom' : 'Median'})</div>` : ""}
+      ${!refPath ? `<div style="color:#94a3b8;">Referens saknas eller är ej jämförbar för perioden.</div>` : ""}
       ${usedMockData ? `<div style="color:#f59e0b;"><strong>⚠️ OBS:</strong> Använder uppskattning för referensvärde</div>` : ""}
+      ${hasOutOfRange ? `<div style="color:#991b1b;">Notering: värden utanför 0–100 är klippta i grafen.</div>` : ""}
       <div style="margin-top:0.5rem;">Enhet: ${escapeHtml(unit)}</div>
     </div>
   `;
