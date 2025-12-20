@@ -27,6 +27,41 @@ let chart;
 let allData;
 const skolenhetCache = new Map();
 
+// OU-stödda KPIer från skolenhetsdashboard (dessa finns på skolenhetsnivå)
+const OU_SUPPORTED_KPIS = new Set([
+  'N15033',  // Antal elever grundskolan
+  'N15438',  // Elever per lärare
+  'N15447',  // Andel lärare med ped. högskoleexamen
+  'N15561',  // Åk 6: E i svenska
+  'N15559',  // Åk 6: E i matematik
+  'N15560',  // Åk 6: E i engelska
+  'N15419',  // Åk 9: behöriga till yrkesprogram
+  'N15421',  // Åk 9: genomsnittligt meritvärde
+  'N15414',  // Åk 9: betygspoäng matematik
+  'U15423',  // SALSA: avvikelse behörighet yrkesprogram
+  'U15424',  // SALSA: avvikelse meritvärde
+  'N15481',  // Åk 6: E engelska fristående
+  'N15482',  // Åk 6: E engelska kommunala
+  'N15483',  // Åk 6: E matematik lägeskommun
+  'N15484',  // Åk 6: E matematik fristående
+  'N15485',  // Åk 6: E matematik kommunala
+  'N15503',  // Åk 9: betygspoäng matematik genomsnitt
+  'N15504',  // Åk 9: meritvärde lägeskommun
+  'N15505',  // Åk 9: meritvärde kommunala
+  'N15506',  // Åk 9: meritvärde fristående
+  'N15502',  // Åk 9: E svenska kommunala
+  'U15414',  // Åk 9: avvikelse SALSA betygskriterier
+  'U15415',  // Åk 9: meritvärde modellberäknat SALSA
+  'U15416'   // Åk 9: meritvärde avvikelse SALSA
+]);
+
+function filtreraKpiForOu(lista) {
+  // Kommunnivå: returnera ofiltrerat
+  if (!aktivSkolenhet) return lista;
+  // Skolenhetsnivå: filtrera till endast OU-stödda KPIer
+  return lista.filter(k => OU_SUPPORTED_KPIS.has(k.id));
+}
+
 function uppdateraSidtitel() {
   const kpiInfo = getKpiList(aktivSkoltyp).find(k => k.id === aktivKPI);
   if (kpiInfo) {
@@ -36,7 +71,24 @@ function uppdateraSidtitel() {
 
 function uppdateraKpiDropdown() {
   const kpiSelect = document.getElementById('kpiSelect');
-  const lista = getKpiList(aktivSkoltyp);
+  const fullLista = getKpiList(aktivSkoltyp);
+  // Om skolenhet: filtrera till endast OU-stödda KPIer
+  const lista = filtreraKpiForOu(fullLista);
+
+  if (!lista.length) {
+    kpiSelect.innerHTML = '';
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = aktivSkolenhet
+      ? 'Inga KPI:er har Kolada OU-data'
+      : 'Inga KPI:er tillgängliga';
+    opt.disabled = true;
+    opt.selected = true;
+    kpiSelect.appendChild(opt);
+    kpiSelect.disabled = true;
+    return;
+  }
+  kpiSelect.disabled = false;
 
   if (!lista.some(kpi => kpi.id === aktivKPI) && lista.length > 0) {
     aktivKPI = lista[0].id;
@@ -120,11 +172,16 @@ function uppdateraDatasetNotice(hasData) {
   if (!notice) return;
 
   if (!hasData) {
-    notice.textContent = 'Data ej tillgängligt på detta dataset.';
+    if (aktivSkolenhet) {
+      notice.textContent = `⚠️ Ingen data tillgänglig för vald skolenhet (${aktivSkolenhetNamn || 'okänd'}) och KPI ${aktivKPI}. Detta KPI finns troligen inte rapporterat på organisationsenhetsnivå.`;
+      notice.classList.add('no-data');
+    } else {
+      notice.textContent = 'Data ej tillgängligt för vald kommun och KPI.';
+    }
     notice.classList.add('visible');
   } else {
     notice.textContent = '';
-    notice.classList.remove('visible');
+    notice.classList.remove('visible', 'no-data');
   }
 }
 
@@ -153,7 +210,7 @@ function visaDataset(event) {
   chart.update();
 }
 
-function bytSkoltyp(skoltyp) {
+async function bytSkoltyp(skoltyp) {
   aktivSkoltyp = skoltyp;
 
   const lista = getKpiList(aktivSkoltyp);
@@ -162,11 +219,11 @@ function bytSkoltyp(skoltyp) {
   }
 
   uppdateraKpiDropdown();
-  uppdateraSkolenhetDropdown();
-  hamtaData();
+  await uppdateraSkolenhetDropdown();
+  await hamtaData();
 }
 
-function bytKPI(kpiKod) {
+async function bytKPI(kpiKod) {
   aktivKPI = kpiKod;
   console.log('bytKPI called, ny KPI:', kpiKod);
   // Uppdatera dropdown‑listan ifall KPI‑listan beror på skoltyp (t.ex. vid byte av enhet)
@@ -175,24 +232,25 @@ function bytKPI(kpiKod) {
   // Visa laddningsmeddelande i analysrutorna så att användaren ser att data uppdateras
   document.getElementById('kommunAnalysis').innerHTML = '<p class="analysis-text">Hämtar data...</p>';
   document.getElementById('riketAnalysis').innerHTML = '<p class="analysis-text">Hämtar data...</p>';
-  hamtaData();
+  await hamtaData();
 }
 
-function bytKommun(kommunId) {
+async function bytKommun(kommunId) {
   aktivKommun = kommunId;
   aktivSkolenhet = '';
   aktivSkolenhetNamn = '';
-  uppdateraSkolenhetDropdown();
-  hamtaData();
+  await uppdateraSkolenhetDropdown();
+  await hamtaData();
 }
 
-function bytSkolenhet(skolenhetId, skolenhetNamn, skolenhetTyp = '') {
+async function bytSkolenhet(skolenhetId, skolenhetNamn, skolenhetTyp = '') {
   // Om användaren väljer "Hela kommunen" (tomt ID), återställ till kommunnivå
   if (!skolenhetId) {
     aktivSkolenhet = '';
     aktivSkolenhetNamn = '';
     console.log('Återställer till kommunnivå');
-    hamtaData();
+    uppdateraKpiDropdown();
+    await hamtaData();
     return;
   }
 
@@ -216,16 +274,11 @@ function bytSkolenhet(skolenhetId, skolenhetNamn, skolenhetTyp = '') {
   if (typ && typ !== aktivSkoltyp) {
     aktivSkoltyp = typ;
     document.getElementById('skolTypSelect').value = typ;
-    uppdateraKpiDropdown();
-  } else {
-    const lista = getKpiList(aktivSkoltyp);
-    if (!lista.some(k => k.id === aktivKPI) && lista.length > 0) {
-      aktivKPI = lista[0].id;
-      uppdateraKpiDropdown();
-    }
   }
+  // Uppdatera KPI-listan (filtrerar till OU-stödda KPI:er vid skolenhet)
+  uppdateraKpiDropdown();
   // Efter att enheten har valts (och eventuella KPI‑ändringar har hanterats) hämta ny data och uppdatera diagrammet
-  hamtaData();
+  await hamtaData();
 }
 
 async function hamtaSkolenheterForKommun(kommunId) {
@@ -348,6 +401,34 @@ async function hamtaData() {
     const harLokalData = datasetHarVarden(lokalData.totalt);
     uppdateraDatasetNotice(harLokalData);
 
+    // Visa/dölj chart beroende på om data finns
+    const chartCanvas = document.getElementById('koladaChart');
+    const copyBtn = document.getElementById('copyChartBtn');
+    const updateBtn = document.getElementById('updateChartBtn');
+    
+    if (!harLokalData && aktivSkolenhet) {
+      // Om det är en skolenhet och ingen data finns - dölj chart helt
+      console.warn('Ingen OU-data tillgänglig för', aktivKPI, 'på', lokalNamn);
+      if (chartCanvas) chartCanvas.style.display = 'none';
+      if (copyBtn) copyBtn.style.display = 'none';
+      if (updateBtn) updateBtn.style.display = 'none';
+      
+      visaIngenDataAnalys(lokalNamn);
+      uppdateraRiketAnalysis(rikeData.totalt, rikeData.ar);
+      
+      if (chart) {
+        chart.destroy();
+        chart = null;
+      }
+      uppdateraSidtitel();
+      return;
+    }
+
+    // Visa chart om data finns eller om det är kommun-nivå
+    if (chartCanvas) chartCanvas.style.display = 'block';
+    if (copyBtn) copyBtn.style.display = 'block';
+    if (updateBtn) updateBtn.style.display = 'block';
+
     if (harLokalData) {
       uppdateraAnalysis(lokalData.totalt, lokalData.ar, rikeData.totalt, rikeData.ar, lokalNamn);
     } else {
@@ -370,7 +451,7 @@ async function hamtaData() {
     const config = skapaChartConfig(aktivKPI, labels, datasets, chartTitle);
 
     if (chart) chart.destroy();
-    chart = new Chart(document.getElementById('koladaChart'), config);
+    chart = new Chart(chartCanvas, config);
     // Uppdatera sidrubriken så den alltid visar det valda KPI‑namnet (kan ha ändrats vid enhetsval)
     uppdateraSidtitel();
   } catch (error) {
@@ -381,6 +462,14 @@ async function hamtaData() {
         ? '<p class="analysis-text">Kunde inte hämta data på grund av nätverks- eller CORS-fel. Kontrollera att API:et är tillgängligt.</p>'
         : '<p class="analysis-text">Fel vid hämtning av data. Försök igen senare.</p>';
     uppdateraDatasetNotice(false);
+    
+    // Dölj chart vid fel
+    const chartCanvas = document.getElementById('koladaChart');
+    const copyBtn = document.getElementById('copyChartBtn');
+    const updateBtn = document.getElementById('updateChartBtn');
+    if (chartCanvas) chartCanvas.style.display = 'none';
+    if (copyBtn) copyBtn.style.display = 'none';
+    if (updateBtn) updateBtn.style.display = 'none';
   }
 }
 
@@ -403,24 +492,24 @@ function initFilters() {
 
 function initSelectors() {
   uppdateraSkoltypSelect();
-  document.getElementById('skolTypSelect')?.addEventListener('change', event => {
+  document.getElementById('skolTypSelect')?.addEventListener('change', async event => {
     aktivSkolenhet = '';
     aktivSkolenhetNamn = '';
-    bytSkoltyp(event.target.value);
+    await bytSkoltyp(event.target.value);
   });
 
-  document.getElementById('kpiSelect')?.addEventListener('change', event => {
-    bytKPI(event.target.value);
+  document.getElementById('kpiSelect')?.addEventListener('change', async event => {
+    await bytKPI(event.target.value);
   });
 
-  document.getElementById('kommunSelect')?.addEventListener('change', event => {
-    bytKommun(event.target.value);
+  document.getElementById('kommunSelect')?.addEventListener('change', async event => {
+    await bytKommun(event.target.value);
   });
 
-  document.getElementById('skolenhetSelect')?.addEventListener('change', event => {
+  document.getElementById('skolenhetSelect')?.addEventListener('change', async event => {
     const option = event.target.selectedOptions[0];
     const skolenhetTyp = option?.dataset?.type || '';
-    bytSkolenhet(event.target.value, option ? option.textContent : '', skolenhetTyp);
+    await bytSkolenhet(event.target.value, option ? option.textContent : '', skolenhetTyp);
   });
 }
 
@@ -452,7 +541,7 @@ function initUpdateButton() {
   });
 }
 
-function init() {
+async function init() {
   const initialKpiList = getKpiList(aktivSkoltyp);
   if (!initialKpiList.some(kpi => kpi.id === aktivKPI) && initialKpiList.length > 0) {
     aktivKPI = initialKpiList[0].id;
@@ -464,9 +553,9 @@ function init() {
   initCopyButton();
   initUpdateButton(); // Ny knapp för manuell uppdatering
   uppdateraKpiDropdown();
-  uppdateraSkolenhetDropdown();
-  hamtaData();
+  await uppdateraSkolenhetDropdown();
+  await hamtaData();
 }
 
 // 🚀 Kör direkt
-init();
+init().catch(err => console.error('Init failed', err));

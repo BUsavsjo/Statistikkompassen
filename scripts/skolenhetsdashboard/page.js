@@ -2250,6 +2250,7 @@ function initKommuner(selectEl, defaultId = '0684') {
 async function onKommunChange(kommunSelect, skolenhetSelect) {
   skolenhetSelect.disabled = true;
   skolenhetSelect.innerHTML = '<option>Hämtar skolenheter...</option>';
+  const previouslySelected = skolenhetSelect.value || '';
   const enheter = await hamtaSkolenheterForKommun(kommunSelect.value);
   skolenhetSelect.innerHTML = '';
   const def = document.createElement('option');
@@ -2258,13 +2259,27 @@ async function onKommunChange(kommunSelect, skolenhetSelect) {
   skolenhetSelect.appendChild(def);
   enheter.forEach(e => {
     const o=document.createElement('option');
-    o.value=e.id; o.textContent=e.title; skolenhetSelect.appendChild(o);
+    o.value=e.id;
+    o.textContent=e.title;
+    skolenhetSelect.appendChild(o);
   });
   skolenhetSelect.disabled = false;
   ['baselineKPIs','outcomeKPIs','svenskaKPIs','matematikKPIs','engelskaKPIs','salsaKPIs','trygghetsKPIs'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.innerHTML='';
   });
+
+  // Auto-återställ vald skolenhet (om den finns kvar) annars välj första och rendera direkt
+  const selectableOptions = [...skolenhetSelect.options].filter(opt => opt.value);
+  const found = selectableOptions.find(opt => opt.value === previouslySelected);
+  if (found) {
+    skolenhetSelect.value = found.value;
+    renderSections(found.value, kommunSelect.value);
+  } else if (selectableOptions.length === 1) {
+    // Om det bara finns en skolenhet, välj den direkt
+    skolenhetSelect.value = selectableOptions[0].value;
+    renderSections(selectableOptions[0].value, kommunSelect.value);
+  }
 }
 
 function initDashboard() {

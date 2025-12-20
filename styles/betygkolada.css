@@ -195,6 +195,17 @@ h1 {
   display: block;
 }
 
+.dataset-notice.no-data {
+  background: #fee2e2;
+  border-color: #ef4444;
+  color: #991b1b;
+}
+
+.dataset-notice.no-data::before {
+  content: '⚠️ ';
+  margin-right: 0.5rem;
+}
+
 @media (max-width: 768px) {
   .analysis-container {
     grid-template-columns: 1fr;

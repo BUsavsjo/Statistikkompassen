@@ -11,16 +11,16 @@ export const KPI_GRUNDSKOLA = [
   { id: 'N15643', namn: 'Trygghet i skolan åk 8', unit: 'percent' },
   { id: 'N15313', namn: 'Pedagogisk personal: studiero på lektioner', unit: 'percent' },
   { id: 'N15331', namn: 'Uppföljning av elevers upplevelse av studiero', unit: 'percent' },
-  { id: 'U15401', namn: 'Kvalitetsindex grundskola', unit: 'number' },
-  { id: 'U15900', namn: 'Effektivitetsindex kommunal grundskola F-9', unit: 'number' },
-  { id: 'U15010', namn: 'Resursindex kommunal grundskola F-9', unit: 'number' },
-  { id: 'U15200', namn: 'Medarbetarengagemang grundskola och förskoleklass', unit: 'number' },
-  { id: 'U15402', namn: 'Elevenkätsindex åk 8', unit: 'number' },
+  { id: 'U15401', namn: 'Kvalitetsindex grundskola', unit: 'index' },
+  { id: 'U15900', namn: 'Effektivitetsindex kommunal grundskola F-9', unit: 'index' },
+  { id: 'U15010', namn: 'Resursindex kommunal grundskola F-9', unit: 'index' },
+  { id: 'U15200', namn: 'Medarbetarengagemang grundskola och förskoleklass', unit: 'index' },
+  { id: 'U15402', namn: 'Elevenkätsindex åk 8', unit: 'index' },
   { id: 'U15011', namn: 'Nettokostnad per elev grundskolan', unit: 'currency' },
   { id: 'N15006', namn: 'Kostnad grundskola åk 1-9 hemkommun, kr/elev', unit: 'currency' },
   { id: 'N15031', namn: 'Lärare med pedagogisk högskoleexamen', unit: 'percent' },
   { id: 'N15814', namn: 'Andel lärare med lärarlegitimation och behörighet i grundskolan åk 1–9, kommunala skolor', unit: 'percent' },
-  { id: 'N15034', namn: 'Elever/lärare grundskola', unit: 'number' },
+  { id: 'N15034', namn: 'Elever/lärare grundskola', unit: 'ratio' },
 
   // Åk 6 - andel med minst E (per skolenhet, bra tidiga signaler)
   { id: 'N15481', namn: 'Åk 6: lägst betyg E i engelska, fristående grundskola, andel (%)', unit: 'percent' },
@@ -30,16 +30,16 @@ export const KPI_GRUNDSKOLA = [
   { id: 'N15485', namn: 'Åk 6: lägst betyg E i matematik, kommunala skolor, andel (%)', unit: 'percent' },
 
   // Åk 9 - betygspoäng / meritvärde (genomsnitt per skola)
-  { id: 'N15503', namn: 'Åk 9: betygspoäng i matematik, genomsnitt', unit: 'number' },
-  { id: 'N15504', namn: 'Åk 9: meritvärde lägeskommun, genomsnitt (17 ämnen)', unit: 'number' },
-  { id: 'N15505', namn: 'Meritvärde åk 9 (kommunala skolor)', unit: 'number' },
-  { id: 'N15506', namn: 'Åk 9: meritvärde fristående skolor i kommunen, genomsnitt (17 ämnen)', unit: 'number' },
+  { id: 'N15503', namn: 'Åk 9: betygspoäng i matematik, genomsnitt', unit: 'points' },
+  { id: 'N15504', namn: 'Åk 9: meritvärde lägeskommun, genomsnitt (17 ämnen)', unit: 'points' },
+  { id: 'N15505', namn: 'Meritvärde åk 9 (kommunala skolor)', unit: 'points' },
+  { id: 'N15506', namn: 'Åk 9: meritvärde fristående skolor i kommunen, genomsnitt (17 ämnen)', unit: 'points' },
   { id: 'N15502', namn: 'Åk 9: lägst betyg E i svenska, kommunala skolor, andel (%)', unit: 'percent' },
 
   // SALSA-relaterade KPI:er (avvikelse / modellberäknade värden på enhetsnivå)
-  { id: 'U15414', namn: 'Åk 9: uppnått betygskriterierna, avvikelse från SALSA (procentenheter)', unit: 'percent' },
-  { id: 'U15415', namn: 'Åk 9: meritvärde, modellberäknat genomsnitt (SALSA)', unit: 'number' },
-  { id: 'U15416', namn: 'Åk 9: meritvärde, avvikelse från SALSA på enhetsnivå (poäng)', unit: 'number' }
+  { id: 'U15414', namn: 'Åk 9: uppnått betygskriterierna, avvikelse från SALSA (procentenheter)', unit: 'percentage_points' },
+  { id: 'U15415', namn: 'Åk 9: meritvärde, modellberäknat genomsnitt (SALSA)', unit: 'points' },
+  { id: 'U15416', namn: 'Åk 9: meritvärde, avvikelse från SALSA på enhetsnivå (poäng)', unit: 'points' }
 ];
 
 export const KPI_FORSKOLA = [
