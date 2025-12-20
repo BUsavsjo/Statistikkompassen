@@ -37,6 +37,7 @@ const KPI_BLOCKS = [
     kpis: [
       { id: "N15473", label: "Elever i åk 3 som klarat alla delar av nationella proven för ämnesprovet i matematik, hemkommun, andel (%)", unit: "%", higherIsBetter: true, kpi_type: "N", rankable: true },
       { id: "N15472", label: "Elever i åk 3 som klarat alla delar av nationella proven för ämnesprovet i svenska och svenska som andraspråk, hemkommun, andel (%)", unit: "%", higherIsBetter: true, kpi_type: "N", rankable: true },
+        { id: "N15456", label: "Elever i åk 3 som klarat alla delar av nationella proven för ämnesproven i SV, Sv2 och MA, kommunal skola, genomsnittlig andel (%)", unit: "%", higherIsBetter: true, kpi_type: "N", rankable: true },
     ],
   },
   {
@@ -66,7 +67,7 @@ const TREND_YEARS_5 = new Set([
   // Kunskapsresultat (5 år)
   "U15456", "N15505", "N15419", "N15436", "N15540",
   // Tidiga signaler (5 år)
-  "N15473", "N15472",
+  "N15473", "N15472", "N15456",
   // Index – långa trender (5 år)
   "U15401", "U15900", "U15010",
   // Organisation & struktur (5 år)
@@ -1781,7 +1782,8 @@ async function loadAndRenderTrendChart(btn, detailRow) {
         </div>`
       : "";
 
-    trendContainer.innerHTML = `${rankBadge}${chartHtml}`;
+    const nidLine = `<div style="margin-top:12px; color:#475569; font-size:0.9rem;">NID: ${escapeHtml(kpiId)}</div>`;
+    trendContainer.innerHTML = `${rankBadge}${chartHtml}${nidLine}`;
     detailRow.dataset.loaded = "1";
     console.log(`[kommunbild] Trend chart loaded for ${kpiId}`);
   } catch (err) {
