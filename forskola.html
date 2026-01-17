@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <title>Statistikkompassen - Förskola</title>
+  <link rel="stylesheet" href="styles/theme.css">
+  <link rel="stylesheet" href="styles/betygkolada.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body data-skoltyp="forskola">
+  <h1 id="pageTitle">Statistikkompassen: Förskola</h1>
+
+  <div class="kpi-selector">
+    <div class="selector-row">
+      <div class="selector-group">
+        <label for="kommunSelect">Välj kommun:</label>
+        <select id="kommunSelect"></select>
+      </div>
+      <div class="selector-group">
+        <label for="skolenhetSelect">Välj skolenhet:</label>
+        <select id="skolenhetSelect" disabled>
+          <option value="">Hämtar skolenheter...</option>
+        </select>
+      </div>
+      <div class="selector-group">
+        <label for="skolTypSelect">Välj skoltyp:</label>
+        <select id="skolTypSelect">
+          <option value="forskola" selected>Förskola</option>
+          <option value="grundskola">Grundskola</option>
+        </select>
+      </div>
+      <div class="selector-group">
+        <label for="kpiSelect">Välj nyckeltal:</label>
+        <select id="kpiSelect"></select>
+      </div>
+    </div>
+  </div>
+
+  <a href="index.html" class="back-link">← Till startsidan</a>
+
+  <div class="filter-container">
+    <button class="filter-btn active" data-filter="alla">Visa alla</button>
+    <button class="filter-btn" data-filter="kvinnor">👩 Kvinnor</button>
+    <button class="filter-btn" data-filter="man">👨 Män</button>
+    <button class="filter-btn" data-filter="totalt">📊 Totalt</button>
+  </div>
+
+  <canvas id="koladaChart" width="800" height="400"></canvas>
+  <button id="copyChartBtn" class="copy-chart-btn" title="Kopiera diagrammet till urklipp">📋 Kopiera bild</button>
+  <div id="datasetNotice" class="dataset-notice" aria-live="polite"></div>
+
+  <div class="analysis-container">
+    <div class="analysis-box">
+      <h3 id="lokalAnalysisTitle">📊 Sävsjö kommun</h3>
+      <div class="analysis-text" id="kommunAnalysis">Hämtar data...</div>
+    </div>
+    <div class="analysis-box">
+      <h3>🇸🇪 Riket</h3>
+      <div class="analysis-text" id="riketAnalysis">Hämtar data...</div>
+    </div>
+  </div>
+
+  <script type="module" src="scripts/betygkolada.js"></script>
+</body>
+</html>

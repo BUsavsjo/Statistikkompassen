@@ -1,0 +1,46 @@
+# Automatisk deployment till GitHub Pages
+# Triggas vid varje push till main-branchen
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main  # Endast main-branchen triggar deployment
+
+# Nödvändiga permissions för GitHub Pages deployment
+permissions:
+  contents: read      # Läsa repository-innehåll
+  pages: write        # Skriva till GitHub Pages
+  id-token: write     # Skriva OIDC-token för autentisering
+
+# Säkerställ att endast en deployment körs åt gången
+concurrency:
+  group: "pages"
+  cancel-in-progress: false  # Avbryt inte pågående deployments
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
+    steps:
+      # Steg 1: Hämta källkod från repository
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      # Steg 2: Konfigurera GitHub Pages miljö
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      
+      # Steg 3: Ladda upp alla filer som artifact (inkl. HTML, CSS, JS)
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'  # Hela projektroten (alla filer)
+      
+      # Steg 4: Deploya artifact till GitHub Pages
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

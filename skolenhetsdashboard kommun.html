@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <title>Kommunbild Grundskola – kvalitet i grundskolan</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- 
+    === BEROENDE FILER ===
+    
+    CSS-FILER:
+    1. styles/theme.css - Enhetlig global CSS för hela appen
+    2. styles/betygkolada.css - Grundläggande styling för KPI-kort och tabeller
+    3. styles/skolenhetsdashboard.css - Specifika stilar för dashboards, inkl. trenddiagram och kort
+    4. styles/executive-summary.css - Stilar för sammanfattningsrutor och rapporter
+    
+    JAVASCRIPT-MODULER:
+    - scripts/kommunbild/page.js - Huvudscript som hanterar:
+      * Hämtning av kommundata från Kolada API
+      * Rendering av KPI-kort med värden, trender och jämförelser
+      * Generering av översiktstexter och styrande analys
+      * Definierar vilka KPIs som visas i olika sektioner (OVERVIEW_KPIS, INDEX_KPIS)
+      * Skapar trenddiagram för 5-årsperioder
+      * Beräknar rankning och jämförelser mot andra kommuner
+    
+    DATAKÄLLOR:
+    - Kolada API (Rådsdata/SKR) - Sveriges officiella kommunstatistik
+    - API-bas: https://api.kolada.se/v3
+    
+    HTML-STRUKTUR:
+    - #kommunSelect: Dropdown för att välja kommun
+    - #qualityYearSelect: Dropdown för att välja år (aktiveras efter kommunval)
+    - #executiveSummary: Executive summary-ruta (genereras av JS)
+    - #kommunbildStatus: Narrativ översiktstext (genereras av JS)
+    - #kpiU15900Value/Trend/Comparison/Analysis: Effektivitetsindex-kort (hardkodat exempel)
+    - #qualityBlocks: Container för kvalitets-KPI-kort (populeras av JS)
+    - #orgTableContainer: Tabell för organisations- och struktur-KPI:er (populeras av JS)
+    - #styrandeAnalys: Styrande skolbild-sektion med trafikljus och insikter (genereras av JS)
+  -->
+  
+  <link rel="stylesheet" href="styles/theme.css">
+  <link rel="stylesheet" href="styles/betygkolada.css">
+  <link rel="stylesheet" href="styles/skolenhetsdashboard.css">
+  <link rel="stylesheet" href="styles/executive-summary.css">
+  <style>
+    
+    body {
+      background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+    
+    #pageTitle {
+      color: #1e3a8a;
+      text-align: center;
+      font-size: 2.5rem;
+      margin-bottom: 2rem;
+      text-shadow: 0 1px 2px rgba(255,255,255,0.5);
+      font-weight: 700;
+    }
+    
+    .kpi-selector {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      margin-bottom: 1.5rem;
+    }
+    
+    .selector-row {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+    
+    .selector-group {
+      flex: 1;
+      min-width: 250px;
+    }
+    
+    .selector-group label {
+      display: block;
+      font-weight: 600;
+      color: #1e40af;
+      margin-bottom: 0.5rem;
+      font-size: 0.95rem;
+    }
+    
+    .selector-group select {
+      width: 100%;
+      padding: 0.75rem;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: all 0.2s;
+      background: white;
+    }
+    
+    .selector-group select:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .selector-group select:disabled {
+      background: #f1f5f9;
+      cursor: not-allowed;
+    }
+    
+    /* === STYRANDE ANALYS CSS === */
+    .styrande-analys-container {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      margin-bottom: 2rem;
+    }
+    
+    .styrande-analys-container h2 {
+      color: #1e3a8a;
+      margin-bottom: 1.5rem;
+      font-size: 1.8rem;
+    }
+    
+    /* Sektionsstatus grid (trafikljus) */
+    .sektion-status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    
+    .sektion-status-card {
+      padding: 1rem;
+      border-radius: 8px;
+      border-left: 5px solid;
+      background: #f8fafc;
+      transition: transform 0.2s;
+    }
+    
+    .sektion-status-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .sektion-status-card.green {
+      border-left-color: #10b981;
+      background: linear-gradient(135deg, #d1fae5 0%, #f0fdf4 100%);
+    }
+    
+    .sektion-status-card.yellow {
+      border-left-color: #f59e0b;
+      background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%);
+    }
+    
+    .sektion-status-card.red {
+      border-left-color: #ef4444;
+      background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%);
+    }
+    
+    .sektion-status-card h4 {
+      margin: 0 0 0.5rem 0;
+      font-size: 1rem;
+      color: #1e293b;
+    }
+    
+    .sektion-status-card .status-icon {
+      font-size: 2rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+      text-align: center;
+    }
+    
+    .sektion-status-card .status-word {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #1e293b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.5rem;
+      text-align: center;
+    }
+    
+    .sektion-status-card .status-summary {
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-bottom: 0.5rem;
+    }
+    
+    .sektion-status-card .status-trend {
+      font-size: 0.8rem;
+      color: #64748b;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+    
+    .sektion-status-card .status-explanation {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      font-style: italic;
+      margin-bottom: 0.5rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid rgba(0,0,0,0.05);
+    }
+    
+    .sektion-status-card .comparison-base {
+      font-size: 0.7rem;
+      color: #94a3b8;
+      margin-top: 0.5rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid rgba(0,0,0,0.05);
+    }
+    
+    /* Insiktsruta */
+    .insikts-ruta {
+      margin-bottom: 2rem;
+    }
+    
+    .insikts-ruta h3 {
+      color: #1e3a8a;
+      margin-bottom: 1rem;
+      font-size: 1.4rem;
+    }
+    
+    .insikt-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+    }
+    
+    .insikt-card {
+      padding: 1.5rem;
+      border-radius: 8px;
+      border-left: 5px solid;
+      background: #f8fafc;
+    }
+    
+    .insikt-card.styrka {
+      border-left-color: #10b981;
+      background: linear-gradient(135deg, #d1fae5 0%, #f0fdf4 100%);
+    }
+    
+    .insikt-card.risk {
+      border-left-color: #ef4444;
+      background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%);
+    }
+
+    .insikt-card.havstang {
+      border-left-color: #3b82f6;
+      background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+    }
+
+    .insikt-card.uppmarksamma {
+      border-left-color: #f59e0b;
+      background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%);
+    }
+    
+    .insikt-card h4 {
+      margin: 0 0 0.75rem 0;
+      font-size: 1.1rem;
+      color: #1e293b;
+      font-weight: 700;
+    }
+    
+    .insikt-card p {
+      margin: 0 0 0.75rem 0;
+      font-size: 0.95rem;
+      color: #475569;
+      line-height: 1.6;
+    }
+    
+    .insikt-card .insikt-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 0.75rem;
+      margin-bottom: 0.25rem;
+    }
+    
+    .insikt-card .insikt-consequence {
+      font-style: italic;
+      color: #64748b;
+      font-size: 0.9rem;
+    }
+    
+    .insikt-card .insikt-action {
+      font-weight: 600;
+      color: #1e293b;
+      background: rgba(255,255,255,0.5);
+      padding: 0.5rem;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+    
+    /* Narrativ text */
+    .narrativ-text {
+      padding: 1.5rem;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+      border-left: 5px solid #0284c7;
+      font-size: 1rem;
+      line-height: 1.8;
+      color: #1e293b;
+    }
+    
+    .narrativ-text h4 {
+      margin-top: 0;
+      margin-bottom: 1rem;
+      color: #0284c7;
+      font-size: 1.1rem;
+    }
+    
+    .narrative-bullets {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    
+    .narrative-bullets li {
+      padding: 0.75rem 0;
+      border-bottom: 1px solid rgba(2, 132, 199, 0.1);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+    
+    .narrative-bullets li:last-child {
+      border-bottom: none;
+    }
+    
+    .narrative-bullets li strong {
+      color: #0284c7;
+      font-weight: 700;
+    }
+    
+    .back-link {
+      display: inline-block;
+      color: #1e3a8a;
+      text-decoration: none;
+      margin-bottom: 1.5rem;
+      padding: 0.5rem 1rem;
+      background: rgba(255,255,255,0.9);
+      border-radius: 8px;
+      transition: all 0.2s;
+      font-weight: 600;
+      border: 2px solid rgba(30, 58, 138, 0.2);
+    }
+    
+    .back-link:hover {
+      background: white;
+      transform: translateX(-2px);
+      border-color: #1e3a8a;
+    }
+    
+    .dashboard-section {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      margin-bottom: 2rem;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .dashboard-section:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 12px rgba(0,0,0,0.15);
+    }
+    
+    .dashboard-section h2 {
+      color: #1e40af;
+      font-size: 1.75rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-bottom: 3px solid #667eea;
+      padding-bottom: 0.75rem;
+    }
+    
+    .panel-description {
+      color: #64748b;
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+      line-height: 1.6;
+      background: #f8fafc;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      border-left: 4px solid #667eea;
+    }
+    
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.25rem;
+      margin-top: 1.5rem;
+    }
+    
+    .kpi-item {
+      background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+      padding: 1.5rem;
+      border-radius: 10px;
+      border: 2px solid #e2e8f0;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .kpi-item.status-green {
+      border-color: #16a34a;
+      background: linear-gradient(135deg, #f0fdf4 0%, #bbf7d0 100%);
+    }
+
+    .kpi-item.status-green::before {
+      background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+      opacity: 1;
+    }
+
+    .kpi-item.status-red {
+      border-color: #dc2626;
+      background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
+    }
+
+    .kpi-item.status-red::before {
+      background: linear-gradient(135deg, #b91c1c 0%, #ef4444 100%);
+      opacity: 1;
+    }
+
+    .kpi-item.status-lightgreen {
+      border-color: #4ade80;
+      background: linear-gradient(135deg, #ecfccb 0%, #bbf7d0 100%);
+    }
+
+    .kpi-item.status-lightgreen::before {
+      background: linear-gradient(135deg, #22c55e 0%, #4ade80 100%);
+      opacity: 1;
+    }
+    
+    .kpi-item::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    
+    .kpi-item:hover {
+      border-color: #667eea;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+      transform: translateY(-2px);
+    }
+    
+    .kpi-item:hover::before {
+      opacity: 1;
+    }
+    
+    .kpi-label {
+      font-size: 0.9rem;
+      color: #475569;
+      margin-bottom: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .kpi-value {
+      font-size: 2.25rem;
+      font-weight: bold;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.75rem;
+      line-height: 1.2;
+    }
+    
+    .kpi-trend {
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+      padding: 0.5rem;
+      border-radius: 6px;
+      background: #f8fafc;
+    }
+    
+    .trend-improving {
+      color: #16a34a;
+      font-weight: 600;
+      background: #f0fdf4;
+    }
+    
+    .trend-improving::before {
+      content: '▲';
+      font-size: 1.1rem;
+      margin-right: 0.25rem;
+    }
+    
+    .trend-declining {
+      color: #dc2626;
+      font-weight: 600;
+      background: #fef2f2;
+    }
+    
+    .trend-declining::before {
+      content: '▼';
+      font-size: 1.1rem;
+      margin-right: 0.25rem;
+    }
+    
+    .trend-stable {
+      color: #64748b;
+      font-weight: 600;
+      background: #f8fafc;
+    }
+    
+    .trend-stable::before {
+      content: '●';
+      font-size: 0.8rem;
+      margin-right: 0.25rem;
+      opacity: 0.6;
+    }
+    
+    .kpi-comparison {
+      font-size: 0.9rem;
+      color: #475569;
+      line-height: 1.6;
+      padding: 0.75rem;
+      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+      border-radius: 6px;
+      margin-bottom: 0.75rem;
+      border-left: 3px solid #667eea;
+    }
+    
+    .kpi-comparison::before {
+      content: '📊 ';
+      margin-right: 0.5rem;
+    }
+    
+    .kpi-analysis {
+      font-size: 0.85rem;
+      color: #475569;
+      line-height: 1.5;
+    }
+    
+    .panel-interpretation {
+      background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+      padding: 1.5rem;
+      border-radius: 10px;
+      border: 2px solid #93c5fd;
+      margin-top: 1.5rem;
+    }
+    
+    .panel-interpretation h4 {
+      color: #1e40af;
+      margin-bottom: 1rem;
+      font-size: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .panel-interpretation h4::before {
+      content: '💡';
+      font-size: 1.5rem;
+    }
+    
+    .panel-interpretation p {
+      color: #334155;
+      line-height: 1.8;
+      margin: 0.75rem 0;
+      padding: 0.75rem;
+      background: white;
+      border-radius: 6px;
+      border-left: 4px solid #667eea;
+    }
+    
+    .loading-message {
+      text-align: center;
+      padding: 2rem 2rem 1rem;
+      color: #475569;
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+    
+    .progress-container {
+      width: 100%;
+      max-width: 400px;
+      margin: 1rem auto;
+      background: #e2e8f0;
+      border-radius: 12px;
+      height: 24px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 50%, #667eea 100%);
+      background-size: 200% 100%;
+      border-radius: 12px;
+      transition: width 0.3s ease;
+      animation: progressShimmer 2s linear infinite;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .progress-text {
+      position: absolute;
+      width: 100%;
+      text-align: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: white;
+      line-height: 24px;
+      z-index: 2;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+      letter-spacing: 0.5px;
+    }
+    
+    @keyframes progressShimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    
+    .loading-message::after {
+      content: '...';
+      animation: loading 1.5s infinite;
+    }
+    
+    @keyframes loading {
+      0%, 20% { content: '.'; }
+      40% { content: '..'; }
+      60%, 100% { content: '...'; }
+    }
+
+    /* Skeleton and loader animations */
+    .skeleton {
+      background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+      background-size: 200% 100%;
+      animation: skeletonPulse 2s infinite;
+      border: none !important;
+    }
+
+    @keyframes skeletonPulse {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    #loadingBar {
+      display: none;
+      margin: 1rem 0;
+      padding: 1rem;
+      background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+      border-radius: 8px;
+      border-left: 5px solid #0284c7;
+    }
+
+    #loadingBar.active {
+      display: block;
+    }
+
+    .loader-track {
+      width: 100%;
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 3px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .loader-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 50%, #667eea 100%);
+      background-size: 200% 100%;
+      border-radius: 3px;
+      animation: progressShimmer 2s linear infinite;
+      width: 100%;
+    }
+
+    .loader-text {
+      font-size: 0.85rem;
+      color: #0284c7;
+      font-weight: 600;
+      margin-top: 0.5rem;
+      text-align: center;
+    }
+    
+    @media (max-width: 768px) {
+      body {
+        padding: 1rem 0.5rem;
+      }
+      
+      #pageTitle {
+        font-size: 1.75rem;
+      }
+      
+      .dashboard-section {
+        padding: 1.25rem;
+      }
+      
+      .kpi-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .selector-row {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body data-skoltyp="grundskola">
+  <h1 id="pageTitle">Kommunbild Grundskola – kvalitet i grundskolan</h1>
+
+  <div class="kpi-selector">
+    <div class="selector-row">
+      <div class="selector-group">
+        <label for="kommunSelect">Välj kommun:</label>
+        <select id="kommunSelect"></select>
+      </div>
+      <div class="selector-group">
+        <label for="qualityYearSelect">År:</label>
+        <select id="qualityYearSelect" disabled title="Vi visar senast tillgängliga värde per nyckeltal om data saknas.">
+          <option value="">Välj kommun först...</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <a href="index.html" class="back-link">← Till startsidan</a>
+  <!-- Loading bar: visas när data hämtas -->
+  <div id="loadingBar">
+    <div class="loader-track">
+      <div class="loader-bar"></div>
+    </div>
+    <div class="loader-text">Hämtar data från Kolada…</div>
+  </div>
+  <!-- Tekniskt element för att detektera rendering stage (används av JS) -->
+  <div id="stageDetection" style="display:none;"></div>
+
+  <!-- === HUVUDINNEHÅLL === -->
+  <!-- Allt innehåll nedan populeras dynamiskt av scripts/kommunbild/page.js -->
+
+  <div id="dashboardContent">
+
+    <!-- === ÖVERSIKT-SEKTION === -->
+    <!-- Visar executive summary, narrativ text och ett exempel-KPI (U15900) -->
+    <div class="dashboard-section" id="kommunbildIntro">
+      <h2>Översikt</h2>
+      <p class="panel-description">
+        Kommunbilden sammanfattar verksamhetens kvalitet med nyckeltal från Kolada.
+        Varje rad visar kommunens värde, förändring mot föregående år (om möjligt) och rank jämfört med alla kommuner.
+        Klicka ▸ på en rad för att se diagram och detaljanalys.
+      </p>
+      
+      <!-- Executive summary: Populeras av JS med övergripande sammanfattning -->
+      <div id="executiveSummary" style="display:none;"></div>
+      
+      <!-- Narrativ statustext: Populeras av JS med beskrivande text om kommunens läge -->
+      <div id="kommunbildStatus" class="narrativ-text" style="display:block; min-height: 60px;"></div>
+    </div>
+
+    <!-- === INDEX-ÖVERSIKT SEKTION === -->
+    <!-- Visar övergripande index (kvalitet, effektivitet, resurser, medarbetare, elever) som tabell -->
+    <div class="dashboard-section" id="kommunbildIndex">
+      <h2>Index-översikt</h2>
+      <p class="panel-description">Övergripande index som sammanfattar verksamhetens kvalitet, effektivitet, resurser och engagemang.</p>
+      <!-- Index-tabell genereras av JS -->
+      <div id="indexTableContainer"></div>
+    </div>
+
+    <!-- === KVALITETS-SEKTION === -->
+    <!-- Visar KPI-kort för verksamhetens kvalitet (resultat, trivsel, betyg etc.) -->
+    <!-- Alla kort i denna sektion genereras dynamiskt av JS baserat på OVERVIEW_KPIS -->
+    <div class="dashboard-section" id="kommunbildQuality">
+      <h2>Kommunbild av verksamhetens kvalitet</h2>
+      <!-- Här renderas KPI-kort från scripts/kommunbild/page.js -->
+      <div id="qualityBlocks"></div>
+    </div>
+
+    <!-- === ORGANISATION & STRUKTUR-SEKTION === -->
+    <!-- Visar KPI:er om lärartäthet, legitimation, resurser etc. som tabell -->
+    <!-- Data från OVERVIEW_KPIS i scripts/kommunbild/page.js -->
+    <div class="dashboard-section" id="kommunbildOrg">
+      <h2>Organisation &amp; struktur</h2>
+      <p class="panel-description">Insatser och förutsättningar (resurser, personal, gruppstorlek). Visas som tabell (utan diagram).</p>
+      <!-- Tabell genereras av JS -->
+      <div id="orgTableContainer"></div>
+    </div>
+
+    <!-- === STYRANDE ANALYS-SEKTION === -->
+    <!-- AI-genererad styrande skolbild med trafikljus, insikter och narrativ -->
+    <!-- Denna sektion skapas och populeras helt av JS -->
+    <div id="styrandeAnalys" class="styrande-analys-container" style="display:none;">
+      <h2>Styrande skolbild</h2>
+      
+      <!-- Trafikljus-grid: Visar status per sektion (grön/gul/röd) -->
+      <div class="sektion-status-grid" id="sektionStatusGrid"></div>
+      
+      <!-- Insikter: Styrkor, risker, hävstångsområden och punkter att uppmärksamma -->
+      <div class="insikts-ruta" id="insiktsRuta">
+        <h3>Nyckelinsikter</h3>
+        <div class="insikt-grid" id="insiktGrid"></div>
+      </div>
+      
+      <!-- Narrativ sammanfattning (3-6 meningar) -->
+      <div class="narrativ-text" id="narrativText"></div>
+    </div>
+  </div>
+
+  <!-- === HUVUDSCRIPT === -->
+  <!-- scripts/kommunbild/page.js är huvudfilen som:
+       - Hämtar kommunlista och populerar dropdown
+       - Hämtar KPI-data från Kolada API
+       - Renderar alla KPI-kort och diagram
+       - Genererar trendanalyser och jämförelser
+       - Skapar styrande analys och trafikljus
+       - Hanterar användarinteraktion (val av kommun/år)
+  -->
+  <script type="module" src="scripts/kommunbild/page.js?v=17"></script>
+</body>
+</html>
