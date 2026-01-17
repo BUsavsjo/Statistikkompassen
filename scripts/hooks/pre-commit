@@ -1,0 +1,38 @@
+#!/bin/bash
+# Git pre-commit hook: Ensure JavaScript syntax is valid before commit
+# Install: cp scripts/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+echo "🔍 Checking JavaScript syntax before commit..."
+
+# Check primary files
+FILES_TO_CHECK=(
+  "scripts/kommunbild/page.js"
+  "scripts/skolenhetsdashboard/page.js"
+)
+
+ERROR=0
+
+for file in "${FILES_TO_CHECK[@]}"; do
+  if [ -f "$file" ]; then
+    if ! node --check "$file" 2>/dev/null; then
+      echo "❌ Syntax error in $file"
+      ERROR=1
+    fi
+  fi
+done
+
+# Try npm run lint if npm is available and package.json exists
+if [ -f "package.json" ] && command -v npm &> /dev/null; then
+  echo "🔍 Running ESLint..."
+  if ! npm run lint 2>/dev/null; then
+    echo "⚠️  ESLint found issues (non-blocking)"
+  fi
+fi
+
+if [ $ERROR -eq 1 ]; then
+  echo "❌ Pre-commit check FAILED – fix syntax errors before committing"
+  exit 1
+fi
+
+echo "✅ All checks passed – commit proceeding"
+exit 0

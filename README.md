@@ -6,6 +6,8 @@ En interaktiv webbplattform för analys och visualisering av statistik för Säv
 
 Statistikkompassen är en modern, användarvänlig plattform som samlar och presenterar statistik om utbildning och elevprestationer för Sävsjö kommun. Plattformen möjliggör enkla jämförelser med riket och liknande kommuner för att identifiera trender och utvecklingsområden.
 
+⚠️ **JavaScript Quality Control:** Alla ändringar i `.js`-filer kräver syntax-check. Se [JS_QUALITY_CONTROL.md](JS_QUALITY_CONTROL.md).
+
 ## 📈 Funktioner
 
 ### 🔗 Huvudmoduler

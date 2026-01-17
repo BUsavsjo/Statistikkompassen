@@ -80,6 +80,63 @@ h2 {
   font-weight: 700;
 }
 
+/* Kommunbild selector container */
+.kpi-selector {
+  margin: 1.25rem 0;
+  padding: 1.25rem;
+  background: var(--surface-muted);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.kpi-selector .selector-row {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.kpi-selector .selector-group {
+  flex: 1;
+  min-width: 200px;
+}
+
+.kpi-selector label {
+  display: block;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.kpi-selector select {
+  width: 100%;
+  padding: 0.7em 1rem;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.kpi-selector select:hover {
+  border-color: var(--accent);
+}
+
+.kpi-selector select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(242, 200, 17, 0.25);
+}
+
+.kpi-selector select:disabled {
+  background: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* Legacy selector styling (alternative layout) */
 .selectors {
   margin-top: 0.35rem;
   display: grid;
@@ -117,11 +174,11 @@ h2 {
 .selectors select {
   margin-top: 0.5em;
   padding: 0.7em;
-  background: var(--surface-muted);
-  border-radius: 999px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 6px;
   width: 100%;
-  height: 10px;
-  overflow: hidden;
+  min-height: 38px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .kpi-mini-bar-track.vertical {

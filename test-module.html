@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Module Test</title>
+</head>
+<body>
+    <h1>Module Test</h1>
+    <div id="output"></div>
+    <script>
+        window.testResults = [];
+        function log(msg) {
+            console.log(msg);
+            window.testResults.push(msg);
+            document.getElementById('output').innerHTML += '<div>' + msg + '</div>';
+        }
+        
+        window.addEventListener('error', (e) => {
+            log('ERROR: ' + e.message);
+        });
+        
+        window.addEventListener('unhandledrejection', (e) => {
+            log('REJECTION: ' + e.reason);
+        });
+    </script>
+    <script type="module">
+        log('Starting module import test...');
+        
+        try {
+            log('Importing ALLA_KOMMUNER...');
+            import { ALLA_KOMMUNER } from './scripts/kommuner.js';
+            
+            // Wait a moment for the import to complete
+            setTimeout(() => {
+                log('Import appears to have succeeded');
+            }, 100);
+        } catch (err) {
+            log('IMPORT ERROR: ' + err.message);
+        }
+        
+        log('Module script loaded');
+    </script>
+</body>
+</html>
