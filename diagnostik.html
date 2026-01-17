@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <title>Diagnostik - Kommunbild</title>
+  <style>
+    body {
+      font-family: monospace;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .log {
+      background: white;
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 6px;
+      border-left: 4px solid #2196F3;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .error {
+      border-left-color: #f44336;
+      background: #ffebee;
+    }
+    .success {
+      border-left-color: #4CAF50;
+      background: #e8f5e9;
+    }
+    h1 {
+      color: #333;
+    }
+    #console {
+      background: #1e1e1e;
+      color: #00ff00;
+      padding: 20px;
+      border-radius: 6px;
+      max-height: 500px;
+      overflow-y: auto;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔧 Diagnostik - Kommunbild Dropdown</h1>
+  
+  <div id="console"></div>
+  
+  <script>
+    const logs = [];
+    
+    function log(msg, type = 'info') {
+      const timestamp = new Date().toLocaleTimeString();
+      const fullMsg = `[${timestamp}] ${msg}`;
+      logs.push(fullMsg);
+      
+      const el = document.getElementById('console');
+      el.innerHTML += fullMsg + '\n';
+      el.scrollTop = el.scrollHeight;
+      
+      console.log(msg);
+    }
+    
+    window.addEventListener('error', (e) => {
+      log('❌ ERROR: ' + e.message + ' @ ' + e.filename + ':' + e.lineno, 'error');
+    });
+    
+    window.addEventListener('unhandledrejection', (e) => {
+      log('❌ UNHANDLED REJECTION: ' + (e.reason?.message || e.reason), 'error');
+    });
+    
+    log('✓ Diagnostik sida laddad');
+    log('✓ document.readyState: ' + document.readyState);
+  </script>
+  
+  <script type="module">
+    const log = (msg) => {
+      const timestamp = new Date().toLocaleTimeString();
+      const fullMsg = `[${timestamp}] ${msg}`;
+      document.getElementById('console').innerHTML += fullMsg + '\n';
+      document.getElementById('console').scrollTop = document.getElementById('console').scrollHeight;
+      console.log(msg);
+    };
+    
+    log('✓ Module script started');
+    
+    try {
+      log('→ Importing ALLA_KOMMUNER from scripts/kommuner.js...');
+      const { ALLA_KOMMUNER } = await import('./scripts/kommuner.js');
+      log('✓ Import successful!');
+      log('✓ ALLA_KOMMUNER.length = ' + ALLA_KOMMUNER.length);
+      log('✓ First 3: ' + ALLA_KOMMUNER.slice(0, 3).map(k => k.title).join(', '));
+      
+      // Try to find and populate the select element
+      log('→ Looking for #kommunSelect element...');
+      const select = document.getElementById('kommunSelect');
+      if (select) {
+        log('✓ Found #kommunSelect');
+        log('→ Populating with ' + ALLA_KOMMUNER.length + ' options...');
+        
+        select.innerHTML = '';
+        for (const k of ALLA_KOMMUNER) {
+          const opt = document.createElement('option');
+          opt.value = k.id;
+          opt.textContent = k.title;
+          select.appendChild(opt);
+        }
+        
+        log('✓ Added ' + ALLA_KOMMUNER.length + ' options to select');
+        log('✓ select.length = ' + select.length);
+        log('✓ First option: ' + select.options[1]?.text);
+      } else {
+        log('❌ #kommunSelect NOT FOUND!');
+        log('→ Available elements with "kommun" in id:');
+        document.querySelectorAll('[id*="kommun"]').forEach((e, i) => {
+          log('  [' + i + '] <' + e.tagName + ' id="' + e.id + '">');
+        });
+      }
+      
+    } catch (err) {
+      log('❌ IMPORT FAILED: ' + err.message);
+      log('❌ Stack: ' + err.stack);
+    }
+  </script>
+  
+  <!-- Include the original HTML content -->
+  <h2 style="margin-top: 40px;">Originalinnehål:</h2>
+  <iframe src="skolenhetsdashboard%20kommun.html" style="width: 100%; height: 600px; border: 1px solid #ccc;"></iframe>
+  
+</body>
+</html>

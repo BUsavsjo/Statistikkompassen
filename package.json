@@ -1,0 +1,17 @@
+{
+  "name": "statistikkompassen",
+  "version": "1.0.0",
+  "description": "Statistikkompassen – Kommunbild och Skolenhetsdashboard",
+  "type": "module",
+  "scripts": {
+    "lint": "eslint scripts/ --fix",
+    "check": "node --check scripts/kommunbild/page.js && node --check scripts/skolenhetsdashboard/page.js && echo '✅ All JavaScript files pass syntax check'",
+    "test": "node test-data-validation.js"
+  },
+  "devDependencies": {
+    "eslint": "^8.56.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

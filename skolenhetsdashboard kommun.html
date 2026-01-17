@@ -745,6 +745,9 @@
   </div>
   <!-- Tekniskt element för att detektera rendering stage (används av JS) -->
   <div id="stageDetection" style="display:none;"></div>
+  
+  <!-- Debug info (temporary) -->
+  <div id="debugInfo" style="position: fixed; top: 10px; right: 10px; background: #fff3cd; border: 2px solid #ffc107; border-radius: 6px; padding: 15px; max-width: 400px; max-height: 300px; overflow-y: auto; font-size: 12px; font-family: monospace; display: none; z-index: 99999; box-shadow: 0 2px 10px rgba(0,0,0,0.2);"></div>
 
   <!-- === HUVUDINNEHÅLL === -->
   <!-- Allt innehåll nedan populeras dynamiskt av scripts/kommunbild/page.js -->
@@ -825,6 +828,32 @@
        - Skapar styrande analys och trafikljus
        - Hanterar användarinteraktion (val av kommun/år)
   -->
-  <script type="module" src="scripts/kommunbild/page.js?v=17"></script>
+  <script>
+    // Global debug logger
+    window.debugLog = [];
+    function addDebug(msg) {
+      window.debugLog.push('[' + new Date().toLocaleTimeString() + '] ' + msg);
+      const debugEl = document.getElementById('debugInfo');
+      if (debugEl) {
+        debugEl.style.display = 'block';
+        debugEl.innerHTML = window.debugLog.map(l => '<div>' + l + '</div>').join('');
+        debugEl.scrollTop = debugEl.scrollHeight;
+      }
+      console.log(msg);
+    }
+    window.addDebug = addDebug;
+    
+    // Global error handler
+    window.addEventListener('error', (event) => {
+      addDebug('ERROR: ' + event.message + ' at ' + event.filename + ':' + event.lineno);
+    });
+    
+    window.addEventListener('unhandledrejection', (event) => {
+      addDebug('UNHANDLED PROMISE REJECTION: ' + (event.reason?.message || event.reason));
+    });
+    
+    addDebug('DEBUG MODE ACTIVE');
+  </script>
+  <script type="module" src="scripts/kommunbild/page.js?v=20"></script>
 </body>
 </html>

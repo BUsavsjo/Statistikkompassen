@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dropdown Test</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        select { padding: 10px; font-size: 16px; }
+        #status { margin-top: 20px; padding: 10px; background: #f0f0f0; }
+    </style>
+</head>
+<body>
+    <h1>Dropdown Test</h1>
+    
+    <label for="test-select">Test Select:</label>
+    <select id="test-select"></select>
+    
+    <div id="status">Loading...</div>
+    
+    <script>
+        function updateStatus(msg) {
+            console.log(msg);
+            document.getElementById('status').innerHTML += '<br>' + msg;
+        }
+        
+        updateStatus('Page loaded');
+    </script>
+    
+    <script type="module">
+        updateStatus('Module script started');
+        
+        import { ALLA_KOMMUNER } from './scripts/kommuner.js';
+        
+        updateStatus('Import completed: ' + ALLA_KOMMUNER.length + ' municipalities');
+        
+        const select = document.getElementById('test-select');
+        for (const k of ALLA_KOMMUNER.slice(0, 10)) {
+            const opt = document.createElement('option');
+            opt.value = k.id;
+            opt.textContent = k.title;
+            select.appendChild(opt);
+        }
+        
+        updateStatus('Added ' + Math.min(10, ALLA_KOMMUNER.length) + ' options');
+    </script>
+</body>
+</html>
