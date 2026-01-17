@@ -32,11 +32,12 @@ Statistikkompassen är en modern, användarvänlig plattform som samlar och pres
 
 ## 🎨 Design & Teknik
 
-- **Frontend**: HTML5, CSS3, JavaScript
+- **Frontend**: HTML5, CSS3, JavaScript (ES6 modules)
 - **Visualisering**: Chart.js för interaktiva grafer
-- **Data**: Kolada API för officiell statistik
+- **Data**: Kolada API v3 för officiell statistik
 - **Design**: Moderna, responsiva boxar med gradient bakgrund
 - **Färgschema**: Blå, vit och gul
+- **Deployment**: GitHub Actions → GitHub Pages (automatisk vid push till main)
 
 ## 🚀 Funktioner i Betyg Kolada
 
@@ -98,17 +99,48 @@ Statistikkompassen syftar till att:
 
 Plattformen är under aktiv utveckling. Nya moduler och funktioner läggs till löpande.
 
+### 🚀 Deployment
+
+Statistikkompassen använder **GitHub Actions** för automatisk deployment till GitHub Pages:
+
+1. **Automatisk deployment**: Varje push till `main`-branchen triggar automatisk uppdatering
+2. **Live URL**: [https://busavsjo.github.io/Statistikkompassen/](https://busavsjo.github.io/Statistikkompassen/)
+3. **Workflow**: Se [.github/workflows/deploy.yml](.github/workflows/deploy.yml)
+
+#### Första gången (engångssetup):
+1. Gå till repo → **Settings** → **Pages**
+2. Under "Source" välj: **GitHub Actions**
+3. Spara inställningarna
+
+#### Därefter:
+```bash
+# Gör ändringar på din feature branch
+git checkout -b min-feature
+# ... gör ändringar ...
+git commit -am "Beskrivning av ändring"
+git push origin min-feature
+
+# Merge till main (via PR eller direkt)
+git checkout main
+git merge min-feature
+git push origin main
+
+# GitHub Actions deployer automatiskt till Pages! 🎉
+```
+
 ### Planerade Förbättringar
 - [ ] Fler statistik-moduler
 - [ ] Exportmöjligheter (PDF, CSV)
 - [ ] Mer avancerad analys
-- [ ] Histrorisk data-jämförelse
+- [ ] Historisk data-jämförelse
 - [ ] Notifikationer vid trendförändring
 
 ## 📝 Licens
 
-Statistikkompassen © 2025. Alla rättigheter förbehållna.
+MIT License - se [LICENSE](LICENSE) för detaljer.
+
+Statistikkompassen © 2026 Höglandsförbundet
 
 ---
 
-**Senast uppdaterad**: November 17, 2025
+**Senast uppdaterad**: Januari 17, 2026
