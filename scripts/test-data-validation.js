@@ -1,18 +1,40 @@
 /**
- * Automatiserad datavalidering för Kommunbild-dashboarden
+ * AUTOMATISERAD DATAVALIDERING FÖR KOMMUNBILD-DASHBOARDEN
+ * =======================================================
  * 
- * Denna script validerar att dashboard-värden matchar Kolada API
+ * Denna Node.js script validerar att dashboard-värden matchar Kolada API
  * genom att jämföra testdata med live API-anrop.
  * 
- * Användning:
- *   node scripts/test-data-validation.js --municipality=0684 --year=2024 --kpis=N15505,N15031,U15011
+ * **Syfte:**
+ *   Catch data divergence mellan dashboard och källa
+ *   Verifiera att ny data hämtas korrekt från Kolada
+ *   Identifiera API-ändringar eller data-publikationsförändringar
  * 
- * Eller med MCP Kolada direkt (om tillgängligt):
- *   node scripts/test-data-validation.js --use-mcp --municipality=0684
+ * **Användning:**
+ *   Alla tester (36 test-cases):
+ *     node scripts/test-data-validation.js
+ *   
+ *   Filtrerade tester:
+ *     node scripts/test-data-validation.js --municipality=0684 --year=2024
+ *     node scripts/test-data-validation.js --kpis=N15505,N15031
+ * 
+ * **Output:**
+ *   Genererar detaljerad ASCII-rapport med pass/fail status
+ *   Exit code: 0 (allt ok), 1 (någon test misslyckades)
+ * 
+ * **Testdata uppdateras:**
+ *   Manual: Uppdatera EXPECTED_VALUES-objektet när Kolada publicerar ny data
+ *   Framtid: Genom GitHub Actions + MCP Kolada automatiserad synkronisering
  */
 
-// Test-konfiguration
+// ===== TEST-KONFIGURATION =====
+// Definierar vilka KPIs, kommuner och år som ska testas
 const TEST_CONFIG = {
+  // Representativa KPIs från olika kategorier:
+  // - Kunskapsresultat (N15505, N15031)
+  // - Kostnader (U15011)
+  // - Organisation (N15034, N15814)
+  // - Index (U15401)
   kpis: [
     { id: 'N15505', label: 'Meritvärde', unit: 'poäng', higherIsBetter: true },
     { id: 'N15031', label: 'Lärare med examen', unit: '%', higherIsBetter: true },
@@ -21,13 +43,19 @@ const TEST_CONFIG = {
     { id: 'N15814', label: 'Legitimerad lärare', unit: '%', higherIsBetter: true },
     { id: 'U15401', label: 'Kvalitetsindex', unit: 'index', higherIsBetter: true },
   ],
-  municipalities: ['0684', '0180', '1480'], // Sävsjö, Stockholm, Göteborg
+  // Testade kommuner (representativ sample):
+  // 0684=Sävsjö, 0180=Stockholm, 1480=Göteborg
+  municipalities: ['0684', '0180', '1480'],
   years: [2024, 2023],
-  tolerancePercent: 0.5, // 0.5% tolerans för avrundning
+  // 0.5% tolerans för små avrundningsfel från Kolada API
+  tolerancePercent: 0.5,
 };
 
-// Testdata från Kolada (uppdaterad 2026-01-17)
+// ===== TEST DATA (från Kolada - uppdaterad 2026-01-17) =====
+// Dessa värden är "sources of truth" för test-validering
+// Uppdatera när Kolada publicerar ny data, eller automatisera via MCP-integration
 const EXPECTED_VALUES = {
+  // Format: 'KPI_ID-MUNICIPALITY-YEAR': expectedValue
   'N15505-0684-2024': 213.8,
   'N15505-0684-2023': 213.2,
   'N15031-0684-2024': 81.5,
@@ -39,7 +67,7 @@ const EXPECTED_VALUES = {
   'N15814-0684-2024': 75.0,
   'N15814-0684-2023': 73.8,
   'U15401-0684-2024': 77.58,
-  'U15401-0684-2023': null, // Ej publicerad
+  'U15401-0684-2023': null, // Ej publicerad ännu för detta år
   
   'N15505-0180-2024': 225.0,
   'N15505-0180-2023': 224.5,
@@ -68,8 +96,16 @@ const EXPECTED_VALUES = {
   'U15401-1480-2023': null,
 };
 
-// Testresultat
+// ===== TEST RESULT WRAPPER CLASS =====
+// Kapslar in ett test med metadata och validerings-logik
+// Ansvarig för att jämföra expected vs actual med tolerans
 class TestResult {
+  /**
+   * Skapa ett nytt test-case
+   * @param {string} kpiId - KPI-identifiering (t.ex. "N15505")
+   * @param {string} municipality - Kommun-ID (4 siffror, t.ex. "0684")
+   * @param {number} year - Testår (t.ex. 2024)
+   */
   constructor(kpiId, municipality, year) {
     this.kpiId = kpiId;
     this.municipality = municipality;
@@ -83,6 +119,13 @@ class TestResult {
     this.message = '';
   }
 
+  /**
+   * Validera API-värde mot förväntat värde
+   * Använder toleransprocentering från TEST_CONFIG för små skillnader (avrundning)
+   * 
+   * @param {number} apiValue - Värde från Kolada API
+   * @returns {boolean} - True om test passou, false annars
+   */
   validate(apiValue) {
     this.apiValue = apiValue;
     

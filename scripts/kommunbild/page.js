@@ -320,7 +320,13 @@ function orientedDiff(current, reference, higherIsBetter) {
   return higherIsBetter ? raw : -raw;   // >0 = "bättre"
 }
 
-// Klassificera nivå och trend utan riket-jämförelse
+/**
+ * Klassificera värde i nivåband (0-100 skala)
+ * Använd för att visa om ett värde är "starkt", "acceptabelt", "riskabelt" eller ett "problem"
+ * Returnerar objekt med label (textetikett), color (färgkod), och band (CSS-klass)
+ * 
+ * Användning: classifyLevel(75) → { label: "Risknivå", color: "#f97316", band: "risk" }
+ */
 function classifyLevel(value) {
   const v = numberOrNull(value);
   if (v === null) return { label: "Ingen nivå", color: "#94a3b8", band: null };
@@ -330,6 +336,13 @@ function classifyLevel(value) {
   return { label: "Problemnivå", color: "#dc2626", band: "problem" };
 }
 
+/**
+ * Klassificera trendförändring mellan två värden
+ * Bestämmer om förändringen är "stark" eller "svag" och om den går upp eller ner
+ * Returnerar beskrivande etikett och färgkod för visuell feedback
+ * 
+ * Användning: classifyTrend(80, 75) → { label: "Svag ökning", color: "#16a34a", dir: "up", ... }
+ */
 function classifyTrend(current, previous) {
   const c = numberOrNull(current);
   const p = numberOrNull(previous);
@@ -339,7 +352,7 @@ function classifyTrend(current, previous) {
   let strength = "stabil";
   if (abs > 5) strength = "kraftig";
   else if (abs > 3) strength = "tydlig";
-  else if (abs > 1) strength = "svag";
+  else if (abs > 1) strength = "svak";
   const dir = delta > 0 ? "up" : delta < 0 ? "down" : null;
   // Strength-driven phrasing; use "Tydlig" for the strongest band to avoid overstatement
   let label;
@@ -348,12 +361,19 @@ function classifyTrend(current, previous) {
   } else if (strength === "kraftig") {
     label = dir === "up" ? "Tydlig förbättring" : "Tydlig minskning";
   } else {
-    const directionLabel = dir === "up" ? "ökning" : "minskning";
-    label = `${strength[0].toUpperCase()}${strength.slice(1)} ${directionLabel}`;
-  }
-  const color = dir === null ? "#94a3b8" : dir === "up" ? "#16a34a" : "#dc2626";
-  return { label, color, dir, strength, delta };
-}
+/**
+ * Bygga en människovänlig tolkning av nivå + trend kombinationen
+ * Säger vad förändringen betyder i kontexten av aktuell nivå
+ * Prioriterar nivåband över trend (en fallande trend från högt är mindre oroande än från lågt)
+ * 
+ * Exempel: buildInterpretation("risk", "up", "tydlig") → "Positiv utveckling"
+ */
+function buildInterpretation(levelBand, trendDir, trendStrength) {
+  if (!trendDir || trendStrength === "none") return "Ingen trend";
+  const isHigh = levelBand === "strong" || levelBand === "ok";
+  const isLow = levelBand === "risk" || levelBand === "problem";
+
+  // Nivån väger tyngre än trenden - en säker grund är viktig
 
 function buildInterpretation(levelBand, trendDir, trendStrength) {
   if (!trendDir || trendStrength === "none") return "Ingen trend";
@@ -364,6 +384,13 @@ function buildInterpretation(levelBand, trendDir, trendStrength) {
   if (isHigh && trendDir === "down") return "Försämring från hög nivå";
   if (isLow && trendDir === "down") return "Kräver fördjupad analys";
   if (isLow && trendDir === "up") return "Positiv utveckling";
+/**
+ * Formatera ett KPI-värde med rätt antal decimaler och enhet
+ * Använder svensk talformat (komma som decimalseparator)
+ * 
+ * Exempel: formatValue(1234.567, "kr") → "1 234,57 kr"
+ * Exempel: formatValue(75.5, "%") → "75,5 %"
+ */
   if (isHigh && trendStrength === "stabil") return "Robust läge";
 
   // Default positive/neutral framing for uppgång, otherwise uppföljning
@@ -376,6 +403,13 @@ function formatValue(value, unit) {
   const num = numberOrNull(value);
   if (num === null) return "–";
 
+/**
+ * Formatera förändring (delta) mellan två mätningar
+ * Respekterar higherIsBetter för att visa om upp-rörelse är bra eller dålig
+ * Detekterar också ovanligt stora förändringar (> 2 standardavvikelser från 5-års genomsnitt)
+ * 
+ * Returnerar: { text: "↑ +3.5 %", className: "trend-improving", icon: "↑", ... }
+ */
   const nf = new Intl.NumberFormat("sv-SE", {
     maximumFractionDigits: unit === "%" ? 1 : 2,
     minimumFractionDigits: unit === "%" ? 0 : 0,
@@ -1336,7 +1370,11 @@ async function computeKpiForMunicipality({ kpi, municipalityId, forcedYear }) {
       kpi,
       meta: null,
       municipalityId,
-      year: Number.isFinite(Number(forcedYear)) ? Number(forcedYear) : DEFAULTS.year,
+   Snabb hämtning av ett KPI's aktuella värde, föregående år, jämförelse, och ranking
+ * Utan trenddata (se fetchKpiTrendBundle för det)
+ * 
+ * Använd när du behöver visa huvuddata snabbt (t.ex. tabell-rendering)
+ * Returnerar: { kpi, meta, municipalityId, year, current, previous, refMedian, rank, ... }year,
       current: null,
       previous: null,
       previousYear: null,
@@ -1693,16 +1731,10 @@ function renderBlockTables(blockResults, forcedYear) {
         </div>`;
     })
     .join("");
-
-  container.innerHTML = sections;
-
-  // Setup expand button listeners
-  setupExpandableRowListeners();
-}
-
 /**
- * Setup event listeners för expandera-knappar
- * Vid klick: toggle details-rad, ladda trend vid första öppning
+ * Setup expandera-knapp event-lyssnare för trend-detalj rader
+ * OnClick: Toggle visibility + lazy-load trend-data på första öppning
+ * Använder data-* attribut för att hitta rätt rad och KPI-id
  */
 function setupExpandableRowListeners() {
   document.querySelectorAll(".expand-btn").forEach((btn) => {
@@ -1723,9 +1755,27 @@ function setupExpandableRowListeners() {
         detailRow.style.display = "table-row";
         btn.textContent = "▾";
 
+        // Ladda trend om inte redan gjort (lazy-loading för prestanda)splay !== "none";
+      
+      if (isVisible) {
+        // Dölj details-raden
+        detailRow.style.display = "none";
+        btn.textContent = "▸";
+      } else {
+        // Visa details-raden
+        detailRow.style.display = "table-row";
+        btn.textContent = "▾";
+
         // Ladda trend om inte redan gjort
         const loaded = detailRow.dataset.loaded === "1";
-        if (!loaded) {
+        if (!loaded) {SVG-chart när användare expanderar en KPI-rad
+ * Hämtar 5-års historik och referensdata för att visa utveckling över tid
+ * 
+ * Processuppföljning:
+ * 1. Hämta KPI-definition och metadata från Kolada
+ * 2. Ladda trend bundle (5 år + referenslinje)
+ * 3. Rendera SVG-chart med data points, axlar och labels
+ * 4. Visa ranking om tillgängligt
           await loadAndRenderTrendChart(btn, detailRow);
         }
       }
@@ -1791,10 +1841,14 @@ async function loadAndRenderTrendChart(btn, detailRow) {
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; flex-wrap:wrap;">
           <div style="font-weight:700; color:#0f172a;">Placering: ${rank} av ${total} kommuner</div>
           <div style="background:#eef2ff; color:#312e81; padding:6px 10px; border-radius:8px; font-weight:600;">
-            Övre ${Math.min(100, Math.max(1, percentile))} %
-          </div>
-        </div>`
-      : "";
+            Övre ${Math.minresponsiv SVG linjegraf
+ * Med intelligent fallback-strategi baserad på datamängd
+ * 
+ * Fallback 1: Inga datapunkter - visa informativt meddelande
+ * Fallback 2: En datapunkt - visa som stort värde med kontext
+ * Normal: 2+ datapunkter - rendera full SVG linjegraf med referenslinje
+ * 
+ * Renderar även: nivå-klassificering, trendklassificering, tolkningstext, badges för varningar
 
     const nidLine = `<div style="margin-top:12px; color:#475569; font-size:0.9rem;">NID: ${escapeHtml(kpiId)}</div>`;
     trendContainer.innerHTML = `${rankBadge}${chartHtml}${nidLine}`;

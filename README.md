@@ -4,7 +4,7 @@ En interaktiv webbplattform för analys och visualisering av statistik för Säv
 
 ## 🎯 Om Statistikkompassen
 
-Statistikkompassen är en modern, användarvänlig plattform som samlar och presenterar statistik om utbildning och elevprestationer för Sävsjö kommun. Plattformen möjliggör enkla jämförelser med riket och liknande kommuner för att identifiera trender och utvecklingsområden. 
+Statistikkompassen är en modern, användarvänlig plattform som samlar och presenterar statistik om utbildning och elevprestationer för Sävsjö kommun. Plattformen möjliggör enkla jämförelser med riket och liknande kommuner för att identifiera trender och utvecklingsområden.
 
 ## 📈 Funktioner
 
@@ -30,7 +30,7 @@ Statistikkompassen är en modern, användarvänlig plattform som samlar och pres
    - År-för-år analys med trendvisning
    - Sortering efter kön (kvinnor/män)
 
-## 🎨 Design & Teknik
+### 🎨 Design & Teknik
 
 - **Frontend**: HTML5, CSS3, JavaScript (ES6 modules)
 - **Visualisering**: Chart.js för interaktiva grafer
@@ -38,6 +38,57 @@ Statistikkompassen är en modern, användarvänlig plattform som samlar och pres
 - **Design**: Moderna, responsiva boxar med gradient bakgrund
 - **Färgschema**: Blå, vit och gul
 - **Deployment**: GitHub Actions → GitHub Pages (automatisk vid push till main)
+
+## 🚀 Nya Funktioner: Outcome-Based Labels & Data Validation
+
+### ✅ Outcome-Based Comparison Labels
+**Vad är det?** Smarta jämförelseetiketter som automatiskt justerar sitt ord baserat på om högre eller lägre värden är bättre.
+
+**Exempel:**
+- För **kostnadsmetrikerna** (lägre är bättre): "Sämre än riket" visas i röd färg när kostnaden är HÖGRE
+- För **kvalitetsmetrikerna** (högre är bättre): "Bättre än riket" visas i grön färg när värdet är HÖGRE
+
+**Implementering:** Använder `higherIsBetter` flaggan i KPI-definitioner + `comparisonLabel()` funktionen i page.js
+
+### ✅ Automatiserad Test Suite
+**Vad är det?** Två testverktyg för att validera att dashboard-värdena stämmer överens med Kolada API.
+
+**Node.js CLI Test** (`scripts/test-data-validation.js`):
+- Kör 36 test-cases automatiskt (6 KPIs × 3 kommuner × 2 år)
+- Validerar mot förväntade värden med 0.5% tolerans
+- Genererar detaljerad rapport med pass/fail status
+- Exit codes för CI/CD integration
+
+**Exempel körning:**
+```bash
+node scripts/test-data-validation.js
+```
+
+**Interaktiv HTML Test View** (`test-data-validation.html`):
+- Browser-baserat test-gränssnitt med visuella indikatorer
+- Realtidsvalidation med grön/röd feedback
+- Välj kommun, år och KPI-set fritt
+- Responsive design för alla skärmstorlekar
+
+**Öppna i webbläsare:**
+```bash
+open test-data-validation.html
+# eller direkt: double-click filen
+```
+
+### ✅ Test Documentation
+Se [TEST_VALIDATION_README.md](TEST_VALIDATION_README.md) för:
+- Detaljerad guide för att köra och tolka tester
+- Information om test-data och uppdateringsschema
+- GitHub Actions CI/CD exempel
+- FAQ med vanliga fel och lösningar
+- Framtida roadmap för MCP Kolada live-validation
+
+Se även [TEST_ARCHITECTURE.md](TEST_ARCHITECTURE.md) för:
+- Teknisk arkitektur för test-systemet
+- API-integrationspunkter
+- Datahantering och uppdateringsprocesser
+- Framtida förbättringar och fasplanering
 
 ## 🚀 Funktioner i Betyg Kolada
 
