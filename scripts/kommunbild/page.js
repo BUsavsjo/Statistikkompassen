@@ -641,10 +641,16 @@ async function fetchMunicipalityValueForYear(kpiId, municipalityId, year) {
 async function fetchMunicipalityValueWithFallback(kpiId, municipalityId, year) {
   const primary = await fetchMunicipalityValueForYear(kpiId, municipalityId, year);
   if (primary !== null) return { value: primary, year };
-  // fallback rule: if missing for selected (e.g. 2024), back to 2023.
-  if (Number(year) === 2024) {
-    const fallback = await fetchMunicipalityValueForYear(kpiId, municipalityId, 2023);
-    if (fallback !== null) return { value: fallback, year: 2023 };
+  
+  // Dynamisk fallback: prova upp till 3 år bakåt
+  const requestedYear = Number(year);
+  for (let offset = 1; offset <= 3; offset++) {
+    const fallbackYear = requestedYear - offset;
+    const fallback = await fetchMunicipalityValueForYear(kpiId, municipalityId, fallbackYear);
+    if (fallback !== null) {
+      console.log(`[kommunbild] Fallback: using ${fallbackYear} data for requested year ${year}`);
+      return { value: fallback, year: fallbackYear };
+    }
   }
   return { value: null, year };
 }
@@ -1175,6 +1181,7 @@ async function computeKpiForMunicipality({ kpi, municipalityId, forcedYear }) {
 
     // Comparison is handled separately (and only for rankable KPIs).
     let refMedian = null;
+    let referenceKind = "median"; // median | riket | custom
     let rank = { rank: null, total: 0 };
     let total = 0;
     let comparisonError = null;
@@ -1227,11 +1234,17 @@ async function computeKpiForMunicipality({ kpi, municipalityId, forcedYear }) {
         const riketRef = await fetchMunicipalityValueForYear(kpi.id, "0000", actualYear);
         if (riketRef !== null && riketRef !== undefined) {
           refMedian = numberOrNull(riketRef);
+          referenceKind = "riket";
           console.log(`[kommunbild] Using riket (0000) as refMedian for ${kpi.id}: ${refMedian}`);
         }
       } catch (err) {
         console.warn(`[kommunbild] Riket (0000) fetch failed for ${kpi.id}`, err);
       }
+    }
+
+    // Warn if no comparison data could be derived
+    if (kpi.rankable === true && refMedian === null) {
+      showAnalyzeWarning(`Saknar jämförelsedata (median/riket) för ${kpi.id} ${actualYear}`);
     }
 
     // Fetch 5-year trend for configured KPIs
@@ -1312,6 +1325,7 @@ async function computeKpiForMunicipality({ kpi, municipalityId, forcedYear }) {
       rank,
       total: total || rank.total,
       comparisonError,
+      referenceKind,
       trendData5Years,
       trendReference5Years,
       usedMockData,
@@ -2046,6 +2060,61 @@ function renderTrendChart({ kpiId, label, unit, higherIsBetter = true, spanYears
   return svg;
 }
 
+/**
+ * Genererar outcome-baserad jämförelse-etikett som tar hänsyn till higherIsBetter
+ * @param {number} ownValue - Kommunens värde
+ * @param {number} referenceValue - Referensvärde (riket eller median)
+ * @param {boolean} higherIsBetter - Om högre värde är bättre
+ * @param {string} unit - Enhet (kr, %, antal)
+ * @param {string} referenceKind - Typ av referens ('riket', 'median', 'custom')
+ * @returns {{ text: string, color: string, tooltip: string }}
+ */
+function comparisonLabel(ownValue, referenceValue, higherIsBetter, unit, referenceKind = 'riket') {
+  if (ownValue === null || referenceValue === null) {
+    return { text: "–", color: "#94a3b8", tooltip: "" };
+  }
+
+  const diff = ownValue - referenceValue;
+  const tolerance = Math.abs(referenceValue) * 0.05; // 5% tolerans
+  const refLabel = referenceKind === 'riket' ? 'riket' : (referenceKind === 'median' ? 'medianen' : 'referensen');
+
+  // I nivå med referensen
+  if (Math.abs(diff) <= tolerance) {
+    return {
+      text: `I nivå med ${refLabel}`,
+      color: "#0284c7",
+      tooltip: `Kommunens värde ligger inom ±5% av ${refLabel} (${formatValue(referenceValue, unit)})`
+    };
+  }
+
+  // Bestäm om skillnaden är bättre eller sämre
+  const isBetter = higherIsBetter ? (diff > 0) : (diff < 0);
+  const absDiff = Math.abs(diff);
+  const diffFormatted = unit === '%' 
+    ? `${absDiff.toFixed(1)} procentenheter`
+    : unit === 'kr'
+      ? `${Math.round(absDiff).toLocaleString('sv-SE')} kr`
+      : `${absDiff.toFixed(1)}`;
+
+  if (isBetter) {
+    // Bättre än referensen
+    const direction = higherIsBetter ? 'högre' : 'lägre';
+    return {
+      text: `Bättre än ${refLabel}`,
+      color: "#16a34a",
+      tooltip: `Kommunen ligger ${diffFormatted} ${direction} än ${refLabel} (${formatValue(referenceValue, unit)}). ${higherIsBetter ? 'Högre värde är bättre.' : 'Lägre värde är bättre.'}`
+    };
+  } else {
+    // Sämre än referensen
+    const direction = higherIsBetter ? 'lägre' : 'högre';
+    return {
+      text: `Sämre än ${refLabel}`,
+      color: "#dc2626",
+      tooltip: `Kommunen ligger ${diffFormatted} ${direction} än ${refLabel} (${formatValue(referenceValue, unit)}). ${higherIsBetter ? 'Högre värde är bättre.' : 'Lägre värde är bättre.'}`
+    };
+  }
+}
+
 function renderOrgTable(rows) {
   const container = document.getElementById("orgTableContainer");
   if (!container) return;
@@ -2076,25 +2145,19 @@ function renderOrgTable(rows) {
       const delta = formatDelta(r.current, r.previous, r.kpi.unit, r.trendData5Years, r.kpi.higherIsBetter);
       const deltaTooltip = delta.isLargeChange ? "title=\"Större än normal variation\"" : "";
       const riketValue = r.riketValue !== null && r.riketValue !== undefined ? formatValue(r.riketValue, r.kpi.unit) : "–";
-      // Prefer riket-based analysis when available; otherwise fallback to level/trend interpretation
+      
+      // Use comparisonLabel for outcome-based analysis
       let analysisText = "–";
       let analysisColor = "#94a3b8";
+      let analysisTooltip = "";
+      
       if (r.current !== null && r.riketValue !== null) {
-        const diff = r.current - r.riketValue;
-        const tolerance = Math.abs(r.riketValue) * 0.05;
-        if (Math.abs(diff) <= tolerance) {
-          analysisText = "I nivå med riket";
-          analysisColor = "#0284c7";
-        } else {
-          if (diff < 0) {
-            analysisText = "Lägre än riket";
-          } else {
-            analysisText = "Högre än riket";
-          }
-          const better = r.kpi.higherIsBetter ? (diff > 0) : (diff < 0);
-          analysisColor = better ? "#16a34a" : "#dc2626";
-        }
+        const comparison = comparisonLabel(r.current, r.riketValue, r.kpi.higherIsBetter, r.kpi.unit, 'riket');
+        analysisText = comparison.text;
+        analysisColor = comparison.color;
+        analysisTooltip = comparison.tooltip;
       } else {
+        // Fallback: level/trend interpretation när riket-data saknas
         const level = classifyLevel(r.current);
         const trend = classifyTrend(r.current, r.previous);
         const interpretation = buildInterpretation(level.band, trend.dir, trend.strength);
@@ -2107,7 +2170,7 @@ function renderOrgTable(rows) {
           <td style="padding:10px 12px; font-weight:600; color:#0f172a;">${escapeHtml(r.kpi.label)}</td>
           <td style="padding:10px 12px;">${escapeHtml(formatValue(r.current, r.kpi.unit))}</td>
           <td style="padding:10px 12px; color:#64748b;">${escapeHtml(riketValue)}</td>
-          <td style="padding:10px 12px; color:${analysisColor}; font-weight:600;">${escapeHtml(analysisText)}</td>
+          <td style="padding:10px 12px; color:${analysisColor}; font-weight:600; cursor:help;" title="${escapeHtml(analysisTooltip)}">${escapeHtml(analysisText)}</td>
           <td style="padding:10px 12px;">${escapeHtml(String(r.year ?? "–"))}</td>
           <td style="padding:10px 12px;" class="${delta.className}" ${deltaTooltip}>${escapeHtml(delta.text)}</td>
           <td style="padding:10px 12px; opacity:.8;">${escapeHtml(r.kpi.id)}</td>
@@ -2244,7 +2307,10 @@ async function onMunicipalityChange() {
     // Erbjud ett fåtal år bakåt, men inkludera även aktuellt år.
     // OBS: Kolada publicerar inte alltid data för senaste år direkt, men användaren ska kunna välja det.
     const nowYear = new Date().getFullYear();
-    const suggestedYears = Array.from(new Set([nowYear + 1, nowYear, 2024, 2023, 2022, 2021, 2020])).sort((a, b) => b - a);
+    const suggestedYears = [];
+    for (let y = nowYear + 1; y >= nowYear - 6; y--) {
+      suggestedYears.push(y);
+    }
     const yearSelect = $("qualityYearSelect");
     const selectedYear = yearSelect && yearSelect.value ? Number(yearSelect.value) : DEFAULTS.year;
     setYearSelectState({ disabled: false, options: suggestedYears, selected: selectedYear });
